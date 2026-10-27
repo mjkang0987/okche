@@ -3,6 +3,7 @@ import SwiftUI
 // 탭 첫 화면들. 내용은 6단계부터 채운다.
 
 struct RecordTab: View {
+    // 위 20은 디자인 일기 화면 값(토큰에 20이 없음).
     var body: some View { TabScreen(title: "승정원일기", subtitle: "매일 기록", topPadding: 20) }
 }
 

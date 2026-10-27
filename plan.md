@@ -5,10 +5,20 @@
 
 ## 지금 하는 일
 
-**4단계 — iOS 뼈대** (브랜치: `feature/ios-skeleton`, 아직 안 만듦)
+**4단계 — iOS 뼈대** (브랜치: `feature/ios-skeleton`)
 
-- 요구사항: Xcode 프로젝트(SwiftUI, iOS 17+, 번들 ID `app.okche`), 하단 탭 5개(일기·문안·실록·어진첩·더보기), `design/generated/OkcheTokens.swift` 연결. 저장은 SwiftData로 `docs/data-model.md`대로.
-- 구현 방식·영향받는 파일·예상 결과: 시작할 때 이 자리에 적고 검토받는다.
+- 요구사항: Xcode 프로젝트(SwiftUI, iOS 17+, 번들 ID `app.okche`), 하단 탭 5개(일기·문안·실록·어진첩·더보기), `design/generated/OkcheTokens.swift` 연결.
+- 범위 나눔 (2026-10-28): SwiftData 저장(모델·하루 기준·고정 ID)은 뼈대와 따로 '4-1 iOS 저장'으로 뺀다. 가장 작은 단위로 나누기 위해서.
+- 구현 방식:
+  - XcodeGen `ios/project.yml` → `ios/Okche.xcodeproj` 생성(둘 다 저장소에 넣어 Xcode로 바로 열리게). 토큰 파일은 복사하지 않고 `design/generated/OkcheTokens.swift`를 그대로 소스로 잇는다.
+  - 시스템 `TabView` + SF Symbols 아이콘(네이티브 우선). 선택 색 `namsaek`, 안 고른 색 `inkMuted`, 글자 12.
+  - 탭 첫 화면 머리: 제목 28(`display`) + 쉬운 말(14, `inkMuted`), 화면 좌우 16 — 디자인 Record·Main·Album·More와 같게. 실록은 아이가 없으니 '실록'.
+  - 글자: `OkcheType` → 글자 크기가 시스템 글자 크기 설정을 따라 커지게(`@ScaledMetric`). 고운바탕 글꼴 파일이 없으면 시스템 글꼴로 그린다(파일 받기는 사용자 허락 뒤).
+  - 밝은 화면만(`UIUserInterfaceStyle` Light) — 토큰이 밝은 한 벌뿐. 시작 화면 바탕 `hanji`.
+  - 앱 버전 `MARKETING_VERSION`은 `VERSION`과 같게, 테스트로 확인.
+- 영향받는 파일: `ios/` 새로 만듦, `.gitignore`(Xcode 사용자 파일·빌드), `index.md`, `plan.md`.
+- 예상 결과: 시뮬레이터에서 탭 5개가 뜨고 눌러 바뀜, 각 탭에 제목만 있는 빈 화면. 빌드·테스트 통과. 디자인과 다른 점은 아래 '디자인 대조'에 적는다.
+- 하지 않음: 앱 아이콘, 글꼴 파일, 저장(4-1), 화면 내용.
 - 3단계 데이터 구조는 끝남(아래 '끝난 일'). 디자인 남은 것 정리 때 캔버스 판 1793090186-890c → 데이터 구조 검토 반영 뒤 1793110210-fe6a.
 - **다음에 할 것** (순서대로):
   1. 준비: `index.md`·`plan.md`·`docs/data-model.md` 읽기. 디자인을 고칠 일이 있으면 `design/README.md`의 '새 세션에서 준비하기'.

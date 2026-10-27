@@ -64,9 +64,9 @@ enum OkcheRadius {
 }
 
 enum OkcheFontFamily {
-    /// 고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구
+    /// Gowun Batang — 화면 제목의 조선식 이름, 아이 이름, 축하 문구
     case display
-    /// 시스템 글꼴 — 나머지 전부
+    /// Noto Sans KR — 나머지 전부 (앱에서는 시스템 글꼴을 써도 됨)
     case sans
 }
 

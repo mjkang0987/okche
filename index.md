@@ -47,14 +47,14 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 | `plan.md` | 있음 | 작업 계획 |
 | `.gitignore` | 있음 | 파이썬 캐시·맥 파일 무시 |
 | `VERSION` | 있음 | 앱 버전 (지금 `0.1.0`) |
-| `docs/` | 계획 | 데이터 구조, 규칙(하루 기준 새벽 6시 등) 문서 |
-| `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt` (자세한 건 `design/README.md`) |
+| `docs/` | 있음 | `data-model.md` 데이터 구조(검토 중 — `feature/data-model` 브랜치) |
+| `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt`, 디자인 가이드 검사 `canvas-check/` (자세한 건 `design/README.md`) |
 | `ios/` | 계획 | Xcode 프로젝트 (SwiftUI) |
 | `android/` | 계획 | Android Studio 프로젝트 (Jetpack Compose) |
 
 ## 현재 상태
 
-- 디자인: 완성 디자인 페이지 기준 화면 설계 완료 (2026-10-27). 남은 디자인: 축하 카드 '쉬운 말' 문구 7종, 보류 중인 추억 쪽 '편지 써 보기'·'도움 받을 곳'.
+- 디자인: 완성 디자인 페이지 기준 화면 설계 완료 (2026-10-27). **화면 72개 모두 디자인 가이드 값으로 맞춤**(2026-10-27, 검사 결과 0 — 예외는 `design/README.md`). 남은 디자인: 인슐린 '건너뜀' 누른 뒤 상태, 축하 카드 '쉬운 말' 문구 7종, 보류 중인 추억 쪽 '편지 써 보기'·'도움 받을 곳'.
 - 코드: 디자인 토큰 생성(2단계) 완료. 다음은 3단계 데이터 구조. iOS·안드로이드 프로젝트는 아직 없음.
 
 ## 브랜치 규칙

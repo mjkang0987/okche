@@ -21,7 +21,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,7 +49,11 @@ fun RootTabs() {
         bottomBar = {
             // 디자인의 탭 막대: 흰 바탕, 위 가는 선(line), 선택 알약 표시 없음.
             NavigationBar(
-                Modifier.drawBehind { drawLine(OkcheColor.Line, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) },
+                Modifier.drawWithContent {
+                    drawContent()
+                    val stroke = 1.dp.toPx()
+                    drawLine(OkcheColor.Line, Offset(0f, stroke / 2), Offset(size.width, stroke / 2), stroke)
+                },
                 containerColor = OkcheColor.Paper,
                 tonalElevation = 0.dp,
             ) {
@@ -69,7 +73,7 @@ fun RootTabs() {
                                 color = { color },
                                 softWrap = false,
                                 maxLines = 1,
-                                autoSize = TextAutoSize.StepBased(maxFontSize = style.fontSize),
+                                autoSize = TextAutoSize.StepBased(minFontSize = style.fontSize * 0.6f, maxFontSize = style.fontSize),
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(

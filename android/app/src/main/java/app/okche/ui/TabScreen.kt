@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -43,12 +44,13 @@ fun TabScreen(
         FlowRow(
             Modifier.semantics(mergeDescendants = true) { heading() },
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
+            verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
         ) {
             // 제목은 낱말 중간에서 끊지 않고, 너무 길면 한 줄 안에서 글자를 줄인다(iOS minimumScaleFactor 0.5와 같음).
             val display = OkcheType.Display.toTextStyle()
             BasicText(
                 title,
-                Modifier.alignByBaseline(),
+                Modifier.testTag("tabTitle").alignByBaseline().singleLineHeight(display.lineHeight),
                 style = display.copy(color = OkcheColor.Ink),
                 maxLines = 1,
                 autoSize = TextAutoSize.StepBased(minFontSize = display.fontSize / 2, maxFontSize = display.fontSize),

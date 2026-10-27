@@ -26,6 +26,15 @@ android {
         assets.directories += "../../design/fonts"
     }
 
+    buildTypes {
+        release {
+            // 아이콘 묶음(material-icons-extended)에서 쓰는 5개만 남기고 줄인다.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -42,7 +51,6 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
-    debugImplementation(libs.compose.ui.tooling)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

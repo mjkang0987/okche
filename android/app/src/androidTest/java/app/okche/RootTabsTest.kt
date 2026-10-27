@@ -6,14 +6,18 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.AnnotatedString
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.WindowCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.ui.theme.OkcheColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -27,13 +31,35 @@ class RootTabsTest {
         rule.onNode(heading.and(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(
             AnnotatedString("승정원일기"), AnnotatedString("매일 기록"),
         )))).assertExists()
-        for ((tab, title) in listOf("문안" to "문안", "실록" to "실록", "어진첩" to "어진첩", "더보기" to "더보기", "일기" to "승정원일기")) {
+        // 탭 이름, 제목, 쉬운 말이 있는지(문안은 날짜)
+        for ((tab, title, hasSubtitle) in listOf(
+            Triple("문안", "문안", true), Triple("실록", "실록", false), Triple("어진첩", "어진첩", true),
+            Triple("더보기", "더보기", false), Triple("일기", "승정원일기", true),
+        )) {
             rule.onNode(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
                 .and(SemanticsMatcher("label $tab") { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == tab } == true }))
                 .performClick().assertIsSelected()
             rule.onNode(heading.and(SemanticsMatcher("title $title") { n ->
-                n.config.getOrNull(SemanticsProperties.Text)?.first()?.text == title
+                val texts = n.config.getOrNull(SemanticsProperties.Text).orEmpty()
+                texts.firstOrNull()?.text == title && (texts.size == 2) == hasSubtitle
             })).assertExists()
+        }
+    }
+
+    /** 제목 줄 높이가 토큰 값(28/36)인지 — 고운바탕 기본 줄 높이(40.5)로 커지지 않게. */
+    @Test fun titleLineHeightMatchesToken() {
+        val height = rule.onNodeWithTag("tabTitle", useUnmergedTree = true).getBoundsInRoot().let { it.bottom - it.top }
+        val fontScale = rule.activity.resources.configuration.fontScale
+        assertEquals(1f, fontScale)
+        assertEquals(36f, height.value, 0.5f)
+    }
+
+    /** 기기가 다크 모드여도 상태바 아이콘이 어두운 색(밝은 바탕용)인지. */
+    @Test fun systemBarsStayLight() {
+        rule.activityRule.scenario.onActivity { activity ->
+            val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+            assertTrue(controller.isAppearanceLightStatusBars)
+            assertTrue(controller.isAppearanceLightNavigationBars)
         }
     }
 

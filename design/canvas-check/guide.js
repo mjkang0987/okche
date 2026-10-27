@@ -35,7 +35,7 @@ const names=process.argv.slice(2).length?process.argv.slice(2):Object.keys(canva
           else if(txt){ if(h!==40&&h!==52&&h<56) add('높이',e,h+'px'); }
           else if(h!==44&&h!==40&&h!==52) add('아이콘버튼높이',e,h+'px');
           const bg=rgb(cs.backgroundColor); if(bg&&bg.k==='47,75,124'&&(tag==='BUTTON'||tag==='A')) navy++; }
-        const rad=parseFloat(cs.borderTopLeftRadius); if(rad && !R.has(rad) && !(Math.abs(rad-Math.min(r.width,r.height)/2)<1) && rad<999) add('모서리',e,rad+'px');
+        const rad=parseFloat(cs.borderTopLeftRadius); if(rad && !cs.borderTopLeftRadius.endsWith('%') && !R.has(rad) && !(Math.abs(rad-Math.min(r.width,r.height)/2)<1) && rad<999) add('모서리',e,rad+'px');
       }
       if(navy>1) issues.push('남색 꽉 찬 버튼 '+navy+'개');
       return issues;

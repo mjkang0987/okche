@@ -58,8 +58,8 @@ python3 -m unittest discover -s design
 **새 세션에서 준비하기** (세션 임시 폴더는 세션이 끝나면 사라진다)
 
 1. 캔버스 파일 받기: Artifact 도구로 https://claude.ai/artifact/XyeFEyC6D7ZUqkg5Zbz4nM 의 `project/` 파일과 `artifact-type/dc-runtime.js`를 읽어 저장한다(`action: read`, `paths`, `out_dir`). `DESIGN`은 `project/` 폴더, `RUNTIME`은 `dc-runtime.js` 경로.
-2. 리액트 받기: 빈 폴더에서 `npm i react@18.3.1 react-dom@18.3.1` → 그 `node_modules`가 `MODULES`.
-3. 브라우저(크로미움·playwright)는 작업 환경에 이미 있다.
+2. 리액트·playwright 받기: 빈 폴더에서 `npm i react@18.3.1 react-dom@18.3.1 playwright` → 그 `node_modules`가 `MODULES`. 실행할 때 `NODE_PATH=$MODULES`를 같이 준다.
+3. 브라우저가 없으면 그 폴더에서 `npx playwright install chromium`.
 4. 고친 화면을 캔버스에 올리기 전에, 올라가 있는 판을 먼저 읽고 바뀐 게 없는지 비교한 뒤 올린다(남이 고친 걸 덮어쓰지 않게).
 
 ```sh

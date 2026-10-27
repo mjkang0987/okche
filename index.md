@@ -46,6 +46,7 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 | `index.md` | 있음 | 이 문서 |
 | `plan.md` | 있음 | 작업 계획 |
 | `.gitignore` | 있음 | 파이썬 캐시·맥 파일 무시 |
+| `VERSION` | 있음 | 앱 버전 (지금 `0.1.0`) |
 | `docs/` | 계획 | 데이터 구조, 규칙(하루 기준 새벽 6시 등) 문서 |
 | `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt` (자세한 건 `design/README.md`) |
 | `ios/` | 계획 | Xcode 프로젝트 (SwiftUI) |
@@ -62,4 +63,4 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 - `dev`: 통합 브랜치. 기능 브랜치를 여기로 머지하고 다시 검증한다.
 - `feature/<짧은-이름>`: `dev`에서 만든다. 가장 작은 단위의 작업 하나씩.
 - 커밋 메시지는 한국어 + Conventional Commits 접두사(`feat:`, `fix:`, `docs:`, `chore:` …), 커밋 후 바로 푸시.
-- PR 머지 때 변경 규모(Patch / Minor / Major)에 맞춰 버전을 올린다.
+- 버전은 저장소 맨 위 `VERSION` 파일 하나로 관리한다(유의적 버전 `주.부.수`, 지금 `0.1.0`). `main`으로 PR을 머지할 때 변경 규모에 맞춰 올린다: 고침만 → 수(Patch), 기능 추가 → 부(Minor), 호환 안 되는 큰 변화 → 주(Major). iOS·안드로이드 프로젝트가 생기면 앱 버전을 이 파일 값에 맞춘다.

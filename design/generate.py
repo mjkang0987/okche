@@ -24,6 +24,12 @@ NAME_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 HEX_RE = re.compile(r"#([0-9A-Fa-f]{6})")
 PX_RE = re.compile(r"(\d+(?:\.\d+)?)px")
 FAMILIES = ("display", "sans")
+FAMILY_ROLE = {"display": "화면 제목의 조선식 이름, 아이 이름, 축하 문구", "sans": "나머지 전부"}
+# Swift 식별자로 쓸 수 없는 낱말 (Kotlin은 대문자로 시작하는 이름이라 겹치지 않음)
+SWIFT_KEYWORDS = frozenset("""associatedtype class deinit enum extension fileprivate func import init inout internal let open
+operator private precedencegroup protocol public rethrows static struct subscript typealias var break case catch continue
+default defer do else fallthrough for guard if in repeat return throw switch where while as any false is nil self super
+throws true try""".split())
 SWIFT_WEIGHTS = {100: "ultraLight", 200: "thin", 300: "light", 400: "regular", 500: "medium",
                  600: "semibold", 700: "bold", 800: "heavy", 900: "black"}
 
@@ -38,6 +44,8 @@ class TokenError(ValueError):
 def check_name(name):
     if not isinstance(name, str) or not NAME_RE.fullmatch(name):
         raise TokenError(f"토큰 이름 형식이 맞지 않음: {name!r}")
+    if name in SWIFT_KEYWORDS:
+        raise TokenError(f"Swift 예약어라 토큰 이름으로 쓸 수 없음: {name!r}")
     return name
 
 
@@ -69,11 +77,13 @@ def comment(text):
 
 
 def unique(items, kind):
-    seen = set()
+    # 하이픈을 지운 코드 이름 기준으로 본다 (space-1-0 과 space-10 은 둘 다 space10)
+    seen = {}
     for it in items:
-        if it["name"] in seen:
-            raise TokenError(f"{kind} 토큰 이름이 겹침: {it['name']}")
-        seen.add(it["name"])
+        ident = camel(it["name"])
+        if ident in seen:
+            raise TokenError(f"{kind} 토큰 이름이 코드에서 겹침: {seen[ident]} / {it['name']}")
+        seen[ident] = it["name"]
     return items
 
 
@@ -86,6 +96,9 @@ def load(data):
                           for t in data["spacing"]["tokens"]], "간격")
         radius = unique([{"name": check_name(t["name"]), "px": px(t["value"]), "usage": comment(t.get("usage"))}
                          for t in data["radius"]["tokens"]], "모서리")
+        families = data["type"]["families"]
+        if set(families) != set(FAMILIES):
+            raise TokenError(f"글꼴 종류는 {FAMILIES} 이어야 함: {sorted(families)}")
         styles = []
         for group in data["type"]["groups"]:
             family = group["family"]
@@ -93,19 +106,25 @@ def load(data):
                 raise TokenError(f"알 수 없는 글꼴 종류: {family!r}")
             for s in group["styles"]:
                 weight = s["fontWeight"]
-                if weight not in SWIFT_WEIGHTS:
+                if type(weight) is not int or weight not in SWIFT_WEIGHTS:
                     raise TokenError(f"글자 굵기는 100~900 사이 100 단위여야 함: {weight!r}")
                 styles.append({"name": check_name(s["name"]), "family": family, "size": px(s["fontSize"]),
                                "line": px(s["lineHeight"]), "weight": weight})
         unique(styles, "글자")
     except (KeyError, TypeError) as e:
         raise TokenError(f"tokens.json 구조가 맞지 않음: {e!r}") from e
-    return {"name": data.get("name", ""), "version": data.get("version", ""), "colors": colors,
+    fonts = {f: first_font(families[f]) for f in FAMILIES}
+    return {"name": data.get("name", ""), "version": data.get("version", ""), "fonts": fonts, "colors": colors,
             "spacing": spacing, "radius": radius, "styles": styles}
 
 
-def num(v):
-    return str(v)
+def first_font(stack):
+    """'\"Gowun Batang\", serif' → 'Gowun Batang' (주석에만 씀)."""
+    return comment(str(stack).split(",")[0].strip().strip('"\''))
+
+
+def family_doc(t, f):
+    return f"{t['fonts'][f]} — {FAMILY_ROLE[f]}"
 
 
 def swift(t):
@@ -118,14 +137,14 @@ def swift(t):
     for title, key in (("OkcheSpacing", "spacing"), ("OkcheRadius", "radius")):
         out += ["}", "", f"enum {title} {{"]
         for s in t[key]:
-            out += [f"    /// {s['usage']}" if s["usage"] else None, f"    static let {camel(s['name'])}: CGFloat = {num(s['px'])}"]
-    out += ["}", "", "enum OkcheFontFamily {", "    /// 고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구", "    case display",
-            "    /// 시스템 글꼴 — 나머지 전부", "    case sans", "}", "",
+            out += [f"    /// {s['usage']}" if s["usage"] else None, f"    static let {camel(s['name'])}: CGFloat = {s['px']}"]
+    out += ["}", "", "enum OkcheFontFamily {", f"    /// {family_doc(t, 'display')}", "    case display",
+            f"    /// {family_doc(t, 'sans')} (앱에서는 시스템 글꼴을 써도 됨)", "    case sans", "}", "",
             "struct OkcheTextStyle {", "    let family: OkcheFontFamily", "    let size: CGFloat", "    let lineHeight: CGFloat",
             "    let weight: Font.Weight", "}", "", "enum OkcheType {"]
     for s in t["styles"]:
-        out.append(f"    static let {camel(s['name'])} = OkcheTextStyle(family: .{s['family']}, size: {num(s['size'])}, "
-                   f"lineHeight: {num(s['line'])}, weight: .{SWIFT_WEIGHTS[s['weight']]})")
+        out.append(f"    static let {camel(s['name'])} = OkcheTextStyle(family: .{s['family']}, size: {s['size']}, "
+                   f"lineHeight: {s['line']}, weight: .{SWIFT_WEIGHTS[s['weight']]})")
     out += ["}", ""]
     return "\n".join(line for line in out if line is not None)
 
@@ -142,14 +161,14 @@ def kotlin(t):
     for title, key in (("OkcheSpacing", "spacing"), ("OkcheRadius", "radius")):
         out += ["}", "", f"object {title} {{"]
         for s in t[key]:
-            out += [f"    // {s['usage']}" if s["usage"] else None, f"    val {camel(s['name'], upper=True)} = {num(s['px'])}.dp"]
-    out += ["}", "", "enum class OkcheFontFamily {", "    // 고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구", "    Display,",
-            "    // 시스템 글꼴 — 나머지 전부", "    Sans,", "}", "",
+            out += [f"    // {s['usage']}" if s["usage"] else None, f"    val {camel(s['name'], upper=True)} = {s['px']}.dp"]
+    out += ["}", "", "enum class OkcheFontFamily {", f"    // {family_doc(t, 'display')}", "    Display,",
+            f"    // {family_doc(t, 'sans')} (앱에서는 시스템 글꼴을 써도 됨)", "    Sans,", "}", "",
             "data class OkcheTextStyle(", "    val family: OkcheFontFamily,", "    val fontSize: TextUnit,",
             "    val lineHeight: TextUnit,", "    val fontWeight: FontWeight,", ")", "", "object OkcheType {"]
     for s in t["styles"]:
         out.append(f"    val {camel(s['name'], upper=True)} = OkcheTextStyle(OkcheFontFamily.{s['family'].capitalize()}, "
-                   f"{num(s['size'])}.sp, {num(s['line'])}.sp, FontWeight.W{s['weight']})")
+                   f"{s['size']}.sp, {s['line']}.sp, FontWeight.W{s['weight']})")
     out += ["}", ""]
     return "\n".join(line for line in out if line is not None)
 
@@ -176,13 +195,14 @@ def run(check=False, source=SOURCE, out_dir=OUT_DIR):
     return 0
 
 
-def main(argv=None):
+def main(argv=None, source=SOURCE, out_dir=OUT_DIR):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--check", action="store_true", help="생성 파일이 최신인지 확인만 한다")
     args = p.parse_args(argv)
     try:
-        return run(check=args.check)
-    except TokenError as e:
+        return run(check=args.check, source=source, out_dir=out_dir)
+    except (TokenError, OSError, json.JSONDecodeError) as e:
+        # 2 = tokens.json 문제, 1 = 생성 파일이 오래됨 (--check)
         print(f"토큰 오류: {e}", file=sys.stderr)
         return 2
 

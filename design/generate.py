@@ -17,7 +17,7 @@ SOURCE = ROOT / "tokens.json"
 OUT_DIR = ROOT / "generated"
 SWIFT_FILE = "OkcheTokens.swift"
 KOTLIN_FILE = "OkcheTokens.kt"
-KOTLIN_PACKAGE = "kr.pikaworks.okche.ui.theme"  # 앱 ID 확정 전 가정값 (plan.md 2단계)
+KOTLIN_PACKAGE = "app.okche.ui.theme"  # 앱 ID app.okche (2026-10-27 확정)
 
 # 토큰 이름은 그대로 코드 식별자가 되므로 좁게 허용한다 (코드 주입 방지).
 NAME_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")

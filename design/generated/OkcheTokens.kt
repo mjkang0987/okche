@@ -2,7 +2,7 @@
 // design/tokens.json을 고친 뒤 `python3 design/generate.py`를 실행한다.
 // 원본: 옥체 디자인 토큰 v1
 
-package kr.pikaworks.okche.ui.theme
+package app.okche.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight

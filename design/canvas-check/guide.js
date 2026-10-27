@@ -45,7 +45,7 @@ const names=process.argv.slice(2).length?process.argv.slice(2):Object.keys(canva
   await b.close(); fs.writeFileSync(OUT+'/guide.json',JSON.stringify(out,null,1));
   // 가이드 예외(이유는 design/README.md): 0.85배 쉬운 말, 그래프 막대·눈금, 위젯 모서리, PDF 미리보기, 털색, 카메라 화면, 사진 칸, 온보딩 글자 로고, 일기 혈당 입력칸 56
   const OK=[/^글자크기 (13\.6|10\.2|11\.9|12\.75)px/,/^모서리 (3|22)px/,/^글자크기 8px/];
-  const EX={Profile:/^색 backgroundColor/,BodyCamera:/^(색|아이콘)/,Memory:/^아이콘/,Memorial:/^아이콘/,PhotoAdd:/^아이콘/,Onboarding:/^글자크기 56px/,RecordGlucose:/^아이콘버튼높이 56px :: INPUT/,RecordInsulinDone:/^아이콘버튼높이 56px :: INPUT/};
+  const EX={Profile:/^색 backgroundColor/,BodyCamera:/^(색|아이콘)/,Memory:/^아이콘/,Memorial:/^아이콘/,PhotoAdd:/^아이콘/,Onboarding:/^글자크기 56px/,RecordGlucose:/^아이콘버튼높이 56px :: INPUT/,RecordInsulinDone:/^아이콘버튼높이 56px :: INPUT/,RecordInsulinSkip:/^아이콘버튼높이 56px :: INPUT/};
   for(const n of Object.keys(out)) out[n]=out[n].filter(i=>!OK.some(r=>r.test(i))&&!(EX[n]&&EX[n].test(i)));
   const total=Object.values(out).reduce((a,v)=>a+v.length,0); console.log('가이드 어긴 곳', total);
   const tally={}; for(const [n,is] of Object.entries(out)) for(const i of is){const k=i.split(' :: ')[0]; (tally[k]=tally[k]||new Set()).add(n);}

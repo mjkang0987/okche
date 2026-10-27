@@ -9,7 +9,8 @@
 
 - 만든 곳: 피카웍스(Pikaworks)
 - 플랫폼: iOS(Swift) · 안드로이드(Kotlin) 동시 개발
-- 서버: Supabase (구독 기능부터 사용 — plan.md 참고)
+- 서버: 없음 — 기록은 기기에 저장, 본인 iCloud·구글 드라이브로 백업
+- 가격: 무료 + 1회 결제(전체 기간 열기 7,900원), 구독 없음
 
 ## 참고 자료
 
@@ -47,7 +48,6 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 | `design/` | 계획 | 디자인 토큰(JSON) — iOS·안드로이드가 같은 값을 쓰도록 |
 | `ios/` | 계획 | Xcode 프로젝트 (SwiftUI) |
 | `android/` | 계획 | Android Studio 프로젝트 (Jetpack Compose) |
-| `supabase/` | 계획 | 마이그레이션·정책 (구독 기능 단계) |
 
 ## 현재 상태
 

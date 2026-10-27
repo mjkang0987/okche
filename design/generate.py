@@ -30,6 +30,8 @@ SWIFT_KEYWORDS = frozenset("""associatedtype class deinit enum extension filepri
 operator private precedencegroup protocol public rethrows static struct subscript typealias var break case catch continue
 default defer do else fallthrough for guard if in repeat return throw switch where while as any false is nil self super
 throws true try""".split())
+# 생성 Kotlin 파일이 쓰는 타입 이름과 같은 PascalCase 이름은 막는다 (예: font-weight → FontWeight)
+KOTLIN_TYPES = frozenset({"Color", "FontWeight", "TextUnit", "OkcheTextStyle", "OkcheFontFamily"})
 SWIFT_WEIGHTS = {100: "ultraLight", 200: "thin", 300: "light", 400: "regular", 500: "medium",
                  600: "semibold", 700: "bold", 800: "heavy", 900: "black"}
 
@@ -81,6 +83,8 @@ def unique(items, kind):
     seen = {}
     for it in items:
         ident = camel(it["name"])
+        if camel(it["name"], upper=True) in KOTLIN_TYPES:
+            raise TokenError(f"Kotlin 타입 이름과 겹쳐 쓸 수 없음: {it['name']}")
         if ident in seen:
             raise TokenError(f"{kind} 토큰 이름이 코드에서 겹침: {seen[ident]} / {it['name']}")
         seen[ident] = it["name"]

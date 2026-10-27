@@ -58,8 +58,8 @@
 
 ## 끝난 일
 
-- 2026-10-28 고운바탕 글꼴(사용자 허락): `design/res/font/gowun_batang_bold.ttf`(Google Fonts 원본, 8.2MB — 사용자 입력 이름 때문에 서브셋 안 함)·`design/fonts/OFL-GowunBatang.txt`. iOS 리소스·`UIAppFonts` 등록, 줄 높이를 토큰 값(28 → 36)에 맞춤(글꼴 기본 40.5). 테스트로 글꼴·라이선스 들어갔는지 확인.
-- 2026-10-28 4단계 iOS 뼈대·`dev` 합침: `ios/`(XcodeGen `project.yml` → `Okche.xcodeproj`, SwiftUI, iOS 17+, `app.okche`, 앱 언어 한국어), 하단 탭 5개(평평한 탭 막대 — `UIDesignRequiresCompatibility`, Apple이 다음 큰 버전에서 없앨 예정), 탭 첫 화면 머리(제목 28·쉬운 말 14, 큰 글자에서 낱말 안 끊김, VoiceOver 한 머리말), 토큰 파일 직접 연결. 테스트 3개(버전=`VERSION`, 에셋 색=토큰, 한국어). 리뷰·검증 3회. 디자인과 다른 점: 탭 높이 시스템 값, SF Symbols 아이콘, 탭 글자 큰 글자 미적용(받아들임) / 고운바탕 글꼴, '콩이실록' 제목, 문안 날짜 6시 기준(나중에).
+- 2026-10-28 고운바탕 글꼴(사용자 허락): `design/res/font/gowun_batang_bold.ttf`(Google Fonts 원본, 8.2MB — 사용자 입력 이름 때문에 서브셋 안 함)·`design/fonts/OFL-GowunBatang.txt`. iOS 리소스·`UIAppFonts` 등록, 줄 높이를 토큰 값(28 → 36, 22 → 30)에 맞춤(글꼴 기본 40.5) — 한 줄 기준, 여러 줄은 둘째 줄부터 40.5(코드 shortcut 주석). 테스트로 글꼴·라이선스 들어갔는지 확인.
+- 2026-10-28 4단계 iOS 뼈대·`dev` 합침: `ios/`(XcodeGen `project.yml` → `Okche.xcodeproj`, SwiftUI, iOS 17+, `app.okche`, 앱 언어 한국어), 하단 탭 5개(평평한 탭 막대 — `UIDesignRequiresCompatibility`, Apple이 다음 큰 버전에서 없앨 예정), 탭 첫 화면 머리(제목 28·쉬운 말 14, 큰 글자에서 낱말 안 끊김, VoiceOver 한 머리말), 토큰 파일 직접 연결. 테스트 3개(버전=`VERSION`, 에셋 색=토큰, 한국어). 리뷰·검증 3회. 디자인과 다른 점: 탭 높이 시스템 값, SF Symbols 아이콘, 탭 글자 큰 글자 미적용(받아들임) / 고운바탕 글꼴(→ 2026-10-28 넣음), '콩이실록' 제목, 문안 날짜 6시 기준(나중에).
 
 - 2026-10-27 3단계 데이터 구조 확정·`dev` 합침: `docs/data-model.md` 사용자 검토(휴양 기간 통계 제외 `RestPeriod`, 몇 시간마다 '늦게 줬을 때' `shiftOnLate`), 리뷰·검증 3회로 약 주기 바꾼 날 규칙을 `seriesId`·넘김·버림으로 다시 정함, 병합 때 짝 없는 기록·열린 줄 정리, 탕약 알림은 줄에 남은 차례에만. 디자인 `MedAddHours`(늦게 줬을 때 라디오)·아이 정보 휴양 문구 고침, 캔버스 판 1793110210-fe6a.
 

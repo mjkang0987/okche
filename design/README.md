@@ -9,6 +9,8 @@
 | `test_generate.py` | 생성 스크립트 확인 |
 | `generated/OkcheTokens.swift` | SwiftUI용 (`OkcheColor`, `OkcheSpacing`, `OkcheRadius`, `OkcheType`) |
 | `generated/OkcheTokens.kt` | Jetpack Compose용 (같은 이름의 `object`) |
+| `res/font/` | 고운바탕 글꼴 파일 (아래 '글꼴') |
+| `fonts/` | 글꼴 라이선스 |
 
 ## 값 바꾸는 법
 

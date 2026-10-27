@@ -37,6 +37,7 @@ private struct OkcheTextModifier: ViewModifier {
         let uiFont = style.family.fontName.flatMap { UIFont(name: $0, size: size) }
             ?? .systemFont(ofSize: size, weight: weight.uiWeight)
         // 줄 높이를 토큰 값에 맞춘다. 글꼴 기본 줄 높이가 더 크면(고운바탕 28 → 40.5) 위아래를 반씩 줄인다 — 웹(디자인)의 line-height와 같은 방식.
+        // shortcut: 여러 줄이면 둘째 줄부터는 글꼴 줄 높이(40.5)로 남음, 여러 줄 고운바탕 글(축하 문구 등)을 만들 때 줄마다 맞추는 방법으로 바꾼다.
         let extra = lineHeight - uiFont.lineHeight
         content
             .font(Font(uiFont))

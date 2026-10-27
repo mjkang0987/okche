@@ -36,7 +36,7 @@ python3 -m unittest discover -s design
 ## 프로젝트에 넣을 때
 
 - 두 파일은 앱 타깃에 직접 넣는다. Swift 선언은 기본 접근 수준(internal)이라, 별도 모듈로 빼면 `public`이 필요하다.
-- Kotlin 패키지 `kr.pikaworks.okche.ui.theme`는 앱 ID를 `kr.pikaworks.okche`로 가정한 값이다. 앱 ID가 바뀌면 `generate.py`의 `KOTLIN_PACKAGE`를 고치고 다시 만든다.
+- Kotlin 패키지는 `app.okche.ui.theme` (앱 ID `app.okche`).
 
 ## 글꼴
 

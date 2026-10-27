@@ -4,6 +4,8 @@ import SwiftUI
 struct TabScreen<Content: View>: View {
     let title: String
     var subtitle: String? = nil
+    /// 화면 위 여백. 디자인은 탭 첫 화면 24, 일기만 20.
+    var topPadding: CGFloat = OkcheSpacing.space6
     @ViewBuilder var content: Content
 
     @ViewBuilder private var header: some View {
@@ -12,11 +14,9 @@ struct TabScreen<Content: View>: View {
             .foregroundStyle(OkcheColor.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
-            .accessibilityAddTraits(.isHeader)
         if let subtitle {
             Text(subtitle)
-                .okcheText(OkcheType.label)
-                .fontWeight(.regular)
+                .okcheText(OkcheType.label, weight: .regular)
                 .foregroundStyle(OkcheColor.inkMuted)
         }
     }
@@ -29,11 +29,14 @@ struct TabScreen<Content: View>: View {
                     HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header }
                     VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header }
                 }
+                // VoiceOver가 제목과 쉬운 말을 한 머리말로 읽게.
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, OkcheSpacing.space6)
+            .padding(.top, topPadding)
             .padding(.bottom, OkcheSpacing.space4)
         }
         .background(OkcheColor.hanji)
@@ -41,7 +44,7 @@ struct TabScreen<Content: View>: View {
 }
 
 extension TabScreen where Content == EmptyView {
-    init(title: String, subtitle: String? = nil) {
-        self.init(title: title, subtitle: subtitle) { EmptyView() }
+    init(title: String, subtitle: String? = nil, topPadding: CGFloat = OkcheSpacing.space6) {
+        self.init(title: title, subtitle: subtitle, topPadding: topPadding) { EmptyView() }
     }
 }

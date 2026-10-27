@@ -8,7 +8,15 @@
 **5단계 — 안드로이드 뼈대** (브랜치: `feature/android-skeleton`, 아직 안 만듦)
 
 - 요구사항: Android 프로젝트(Jetpack Compose, API 26+, 패키지 `app.okche`), 하단 탭 5개, `design/generated/OkcheTokens.kt` 연결. iOS 뼈대(4단계)와 같은 화면·같은 디자인 대조 기준.
-- 구현 방식·영향받는 파일·예상 결과: 시작할 때 이 자리에 적고 검토받는다.
+- 구현 방식:
+  - Gradle 9.8.1·AGP 9.4.1(코틀린 내장)·Kotlin 2.4.21·Compose BOM 2026.09.00 — 이 맥의 다른 앱(tas-android)에서 돌아가는 조합. compileSdk 37, targetSdk 36, minSdk 26.
+  - 원본을 복사하지 않는다: 토큰은 `design/generated/`를 소스 폴더로, 글꼴은 `design/res/`를 리소스 폴더로, 라이선스는 `design/fonts/`를 assets로, `versionName`은 저장소 맨 위 `VERSION`을 읽는다.
+  - Material3 `NavigationBar`(네이티브 우선): 흰 바탕 + 위 가는 선, 고른 탭 `Namsaek` 굵게·안 고른 탭 `InkMuted`, 글자 12, 선택 알약 표시 없음(디자인에 없음). 아이콘은 Material 아이콘 선 모양(iOS가 SF Symbols를 쓴 것과 같은 판단).
+  - 탭 첫 화면 머리: iOS와 같게 제목 28(고운바탕)+쉬운 말 14, 위 24(일기 20)·좌우 16, 넘치면 쉬운 말 아래 줄, 제목은 낱말 안 끊김, TalkBack 한 머리말. 글자 크기는 `sp`라 시스템 글자 크기를 따른다.
+  - 밝은 화면만, 앱 문구는 한국어 `strings.xml`.
+  - 테스트: 계측 테스트(에뮬레이터)로 탭 5개 전환·머리말, JVM 테스트 없음(로직이 없음).
+- 영향받는 파일: `android/` 새로 만듦, `.gitignore`(Gradle·로컬 설정), `index.md`, `plan.md`.
+- 예상 결과: 에뮬레이터(Small_Phone, API 37)에서 iOS와 같은 빈 화면 5개, 빌드·테스트 통과, 디자인 대조 결과를 여기 적음.
 - 4-1 iOS 저장(SwiftData 모델·하루 기준·고정 ID)·5-1 안드로이드 저장(Room)은 뼈대 뒤에 따로.
 - 3단계 데이터 구조는 끝남(아래 '끝난 일'). 디자인 남은 것 정리 때 캔버스 판 1793090186-890c → 데이터 구조 검토 반영 뒤 1793110210-fe6a.
 - **다음에 할 것** (순서대로):

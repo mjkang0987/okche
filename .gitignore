@@ -5,3 +5,8 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 build/
+.gradle/
+local.properties
+.kotlin/
+.idea/
+*.iml

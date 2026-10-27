@@ -11,6 +11,8 @@
 		33ABCD9E369A3EE6CD8276DB /* TabScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */; };
 		47B5D69BEBA333C23CA3FCEC /* OkcheApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */; };
 		557FB933A1B43D9BD16869FA /* OkcheTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */; };
+		5A82FD664A39A818C8374714 /* OFL-GowunBatang.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9179F1B84DD420CB6775A1FC /* OFL-GowunBatang.txt */; };
+		5E40F4FC62DDE84531754748 /* gowun_batang_bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B590D8DB533C4B3A72A47C59 /* gowun_batang_bold.ttf */; };
 		617D645225490C8F9FAD3AB2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BBBC424F9384B64EDCFCE73C /* Assets.xcassets */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
 		B98102180DE4DD53B6377DCA /* OkcheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */; };
@@ -31,7 +33,9 @@
 		1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabScreen.swift; sourceTree = "<group>"; };
 		22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OkcheTokens.swift; path = ../../../design/generated/OkcheTokens.swift; sourceTree = "<group>"; };
 		650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheTests.swift; sourceTree = "<group>"; };
+		9179F1B84DD420CB6775A1FC /* OFL-GowunBatang.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "OFL-GowunBatang.txt"; path = "../../../design/fonts/OFL-GowunBatang.txt"; sourceTree = "<group>"; };
 		ACD8ED29171327F04FE543E9 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		B590D8DB533C4B3A72A47C59 /* gowun_batang_bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = gowun_batang_bold.ttf; path = ../../../design/res/font/gowun_batang_bold.ttf; sourceTree = "<group>"; };
 		BBBC424F9384B64EDCFCE73C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BE50F69BB45ACED338B1B7A2 /* OkcheText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheText.swift; sourceTree = "<group>"; };
 		CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheApp.swift; sourceTree = "<group>"; };
@@ -75,6 +79,8 @@
 		92A3D766F6450A40DE97DCF9 /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				B590D8DB533C4B3A72A47C59 /* gowun_batang_bold.ttf */,
+				9179F1B84DD420CB6775A1FC /* OFL-GowunBatang.txt */,
 				BE50F69BB45ACED338B1B7A2 /* OkcheText.swift */,
 				22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */,
 				1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */,
@@ -175,6 +181,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				617D645225490C8F9FAD3AB2 /* Assets.xcassets in Resources */,
+				5A82FD664A39A818C8374714 /* OFL-GowunBatang.txt in Resources */,
+				5E40F4FC62DDE84531754748 /* gowun_batang_bold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

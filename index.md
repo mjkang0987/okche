@@ -48,7 +48,7 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 | `.gitignore` | 있음 | 파이썬 캐시·맥 파일 무시 |
 | `VERSION` | 있음 | 앱 버전 (지금 `0.1.0`) |
 | `docs/` | 있음 | `data-model.md` 데이터 구조(확정 2026-10-27) |
-| `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt`, 디자인 가이드 검사 `canvas-check/` (자세한 건 `design/README.md`) |
+| `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt`, 고운바탕 글꼴 `res/font/`(라이선스 `fonts/`), 디자인 가이드 검사 `canvas-check/` (자세한 건 `design/README.md`) |
 | `ios/` | 있음 | Xcode 프로젝트 (SwiftUI, iOS 17+). `project.yml`(XcodeGen)로 `Okche.xcodeproj` 생성 — 고친 뒤 `cd ios && xcodegen generate`(XcodeGen 2.45+, `brew install xcodegen`). Xcode 26 기준(프로젝트 형식은 Xcode 16+). 토큰은 `design/generated/OkcheTokens.swift`를 그대로 씀. 실기기 서명 팀 ID는 아직 없음 — TestFlight 단계에서 `project.yml`에 넣는다(Xcode에서 고르면 다음 생성 때 지워짐) |
 | `android/` | 계획 | Android Studio 프로젝트 (Jetpack Compose) |
 

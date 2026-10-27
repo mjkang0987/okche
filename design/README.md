@@ -9,6 +9,8 @@
 | `test_generate.py` | 생성 스크립트 확인 |
 | `generated/OkcheTokens.swift` | SwiftUI용 (`OkcheColor`, `OkcheSpacing`, `OkcheRadius`, `OkcheType`) |
 | `generated/OkcheTokens.kt` | Jetpack Compose용 (같은 이름의 `object`) |
+| `res/font/` | 고운바탕 글꼴 파일 (아래 '글꼴') |
+| `fonts/` | 글꼴 라이선스 |
 
 ## 값 바꾸는 법
 
@@ -40,7 +42,11 @@ python3 -m unittest discover -s design
 
 ## 글꼴
 
-글자 스타일에는 글꼴 종류만 적는다: `display`(고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구)와 `sans`(디자인 기준 Noto Sans KR, 앱에서는 시스템 글꼴을 써도 됨 — 나머지). 주석의 글꼴 이름은 `tokens.json`의 `type.families`에서 가져온다. 실제 글꼴 파일 연결은 iOS·안드로이드 프로젝트를 만드는 단계에서 한다.
+글자 스타일에는 글꼴 종류만 적는다: `display`(고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구)와 `sans`(디자인 기준 Noto Sans KR, 앱에서는 시스템 글꼴을 써도 됨 — 나머지). 주석의 글꼴 이름은 `tokens.json`의 `type.families`에서 가져온다.
+
+- `res/font/gowun_batang_bold.ttf`: 고운바탕 Bold(PostScript 이름 `GowunBatang-Bold`). Google Fonts 저장소(github.com/google/fonts, `ofl/gowunbatang`)에서 받음, 2026-10-28, SHA-256 `dbfcaa646e5831e7478524924f02906f550285a5050699b4e38c9950b3ec4b94`. iOS는 이 파일을 리소스로, 안드로이드는 이 `res/` 폴더를 리소스 폴더로 그대로 쓴다(안드로이드 리소스 이름 규칙 때문에 소문자·밑줄 이름).
+- `fonts/OFL-GowunBatang.txt`: 글꼴 라이선스(SIL OFL 1.1). 글꼴과 함께 앱에 넣어 배포한다 — iOS는 리소스, 안드로이드는 이 `fonts/` 폴더를 assets 폴더로.
+- `sans`는 글꼴 파일 없이 시스템 글꼴.
 
 ## 디자인 가이드 검사 (`canvas-check/`)
 

@@ -25,8 +25,19 @@ python3 -m unittest discover -s design
 
 ## 이름 규칙
 
-토큰 이름 `ink-muted`, `space-4`, `radius-lg`가 Swift에선 `OkcheColor.inkMuted`, `OkcheSpacing.space4`, `OkcheRadius.radiusLg`, Kotlin에선 `OkcheColor.InkMuted`, `OkcheSpacing.Space4`, `OkcheRadius.RadiusLg`가 된다. 이름은 영어 소문자·숫자·하이픈만 받는다 (다른 글자가 있으면 생성이 멈춘다).
+토큰 이름 `ink-muted`, `space-4`, `radius-lg`가 Swift에선 `OkcheColor.inkMuted`, `OkcheSpacing.space4`, `OkcheRadius.radiusLg`, Kotlin에선 `OkcheColor.InkMuted`, `OkcheSpacing.Space4`, `OkcheRadius.RadiusLg`가 된다.
+
+토큰 이름은 그대로 코드 이름이 되므로 아래에 맞지 않으면 생성이 멈춘다(종료 코드 2).
+
+- 영어 소문자로 시작하고, 소문자·숫자를 하이픈 하나로 이은 것 (`--`, 끝 하이픈 안 됨)
+- Swift 예약어(`default`, `in`, `self` …)가 아닐 것
+- 하이픈을 지운 코드 이름이 같은 묶음 안에서 겹치지 않을 것 (`space-1-0`과 `space-10`은 둘 다 `space10`)
+
+## 프로젝트에 넣을 때
+
+- 두 파일은 앱 타깃에 직접 넣는다. Swift 선언은 기본 접근 수준(internal)이라, 별도 모듈로 빼면 `public`이 필요하다.
+- Kotlin 패키지 `kr.pikaworks.okche.ui.theme`는 앱 ID를 `kr.pikaworks.okche`로 가정한 값이다. 앱 ID가 바뀌면 `generate.py`의 `KOTLIN_PACKAGE`를 고치고 다시 만든다.
 
 ## 글꼴
 
-글자 스타일에는 글꼴 종류만 적는다: `display`(고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구)와 `sans`(시스템 글꼴 — 나머지). 실제 글꼴 파일 연결은 iOS·안드로이드 프로젝트를 만드는 단계에서 한다.
+글자 스타일에는 글꼴 종류만 적는다: `display`(고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구)와 `sans`(디자인 기준 Noto Sans KR, 앱에서는 시스템 글꼴을 써도 됨 — 나머지). 주석의 글꼴 이름은 `tokens.json`의 `type.families`에서 가져온다. 실제 글꼴 파일 연결은 iOS·안드로이드 프로젝트를 만드는 단계에서 한다.

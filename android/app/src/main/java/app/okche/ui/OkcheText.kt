@@ -34,8 +34,8 @@ fun OkcheTextStyle.toTextStyle(weight: FontWeight = fontWeight) = TextStyle(
 fun Modifier.singleLineHeight(lineHeight: TextUnit) = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
     val target = lineHeight.roundToPx()
-    val offset = maxOf(0, placeable.height - target) / 2
-    val height = placeable.height - offset * 2
+    val height = minOf(placeable.height, target)
+    val offset = (placeable.height - height) / 2
     val baseline = placeable[FirstBaseline]
     val lines = if (baseline == AlignmentLine.Unspecified) emptyMap() else mapOf<AlignmentLine, Int>(FirstBaseline to baseline - offset)
     layout(placeable.width, height, lines) { placeable.place(0, -offset) }

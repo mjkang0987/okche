@@ -1,5 +1,6 @@
 package app.okche
 
+import android.content.res.Configuration
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -18,6 +19,7 @@ import app.okche.ui.theme.OkcheColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -50,16 +52,25 @@ class RootTabsTest {
     @Test fun titleLineHeightMatchesToken() {
         val height = rule.onNodeWithTag("tabTitle", useUnmergedTree = true).getBoundsInRoot().let { it.bottom - it.top }
         val fontScale = rule.activity.resources.configuration.fontScale
-        assertEquals(1f, fontScale)
+        assumeTrue("기기 글자 크기 1.0에서만", fontScale == 1f)
         assertEquals(36f, height.value, 0.5f)
     }
 
     /** 기기가 다크 모드여도 상태바 아이콘이 어두운 색(밝은 바탕용)인지. */
     @Test fun systemBarsStayLight() {
-        rule.activityRule.scenario.onActivity { activity ->
-            val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-            assertTrue(controller.isAppearanceLightStatusBars)
-            assertTrue(controller.isAppearanceLightNavigationBars)
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.executeShellCommand("cmd uimode night yes").close()
+        try {
+            rule.activityRule.scenario.recreate()
+            rule.activityRule.scenario.onActivity { activity ->
+                // 다크 모드가 실제로 켜졌는지 먼저 확인(안 켜졌으면 이 테스트는 아무것도 확인하지 못함).
+                assertEquals(Configuration.UI_MODE_NIGHT_YES, activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK)
+                val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                assertTrue(controller.isAppearanceLightStatusBars)
+                assertTrue(controller.isAppearanceLightNavigationBars)
+            }
+        } finally {
+            automation.executeShellCommand("cmd uimode night no").close()
         }
     }
 

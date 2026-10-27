@@ -1,6 +1,10 @@
 package app.okche.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
@@ -18,6 +22,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,9 +32,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.okche.R
 import app.okche.ui.theme.OkcheColor
+import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheType
 
 private enum class Tab(val label: Int, val icon: ImageVector) {
@@ -59,7 +66,16 @@ fun RootTabs() {
             ) {
                 Tab.entries.forEachIndexed { index, tab ->
                     val isSelected = index == selected
+                    // 키보드로 옮겨 갈 때 포커스가 잘 보이게(알약 표시를 없애 기본 포커스 표시는 대비가 낮음).
+                    val interaction = remember { MutableInteractionSource() }
+                    val focused by interaction.collectIsFocusedAsState()
                     NavigationBarItem(
+                        modifier = if (focused) {
+                            Modifier.border(2.dp, OkcheColor.Namsaek, RoundedCornerShape(OkcheRadius.RadiusMd))
+                        } else {
+                            Modifier
+                        },
+                        interactionSource = interaction,
                         selected = isSelected,
                         onClick = { selected = index },
                         icon = { Icon(tab.icon, contentDescription = null) },
@@ -73,6 +89,7 @@ fun RootTabs() {
                                 color = { color },
                                 softWrap = false,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 autoSize = TextAutoSize.StepBased(minFontSize = style.fontSize * 0.6f, maxFontSize = style.fontSize),
                             )
                         },

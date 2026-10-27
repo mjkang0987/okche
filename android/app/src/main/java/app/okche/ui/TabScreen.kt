@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheSpacing
@@ -53,6 +54,7 @@ fun TabScreen(
                 Modifier.testTag("tabTitle").alignByBaseline().singleLineHeight(display.lineHeight),
                 style = display.copy(color = OkcheColor.Ink),
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 autoSize = TextAutoSize.StepBased(minFontSize = display.fontSize / 2, maxFontSize = display.fontSize),
             )
             if (subtitle != null) {

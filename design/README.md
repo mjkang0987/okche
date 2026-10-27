@@ -50,6 +50,17 @@ python3 -m unittest discover -s design
 |---|---|
 | `guide.js` | 화면을 실제로 그려서 글자 크기·높이·모서리·색을 잰다. 가이드에 없는 값을 화면별로 적고 `guide.json`에 남긴다. |
 | `guidefix.py` | 자주 나오는 어긋남을 가이드 값으로 바꾼다(여러 번 돌려도 같은 결과). 캔버스 생성 스크립트를 다시 돌렸다면 마지막에 돌린다. |
+| `audit.js` | 모든 화면을 그려서 링크 끊김·글자 넘침·이름 없는 입력칸·콘솔 오류를 찾는다. |
+| `rshot.js` | 화면 이름을 주면 그림 파일로 찍는다(`node rshot.js Record Sura`). |
+| `needh.js` | 화면 내용이 실제로 필요한 높이를 잰다(화면이 길어졌을 때 보드 높이 정하기). |
+| `backdrops.py` | 시트·확인창 뒤에 깔린 부모 화면 복사본을 다시 맞춘다. 부모 화면을 고친 뒤 돌린다. |
+
+**새 세션에서 준비하기** (세션 임시 폴더는 세션이 끝나면 사라진다)
+
+1. 캔버스 파일 받기: Artifact 도구로 https://claude.ai/artifact/XyeFEyC6D7ZUqkg5Zbz4nM 의 `project/` 파일과 `artifact-type/dc-runtime.js`를 읽어 저장한다(`action: read`, `paths`, `out_dir`). `DESIGN`은 `project/` 폴더, `RUNTIME`은 `dc-runtime.js` 경로.
+2. 리액트 받기: 빈 폴더에서 `npm i react@18.3.1 react-dom@18.3.1` → 그 `node_modules`가 `MODULES`.
+3. 브라우저(크로미움·playwright)는 작업 환경에 이미 있다.
+4. 고친 화면을 캔버스에 올리기 전에, 올라가 있는 판을 먼저 읽고 바뀐 게 없는지 비교한 뒤 올린다(남이 고친 걸 덮어쓰지 않게).
 
 ```sh
 DESIGN=<캔버스 project 폴더>/ RUNTIME=<캔버스 dc-runtime.js> MODULES=<react가 든 node_modules> OUT=<결과 폴더> node design/canvas-check/guide.js

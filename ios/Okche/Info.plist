@@ -18,6 +18,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>gowun_batang_bold.ttf</string>
+	</array>
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 	<key>UILaunchScreen</key>

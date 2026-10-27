@@ -23,6 +23,13 @@ targets:
       # 디자인 토큰은 복사하지 않고 생성 파일을 그대로 쓴다.
       - path: ../design/generated/OkcheTokens.swift
         group: Okche/Design
+      # 고운바탕 글꼴과 라이선스(OFL은 글꼴과 함께 배포해야 함). 안드로이드와 같은 파일.
+      - path: ../design/res/font/gowun_batang_bold.ttf
+        group: Okche/Design
+        buildPhase: resources
+      - path: ../design/fonts/OFL-GowunBatang.txt
+        group: Okche/Design
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.okche
@@ -42,6 +49,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # iOS 26 유리 탭 막대 대신 디자인의 평평한 탭 막대. Apple은 다음 큰 버전에서 이 키를 없앤다고 함 — 그때 다시 정한다.
         UIDesignRequiresCompatibility: true
+        UIAppFonts: [gowun_batang_bold.ttf]
         UILaunchScreen:
           UIColorName: Hanji
   OkcheTests:

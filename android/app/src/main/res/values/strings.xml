@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">옥체</string>
+    <string name="tab_record">일기</string>
+    <string name="tab_main">문안</string>
+    <string name="tab_sillok">실록</string>
+    <string name="tab_album">어진첩</string>
+    <string name="tab_more">더보기</string>
+    <string name="record_title">승정원일기</string>
+    <string name="record_subtitle">매일 기록</string>
+    <string name="album_subtitle">앨범</string>
+</resources>

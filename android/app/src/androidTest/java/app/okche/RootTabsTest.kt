@@ -1,6 +1,8 @@
 package app.okche
 
+import android.app.UiAutomation
 import android.content.res.Configuration
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,7 +22,6 @@ import app.okche.ui.theme.OkcheColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -51,15 +53,15 @@ class RootTabsTest {
     /** 제목 줄 높이가 토큰 값(28/36)인지 — 고운바탕 기본 줄 높이(40.5)로 커지지 않게. */
     @Test fun titleLineHeightMatchesToken() {
         val height = rule.onNodeWithTag("tabTitle", useUnmergedTree = true).getBoundsInRoot().let { it.bottom - it.top }
-        val fontScale = rule.activity.resources.configuration.fontScale
-        assumeTrue("기기 글자 크기 1.0에서만", fontScale == 1f)
-        assertEquals(36f, height.value, 0.5f)
+        // 기기 글자 크기 설정을 반영한 36sp(안드로이드 14+ 큰 글자는 덜 커짐)
+        val expected = with(rule.density) { 36.sp.toDp() }
+        assertEquals(expected.value, height.value, 0.5f)
     }
 
     /** 기기가 다크 모드여도 상태바 아이콘이 어두운 색(밝은 바탕용)인지. */
     @Test fun systemBarsStayLight() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        automation.executeShellCommand("cmd uimode night yes").close()
+        automation.run("cmd uimode night yes")
         try {
             rule.activityRule.scenario.recreate()
             rule.activityRule.scenario.onActivity { activity ->
@@ -70,7 +72,7 @@ class RootTabsTest {
                 assertTrue(controller.isAppearanceLightNavigationBars)
             }
         } finally {
-            automation.executeShellCommand("cmd uimode night no").close()
+            automation.run("cmd uimode night no")
         }
     }
 
@@ -80,5 +82,10 @@ class RootTabsTest {
         assertNotNull(ResourcesCompat.getFont(context, R.font.gowun_batang_bold))
         context.assets.open("OFL-GowunBatang.txt").use { assertNotNull(it.read()) }
         assertEquals(OkcheColor.Hanji.toArgb(), context.getColor(R.color.hanji))
+    }
+
+    /** 셸 명령이 끝날 때까지 기다린다(출력을 다 읽어야 끝남). */
+    private fun UiAutomation.run(command: String) {
+        ParcelFileDescriptor.AutoCloseInputStream(executeShellCommand(command)).use { it.readBytes() }
     }
 }

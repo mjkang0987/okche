@@ -1,7 +1,6 @@
 package app.okche.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,10 +48,12 @@ fun TabScreen(
         ) {
             // 제목은 낱말 중간에서 끊지 않고, 너무 길면 한 줄 안에서 글자를 줄인다(iOS minimumScaleFactor 0.5와 같음).
             val display = OkcheType.Display.toTextStyle()
-            BasicText(
+            Text(
                 title,
                 Modifier.testTag("tabTitle").alignByBaseline().singleLineHeight(display.lineHeight),
-                style = display.copy(color = OkcheColor.Ink),
+                color = OkcheColor.Ink,
+                style = display,
+                softWrap = false,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 autoSize = TextAutoSize.StepBased(minFontSize = display.fontSize / 2, maxFontSize = display.fontSize),

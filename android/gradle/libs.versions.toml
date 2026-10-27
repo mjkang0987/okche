@@ -4,6 +4,9 @@ kotlin = "2.4.21"
 composeBom = "2026.09.00"
 activityCompose = "1.13.0"
 materialIcons = "1.7.8"
+testRunner = "1.7.0"
+# Compose 테스트가 끌어오는 3.5.0은 Android 17에서 없어진 InputManager.getInstance를 불러 실패한다.
+espresso = "3.7.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -13,6 +16,8 @@ compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material-icons = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIcons" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "testRunner" }
+androidx-test-espresso = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
 [plugins]

@@ -1,6 +1,8 @@
 package app.okche.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Description
@@ -12,7 +14,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,9 +60,16 @@ fun RootTabs() {
                         onClick = { selected = index },
                         icon = { Icon(tab.icon, contentDescription = null) },
                         label = {
-                            Text(
+                            // 큰 글자에서도 한 줄(낱말 중간에서 안 끊김), 칸보다 길면 글자를 줄인다.
+                            val style = OkcheType.Caption.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                            val color = LocalContentColor.current
+                            BasicText(
                                 stringResource(tab.label),
-                                style = OkcheType.Caption.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
+                                style = style,
+                                color = { color },
+                                softWrap = false,
+                                maxLines = 1,
+                                autoSize = TextAutoSize.StepBased(maxFontSize = style.fontSize),
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(

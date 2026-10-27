@@ -34,6 +34,14 @@ class Parts(unittest.TestCase):
             with self.assertRaises(g.TokenError):
                 g.px(bad)
 
+    def test_swift_keyword_rejected(self):
+        for kw in ["default", "in", "self", "true"]:
+            with self.assertRaises(g.TokenError, msg=kw):
+                g.check_name(kw)
+
+    def test_first_font(self):
+        self.assertEqual(g.first_font('"Gowun Batang", "Nanum Myeongjo", serif'), "Gowun Batang")
+
     def test_comment_is_one_line(self):
         self.assertEqual(g.comment("a\nb\r\n  c"), "a b c")
 
@@ -42,6 +50,24 @@ class Load(unittest.TestCase):
     def test_duplicate_name(self):
         d = copy.deepcopy(REAL)
         d["color"]["tokens"].append(dict(d["color"]["tokens"][0]))
+        with self.assertRaises(g.TokenError):
+            g.load(d)
+
+    def test_same_identifier_after_camel(self):
+        d = copy.deepcopy(REAL)
+        d["spacing"]["tokens"] += [{"name": "space-1-0", "value": "1px"}, {"name": "space-10", "value": "2px"}]
+        with self.assertRaises(g.TokenError):
+            g.load(d)
+
+    def test_float_weight_rejected(self):
+        d = copy.deepcopy(REAL)
+        d["type"]["groups"][0]["styles"][0]["fontWeight"] = 700.0
+        with self.assertRaises(g.TokenError):
+            g.load(d)
+
+    def test_families_must_match(self):
+        d = copy.deepcopy(REAL)
+        d["type"]["families"]["mono"] = "monospace"
         with self.assertRaises(g.TokenError):
             g.load(d)
 
@@ -91,9 +117,19 @@ class Output(unittest.TestCase):
         self.assertIn(f"package {g.KOTLIN_PACKAGE}", self.kt)
 
     def test_braces_balanced(self):
+        # 주석(usage 문구)은 빼고 코드 줄만 센다
         for text in self.files.values():
-            self.assertEqual(text.count("{"), text.count("}"))
-            self.assertEqual(text.count("("), text.count(")"))
+            code = "\n".join(l.split("//")[0] for l in text.splitlines())
+            self.assertEqual(code.count("{"), code.count("}"))
+            self.assertEqual(code.count("("), code.count(")"))
+
+    def test_bad_json_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "tokens.json"
+            bad.write_text("{", encoding="utf-8")
+            self.assertEqual(g.main([], source=bad, out_dir=tmp), 2)
+            self.assertEqual(g.main([], source=Path(tmp) / "없음.json", out_dir=tmp), 2)
+            self.assertEqual(list(Path(tmp).glob("Okche*")), [])  # 실패하면 아무것도 쓰지 않음
 
     def test_check_mode(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -93,7 +93,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 | `kind` | 화면 | `data` 칸 |
 |---|---|---|
-| `vomit` | 구토 | `contents`: `kibble`(사료 알갱이), `digested`(죽처럼 삭은 사료), `liquidFoam`(액체·거품), `hairball`(헤어볼), `plant`(풀·식물), `foreign`(이물질) 중 여러 개 · `color`: `food`(사료 색), `yellow`, `clear`(투명·흰색), `green`, `red`(피), `darkRed`(검붉은·커피색) · `count`: 1, 2, 3(3번 이상) |
+| `vomit` | 구토 | `contents`: `kibble`(사료 알갱이), `digested`(죽처럼 불은 사료), `liquidFoam`(액체·거품), `hairball`(헤어볼), `plant`(풀·식물), `foreign`(이물질) 중 여러 개 · `color`: `food`(사료 색), `yellow`, `clear`(투명·흰색), `green`, `red`(피), `darkRed`(검붉은·커피색) · `count`: 1, 2, 3(3번 이상) |
 | `stool` | 매화 | `shape`: `hard`(단단해요), `normal`(정상), `soft`(물러요), `loose`(묽어요), `watery`(물 같아요) · `color`: `brown`, `yellowOrange`, `green`, `black`(짜장처럼), `pale`(회백색) · `signs`: `blood`, `mucus`, `foreign` 중 여러 개 |
 | `urine` | 소피 | `amount`: `little`(찔끔), `normal`(보통), `much`(많음) · `color`: `paleYellow`(보통), `clear`, `darkYellow`, `pinkRed` · `signs`: `straining`(힘만 주고 안 나옴), `frequent`(자주 들락거림), `outside`(화장실 밖), `pain`(볼 때 울거나 아파함) 중 여러 개 |
 | `meal` | 수라 | `result`: `all`, `some`, `none` · `foodId`(그때 먹던 사료) · `slotName`(아침·점심·저녁 같은 끼니 이름 또는 없음) |
@@ -255,7 +255,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 ## 12. 디자인과 맞춘 것·남은 것
 
 - **수라 결과 문구 통일 (2026-10-27 반영)** — 일기·수라·급식기·인슐린 시트 모두 '다 먹음·남김·안 먹음' = `all`·`some`·`none`.
-- **구토 빠른 버튼 (2026-10-27 반영)** — '사료·삭은 사료·거품' = 시트의 '사료 알갱이'(`kibble`)·'죽처럼 삭은 사료'(`digested`)·'액체·거품'(`liquidFoam`). 버튼은 줄 폭 때문에 줄인 이름, 화면 읽기 이름은 시트 이름 그대로.
+- **구토 빠른 버튼 (2026-10-27 반영)** — '사료·불은 사료·거품' = 시트의 '사료 알갱이'(`kibble`)·'죽처럼 불은 사료'(`digested`)·'액체·거품'(`liquidFoam`). 버튼은 줄 폭 때문에 줄인 이름, 화면 읽기 이름은 시트 이름 그대로.
 - **남음: 인슐린 '건너뜀'을 누른 뒤 상태** — '✓ 08:02 맞음'만 그려져 있다. 건너뛴 차례가 어떻게 보이는지(예: '건너뜀 · 08:02', 되돌리기) 그려야 한다.
 
 ## 13. 확인 필요

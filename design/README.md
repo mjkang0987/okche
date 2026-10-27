@@ -41,3 +41,42 @@ python3 -m unittest discover -s design
 ## 글꼴
 
 글자 스타일에는 글꼴 종류만 적는다: `display`(고운바탕 — 화면 제목의 조선식 이름, 아이 이름, 축하 문구)와 `sans`(디자인 기준 Noto Sans KR, 앱에서는 시스템 글꼴을 써도 됨 — 나머지). 주석의 글꼴 이름은 `tokens.json`의 `type.families`에서 가져온다. 실제 글꼴 파일 연결은 iOS·안드로이드 프로젝트를 만드는 단계에서 한다.
+
+## 디자인 가이드 검사 (`canvas-check/`)
+
+디자인 캔버스의 화면이 디자인 시스템 README·`tokens.json` 값을 지키는지 본다. 화면을 고칠 때마다 돌리고, 0이 아니면 고친다.
+
+| 파일 | 하는 일 |
+|---|---|
+| `guide.js` | 화면을 실제로 그려서 글자 크기·높이·모서리·색을 잰다. 가이드에 없는 값을 화면별로 적고 `guide.json`에 남긴다. |
+| `guidefix.py` | 자주 나오는 어긋남을 가이드 값으로 바꾼다(여러 번 돌려도 같은 결과). 캔버스 생성 스크립트를 다시 돌렸다면 마지막에 돌린다. |
+| `audit.js` | 모든 화면을 그려서 링크 끊김·글자 넘침·이름 없는 입력칸·콘솔 오류를 찾는다. |
+| `rshot.js` | 화면 이름을 주면 그림 파일로 찍는다(`node rshot.js Record Sura`). |
+| `needh.js` | 화면 내용이 실제로 필요한 높이를 잰다(화면이 길어졌을 때 보드 높이 정하기). |
+| `backdrops.py` | 시트·확인창 뒤에 깔린 부모 화면 복사본을 다시 맞춘다. 부모 화면을 고친 뒤 돌린다. |
+
+**새 세션에서 준비하기** (세션 임시 폴더는 세션이 끝나면 사라진다)
+
+1. 캔버스 파일 받기: Artifact 도구로 https://claude.ai/artifact/XyeFEyC6D7ZUqkg5Zbz4nM 의 `project/` 파일과 `artifact-type/dc-runtime.js`를 읽어 저장한다(`action: read`, `paths`, `out_dir`). `DESIGN`은 `project/` 폴더, `RUNTIME`은 `dc-runtime.js` 경로.
+2. 리액트·playwright 받기: 빈 폴더에서 `npm i react@18.3.1 react-dom@18.3.1 playwright` → 그 `node_modules`가 `MODULES`. 실행할 때 `NODE_PATH=$MODULES`를 같이 준다.
+3. 브라우저가 없으면 그 폴더에서 `npx playwright install chromium`.
+4. 고친 화면을 캔버스에 올리기 전에, 올라가 있는 판을 먼저 읽고 바뀐 게 없는지 비교한 뒤 올린다(남이 고친 걸 덮어쓰지 않게).
+
+```sh
+DESIGN=<캔버스 project 폴더>/ RUNTIME=<캔버스 dc-runtime.js> MODULES=<react가 든 node_modules> OUT=<결과 폴더> node design/canvas-check/guide.js
+DESIGN=<캔버스 project 폴더>/ python3 design/canvas-check/guidefix.py
+```
+
+검사하는 값: 글자 12·14·16·18·22·28·32, 버튼 높이 52·40(아이콘만 있는 버튼 44), 바로 기록 버튼 56 이상, 입력칸·셀렉트 52, 모서리 8·14·20·999, 색은 토큰 15개.
+
+**예외** (가이드를 어긴 게 아니라 일부러 다르게 둔 것):
+
+- 쉬운 말 0.85배 크기(13.6·11.9·10.2 등) — 가이드가 정한 크기
+- 그래프 막대·눈금(모서리 3), 홈 화면 위젯 모서리 22(휴대폰이 정함)
+- 실록 PDF 미리보기의 작은 글자 — 종이 한 장을 줄여 보여 주는 그림
+- 아이 등록의 털색 동그라미 — 실제 털 색
+- 체형 사진 찍기 화면의 어두운 색·셔터 — 카메라 화면
+- 사진 칸·메모 여러 줄 칸 — 사진 크기·여러 줄이라 높이가 다름
+- 온보딩의 큰 '옥체' 글자 — 앱 이름 글자 로고
+- 일기 혈당 입력칸 56 — 같은 줄의 기록 버튼(56)과 높이를 맞춤
+- 화면 흐름도(Flow)·앱 아이콘 보드 — 앱 화면이 아님

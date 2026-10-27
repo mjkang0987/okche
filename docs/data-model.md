@@ -11,10 +11,10 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 | 칸 | 형식 | 뜻 |
 |---|---|---|
-| `id` | UUID v7 문자열 | 고유 ID. 기기에서 만든다. 시간 순으로 정렬되는 v7을 쓴다. |
+| `id` | UUID 문자열 | 고유 ID. 기기에서 만든다(Swift `UUID()`, Kotlin `UUID.randomUUID()`). 정렬은 `createdAt`으로 한다. |
 | `createdAt` | UTC 시각 (밀리초) | 처음 만든 때 |
 | `updatedAt` | UTC 시각 (밀리초) | 마지막으로 고친 때. 고칠 때마다 바꾼다. |
-| `deletedAt` | UTC 시각 또는 없음 | 지운 때. 실제로 지우지 않고 표시만 한다(백업 병합에서 '지웠음'도 전달해야 해서). 화면과 통계에선 빼고 본다. |
+| `deletedAt` | UTC 시각 또는 없음 | 지운 때. 줄은 남기고(백업 병합에서 '지웠음'도 전달해야 해서) **내용 칸은 비우고 사진 파일은 바로 지운다** — 화면이 '되돌릴 수 없어요'라고 말하므로. 화면과 통계에선 빼고 본다. |
 
 - 시각은 모두 UTC로 저장하고, 화면에 보일 때만 기기 시간대로 바꾼다.
 - 이름 규칙: 문서·백업 JSON은 `camelCase`, Swift도 `camelCase`, Kotlin도 `camelCase`, Room 테이블·열 이름은 `snake_case`.
@@ -50,6 +50,8 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 체중은 아이 칸이 아니라 기록(`weight`)으로 남긴다. 아이 등록 때 넣은 체중도 첫 체중 기록이 된다.
 
+**아이 지우기**: 아이와 그 아이의 기록·약 주기·인슐린·사료 바꾸기·급식기 설정에 모두 `deletedAt`을 넣는다. 사진은 그 아이를 `petIds`에서 빼고, 남은 아이가 없으면 사진도 지운다.
+
 ## 3. 기록 (`Record`)
 
 모든 일기 기록을 한 테이블에 담는다. 실록 집계가 `petId + kind + day`로 한 번에 되도록.
@@ -76,7 +78,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 | `snack` | 다과 | `snackId` · `amount`: 글자 또는 없음 ('얼마나 줬나요? (선택)') |
 | `weight` | 옥체 | `kg`: 소수 (소수점 둘째 자리까지) |
 | `med` | 탕약 | `scheduleId`(어느 알림에서 왔는지, 예정에 없던 약이면 없음) · `medicationId` · `plannedAt`(먹일 예정이던 시각 또는 없음) · `status`: `given`(줬어요), `skipped`(건너뜀), `vomited`(먹고 토함) · `amount`, `unit` |
-| `glucose` | 혈당 | `mgdl`: 정수 · `timing`: `beforeInsulin`, `afterInsulin`, `other` · `signs`: `weak`(기운 없음), `wobbly`(비틀거림·떨림), `seizure`(경련) 중 여러 개 · `curveId`: 하루 곡선으로 묶을 때 같은 값 |
+| `glucose` | 혈당 | `mgdl`: 정수 · `timing`: `beforeInsulin`, `afterInsulin`, `other` · `signs`: `weak`(기운 없음), `wobbly`(비틀거림·떨림), `seizure`(경련) 중 여러 개 |
 | `insulin` | 인슐린 | `planSlotTime`(정해 둔 시간 `HH:mm` 또는 없음) · `units`: 소수 · `status`: `full`(다 맞음), `partial`(일부만), `skipped`(건너뜀) · `mealBefore`: `all`, `some`, `none` 또는 없음 |
 
 - 값은 화면 글자가 아니라 위의 영어 값으로 저장한다(문구를 바꿔도 기록이 깨지지 않게).
@@ -119,7 +121,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 `frequency` 값: `daily`(매일), `everyNDays`(며칠마다), `weekdays`(요일 정해서), `everyNHours`(몇 시간마다), `asNeeded`(필요할 때만 — 줄·알림에 안 나옴).
 
 - **주기를 바꾸면 고치지 않고 새 줄을 만든다.** 원래 줄에 `activeUntil`을 넣고, 새 줄을 `activeFrom` 그날로 만든다. 그래야 지난 기간의 '몇 번 중 몇 번'이 그때 주기로 계산된다. 실록의 '이 기간에 바뀐 것'(약)도 이 날짜에서 나온다.
-- 몇 시간마다: 차례는 `firstAt`부터 `everyHours`씩. **늦게 줬으면 다음 차례도 그만큼 밀린다** = 다음 차례는 '마지막으로 준 시각 + `everyHours`'.
+- 몇 시간마다: 차례는 `firstAt`부터 `everyHours`씩. **늦게 줬으면 다음 차례도 그만큼 밀린다** = 다음 차례는 '그 앞 차례에 남긴 기록 시각(없으면 그 앞 차례 예정 시각) + `everyHours`'. 지난 기간 통계도 같은 방식으로 차례를 다시 만들어 센다.
 
 ## 6. 계산 규칙
 
@@ -134,7 +136,11 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 - 분모: 그 기간 각 날짜에 6-1의 1~2단계로 만든 차례 수 (그날 유효했던 주기 기준).
 - 분자: 같은 기간 `med`(또는 `insulin`) 기록 중 `given`(인슐린은 `full`·`partial`) 수. `vomited`는 분자에 넣지 않고 실록에 따로 센다('먹고 토함'은 실록에 따로 세요).
 
-### 6-3. 바꾼 날 (실록 금색 선)
+### 6-3. 혈당 곡선
+
+- 같은 아이·같은 `day`의 `glucose` 기록을 시각 순으로 이은 것. 따로 묶음 ID를 두지 않는다('같은 날 여러 번 재면 곡선으로 묶여요').
+
+### 6-4. 바꾼 날 (실록 금색 선)
 
 - 사료: `FoodChange.startedOn`. 약: `MedSchedule.activeFrom`(새로 만든 날)과 `activeUntil`.
 
@@ -188,6 +194,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 - 백업 파일 = 위 모든 표를 JSON 배열로 + 사진 파일. 본인 iCloud Drive·구글 드라이브에 저장.
 - **가져오기는 덮어쓰지 않고 합친다.** 같은 `id`가 양쪽에 있으면 `updatedAt`이 늦은 쪽을 남긴다. `deletedAt`도 고친 것과 똑같이 취급한다(늦게 지웠으면 지운 게 이김).
 - 이 기기에 없는 `id`는 그대로 가져온다. 사진 파일은 이 기기에 없는 것만 복사한다.
+- 시각 비교는 각 기기 시계를 믿는다. 기기 시계가 크게 틀리면 늦게 고친 쪽이 질 수 있다(v1.0은 한 사람이 쓰는 백업이라 받아들임).
 - 같은 규칙을 다음 버전 서버 동기화에도 그대로 쓴다.
 
 ## 12. 디자인과 맞지 않는 곳 (디자인부터 고칠 것)

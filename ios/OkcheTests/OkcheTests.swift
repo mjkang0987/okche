@@ -14,6 +14,15 @@ final class OkcheTests: XCTestCase {
         XCTAssertEqual(actual, expected)
     }
 
+    /// 앱 기본 언어가 한국어인지(영어면 시스템 버튼·날짜가 영어로 나옴).
+    func testDevelopmentLanguageIsKorean() {
+        XCTAssertEqual(Bundle.main.developmentLocalization, "ko")
+        XCTAssertEqual(Bundle.main.preferredLocalizations.first, "ko")
+        // 문안 날짜는 지역을 따로 주지 않으므로 앱 언어로 나와야 한다.
+        let day = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 10, day: 28))!
+        XCTAssertEqual(day.formatted(.dateTime.month().day().weekday(.wide)), "10월 28일 수요일")
+    }
+
     /// 에셋 색(시작 화면 바탕·강조색)이 토큰과 같은지. 에셋 JSON에는 토큰을 쓸 수 없어 값을 따로 적었다.
     func testAssetColorsMatchTokens() {
         assertSame(UIColor(named: "Hanji", in: Bundle.main, compatibleWith: nil), OkcheColor.hanji)

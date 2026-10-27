@@ -10,7 +10,7 @@ struct RecordTab: View {
 struct MainTab: View {
     // shortcut: 켜 둔 채 날이 바뀌어도 그대로고 하루 기준(새벽 6시)도 아직 안 따름, 6단계 문안 내용에서 고친다.
     var body: some View {
-        TabScreen(title: "문안", subtitle: Date.now.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "ko_KR"))))
+        TabScreen(title: "문안", subtitle: Date.now.formatted(.dateTime.month().day().weekday(.wide)))
     }
 }
 

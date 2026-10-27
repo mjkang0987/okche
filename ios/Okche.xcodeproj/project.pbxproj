@@ -145,16 +145,16 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 				};
 			};
 			buildConfigurationList = 7672C34AD780FF67E2E3DB77 /* Build configuration list for PBXProject "Okche" */;
-			developmentRegion = en;
+			developmentRegion = ko;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
-				en,
+				ko,
 			);
 			mainGroup = BB35365A5772B35919B8FC3E;
 			minimizedProjectReferenceProxies = 1;

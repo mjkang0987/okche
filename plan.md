@@ -5,16 +5,9 @@
 
 ## 지금 하는 일
 
-**2단계 — 디자인 토큰** (브랜치: `feature/design-tokens`)
+**3단계 — 데이터 구조** (브랜치: `feature/data-model`, 시작 전)
 
-- 요구사항: iOS와 안드로이드가 디자인 시스템과 똑같은 색·글자·간격·모서리 값을 쓴다. 값을 손으로 옮겨 적지 않는다.
-- 구현 방식:
-  - 옥체 디자인 시스템의 `tokens.json`(버전 1792980009-1583)을 `design/tokens.json`에 그대로 복사한다. 이 파일이 값의 기준이다.
-  - `design/generate.py`(파이썬 표준 라이브러리만)가 이 파일을 읽어 `design/generated/OkcheTokens.swift`(SwiftUI)와 `design/generated/OkcheTokens.kt`(Jetpack Compose)를 만든다. `--check`로 돌리면 생성 파일이 최신인지 확인만 한다.
-  - 글꼴: 조선식 이름은 고운바탕(앱에 넣을 글꼴, 4·5단계에서 연결), 본문은 시스템 글꼴. 생성 파일에는 글꼴 종류(`display`/`sans`)만 적는다.
-  - 생성 파일은 4·5단계에서 각 프로젝트에 넣는다.
-- 영향받는 파일: `design/tokens.json`, `design/generate.py`, `design/test_generate.py`, `design/generated/*`, `design/README.md`
-- 예상 결과: 토큰을 바꾸면 스크립트 한 번으로 두 플랫폼 값이 같이 바뀐다.
+- 2단계가 끝나 다음 차례. 시작할 때 요구사항·구현 방식·영향받는 파일·예상 결과를 여기 자세히 적는다.
 - 확인 필요: 앱 ID(번들·패키지 이름)를 `kr.pikaworks.okche`로 가정했다. 스토어 등록 뒤엔 못 바꾸니 5단계 전에 확정.
 
 ## 정한 것
@@ -30,7 +23,6 @@
 
 | 단계 | 브랜치(예정) | 내용 | 결과 |
 |---|---|---|---|
-| 2 | `feature/design-tokens` | 디자인 시스템 토큰을 `design/tokens.json`으로 가져오고, iOS·안드로이드 색·글꼴·간격 값으로 변환 | 두 플랫폼이 같은 값 사용 |
 | 3 | `feature/data-model` | `docs/data-model.md`: 아이, 기록(구토·매화·소피·탕약·수라·다과·체중·혈당·인슐린), 약(주기: 매일·며칠마다·요일·몇 시간마다·필요할 때만), 사료 바꾼 날, 사진. 모든 기록에 고유 ID(UUID) · 수정 시각 · 삭제 표시, 하루 기준 새벽 6시 | 플랫폼 공통 데이터 구조 확정 |
 | 4 | `feature/ios-skeleton` | Xcode 프로젝트, 하단 탭 5개, 디자인 토큰 연결 | iOS 빈 화면 5개 |
 | 5 | `feature/android-skeleton` | Android 프로젝트, 하단 탭 5개, 디자인 토큰 연결 | 안드로이드 빈 화면 5개 |
@@ -49,4 +41,5 @@
 ## 끝난 일
 
 - 2026-10-27 1단계 저장소 기본 설정: 저장소 생성(`mjkang0987/okche`), 안내·계획 문서, `dev` 브랜치.
+- 2026-10-27 2단계 디자인 토큰: `design/tokens.json`(디자인 시스템 원본) → `design/generate.py`가 `OkcheTokens.swift`·`OkcheTokens.kt` 생성, 테스트 20개. 코드리뷰·검증 3회. Swift·Kotlin 실제 컴파일은 4·5단계 프로젝트에서 확인.
 - 2026-10-27 최소 지원 버전·기기 저장 방식 결정. 가격 구조 확정(무료 / 1회 5,900원 / 구독 월 1,900원은 다음 버전), 아이 여러 마리 무료.

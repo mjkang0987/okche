@@ -59,6 +59,12 @@ class Load(unittest.TestCase):
         with self.assertRaises(g.TokenError):
             g.load(d)
 
+    def test_kotlin_type_name_rejected(self):
+        d = copy.deepcopy(REAL)
+        d["type"]["groups"][1]["styles"].append({"name": "font-weight", "fontSize": "1px", "lineHeight": "1px", "fontWeight": 400})
+        with self.assertRaises(g.TokenError):
+            g.load(d)
+
     def test_float_weight_rejected(self):
         d = copy.deepcopy(REAL)
         d["type"]["groups"][0]["styles"][0]["fontWeight"] = 700.0

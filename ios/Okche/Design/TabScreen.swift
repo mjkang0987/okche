@@ -6,20 +6,28 @@ struct TabScreen<Content: View>: View {
     var subtitle: String? = nil
     @ViewBuilder var content: Content
 
+    @ViewBuilder private var header: some View {
+        Text(title)
+            .okcheText(OkcheType.display)
+            .foregroundStyle(OkcheColor.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .accessibilityAddTraits(.isHeader)
+        if let subtitle {
+            Text(subtitle)
+                .okcheText(OkcheType.label)
+                .fontWeight(.regular)
+                .foregroundStyle(OkcheColor.inkMuted)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OkcheSpacing.space4) {
-                HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) {
-                    Text(title)
-                        .okcheText(OkcheType.display)
-                        .foregroundStyle(OkcheColor.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    if let subtitle {
-                        Text(subtitle)
-                            .okcheText(OkcheType.label)
-                            .fontWeight(.regular)
-                            .foregroundStyle(OkcheColor.inkMuted)
-                    }
+                // 큰 글자 설정에서 한 줄에 안 들어가면 쉬운 말을 아래로 내린다(제목이 글자 중간에서 끊기지 않게).
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header }
+                    VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header }
                 }
                 content
             }

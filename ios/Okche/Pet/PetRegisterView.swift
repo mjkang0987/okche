@@ -8,6 +8,8 @@ struct PetRegisterView: View {
     @State private var form = PetRegistration()
     @State private var errors: [PetRegistration.Field: String] = [:]
     @State private var pickingBirth = false
+    /// 저장한 뒤 닫히는 동안 한 번 더 눌러 두 번 저장되지 않게.
+    @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
 
     var body: some View {
@@ -46,6 +48,7 @@ struct PetRegisterView: View {
                             OkcheFieldError(message: errors[.save])
                             Button("모시기") { save(scroller) }
                                 .buttonStyle(.okchePrimary)
+                                .disabled(saved)
                         }
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
@@ -64,6 +67,17 @@ struct PetRegisterView: View {
             }
         }
         .sheet(isPresented: $pickingBirth) { BirthPicker(date: $form.birthDate) }
+        // 칸을 고치면 그 칸의 오류는 지운다(다시 누르기 전까지 틀렸다고 보이지 않게).
+        .onChange(of: form.name) { errors[.name] = nil }
+        .onChange(of: form.weightKg) { errors[.weight] = nil }
+        .onChange(of: form.approxAge) { errors[.age] = nil }
+        .onChange(of: form.birthDate) { errors[.birth] = nil }
+        .onChange(of: form.insulinSlots) { old, new in
+            errors[.insulinTimes] = nil
+            for slot in new where old.first(where: { $0.id == slot.id })?.units != slot.units {
+                errors[.insulinUnits(slot.id)] = nil
+            }
+        }
     }
 
     private var header: some View {
@@ -194,9 +208,11 @@ struct PetRegisterView: View {
     private static let ageHelp = "오늘에서 그만큼 거슬러 간 날을 생일로 잡아요. 1살이 안 됐으면 0을 넣어 주세요."
 
     private func save(_ scroller: ScrollViewProxy) {
+        guard !saved else { return }
         do {
             try form.save(in: context)
             errors = [:]
+            saved = true
             dismiss()
         } catch let invalid as PetRegistration.Invalid {
             errors = invalid.errors
@@ -235,10 +251,13 @@ private struct InsulinSection: View {
                         .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
                 }
                 OkcheFieldError(message: errors[.insulinTimes]).id(PetRegistration.Field.insulinTimes)
-                Button("+ 시간 추가") { form.insulinSlots.append(.init(time: "12:00")) }
-                    .okcheText(OkcheType.body, weight: .medium)
-                    .foregroundStyle(OkcheColor.namsaek)
-                    .frame(minHeight: 44)
+                Button { form.insulinSlots.append(.init(time: "12:00")) } label: {
+                    Text("+ 시간 추가")
+                        .okcheText(OkcheType.body, weight: .medium)
+                        .foregroundStyle(OkcheColor.namsaek)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
             }
             VStack(alignment: .leading, spacing: 8) {
                 OkcheFieldLabel(title: "주사기 종류").accessibilityAddTraits(.isHeader)
@@ -260,6 +279,7 @@ private struct InsulinSection: View {
         let error = errors[.insulinUnits(id)]
         let time = DatePicker("\(nth) 시간", selection: timeBinding(index), displayedComponents: .hourAndMinute)
             .labelsHidden()
+            .accessibilityLabel("\(nth) 시간") // labelsHidden이면 화면 읽기 이름이 '시간 선택기'가 됨
             .frame(maxWidth: .infinity, alignment: .leading)
             .okcheFieldBox()
         let units = HStack(spacing: 4) {
@@ -318,6 +338,14 @@ private struct BirthPicker: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            HStack {
+                Button("취소") { dismiss() }
+                Spacer()
+                if date != nil { Button("지우기") { date = nil; dismiss() } }
+            }
+            .okcheText(OkcheType.body, weight: .medium)
+            .foregroundStyle(OkcheColor.namsaek)
+            .frame(minHeight: 44)
             DatePicker("생일", selection: $picked, in: ...Date.now, displayedComponents: .date)
                 .datePickerStyle(.graphical)
                 .tint(OkcheColor.namsaek)
@@ -325,6 +353,7 @@ private struct BirthPicker: View {
                 .buttonStyle(.okchePrimary)
         }
         .padding(OkcheSpacing.space4)
+        .frame(maxHeight: .infinity, alignment: .top)
         .presentationDetents([.large])
         .onAppear { picked = date ?? .now }
     }

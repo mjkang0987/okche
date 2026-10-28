@@ -86,6 +86,14 @@ final class PetRegistrationTests: XCTestCase {
         XCTAssertEqual(form.validate(today: now, calendar: seoul), [.age: "0에서 30 사이로 넣어 주세요"])
     }
 
+    /// 무한대·NaN은 숫자로 보지 않는다(SwiftData가 JSON으로 못 바꿔 멈춤).
+    func testNumberRejectsNonFinite() {
+        XCTAssertNil(PetRegistration.number("1e400"))
+        XCTAssertNil(PetRegistration.number("nan"))
+        XCTAssertNil(PetRegistration.number("inf"))
+        XCTAssertEqual(PetRegistration.number("4,6"), 4.6)
+    }
+
     func testTinyWeightAndEmptyAge() throws {
         var form = PetRegistration()
         form.name = "콩이"

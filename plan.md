@@ -7,7 +7,7 @@
 
 **6단계 아이 등록·아이 정보** (`feature/pet-profile`, 아직 시작 안 함)
 
-- 4-1·5-1 저장은 `dev`에 합침(아래 '끝난 일'). 다음은 `main` PR을 할지 정한 뒤 6단계.
+- 4-1·5-1 저장은 `main`에 합침(PR #2, 2026-10-28). 다음은 6단계.
 - 할 일(표 6행): 아이 등록·아이 정보(당뇨 스위치·인슐린 설정 포함). 지운 아이에 딸린 줄 거르기(문서 1-4)를 화면에 붙일 때 같이.
 - 뒤 단계로 넘긴 것(4-1에서): 저장소를 App Group으로 옮기기(12단계 위젯 전, 출시 전), 출시 때 SchemaV1을 얼린 모델로 바꾸기(첫 출시 전), 백업 가져오기용 init(`Record.day`·시각을 그대로 받음, 13단계), 급식기 자동 기록은 `updatedAt` = 끼니 예정 시각(8단계 끼니).
 - 뒤 단계로 넘긴 것(5-1에서): ID 글자 소문자 — iOS `slotKey`·백업 내보내기에서 `.lowercased()`, 가져오기에서 소문자로 바꿔 견주기(8·13단계, 문서 1-1). 사진 줄과 파일 이름을 한 번에 만드는 함수(11단계, 안드로이드는 `file`을 호출하는 쪽이 넣음). 기기 자동 백업(안드로이드 `allowBackup`·iOS iCloud 기기 백업)에 저장소·이 기기만의 설정을 넣을지(13단계). 첫 출시 전: 머지 전 확인에 `./gradlew :app:assembleDebug && git diff --exit-code android/app/schemas`(엔티티를 바꾸고 version을 안 올리면 출시된 기기에서 열 때 죽음).
@@ -58,6 +58,7 @@
 
 ## 끝난 일
 
+- 2026-10-28 `main` 합침: PR #2(`dev` → `main`, 4-1·5-1 기기 안 저장). CI 없음 — `dev`에서 iOS 14·안드로이드 15 테스트·출시 빌드·design 검사 통과 확인 뒤 머지. `VERSION`은 그대로(0.1.0).
 - 2026-10-28 5-1 안드로이드 저장·`dev` 합침: `android/app/src/main/java/app/okche/store/` — Room 2.8.5 + KSP 2.3.12, 엔티티 13개(테이블·열 `snake_case`, ID 소문자 글자, 시각 UTC 밀리초, 선택지 enum 이름 = 문서 영어 값, 목록 칸 JSON, 설정 묶음 `@Embedded`), 색인 `record(pet_id, kind, day)`·`record(slot_key)`·`photo_pet` 두 칸, `OkcheDay`(`LocalDateTime` 벽시계 6시), `fixedId`(`UUID.nameUUIDFromBytes`). 같은 id 넣기는 오류(덮어쓰지 않음), 설정 줄은 `IGNORE`로 없을 때만. 앱 시작 때 설정 줄 만들기. 스키마 JSON `android/app/schemas/` 커밋. 테스트 11개(iOS와 같은 고정 ID·6시·서머타임 기대값, 13개 왕복, 검색, 목록에서 지운 줄 빼기, 설정, 같은 id 오류, 선택지 값 14종 — iOS에도 같은 선택지 테스트 추가). 리뷰·검증 3회, R8 출시 빌드 실행·DB를 sqlite로 확인. 문서 1-1에 ID 소문자 규칙.
 - 2026-10-28 4-1 iOS 저장·`dev` 합침: `ios/Okche/Store/` — SwiftData 모델 13개(관계 대신 ID 칸, 선택지는 영어 원시값, 기록 `kind`는 글자), `OkcheDay`(벽시계 6시 기준), 고정 ID(`UUID(fixedName:)`, Java와 같은 값), `SchemaV1`·`MigrationPlan`, CloudKit 끔. 앱 시작 때 저장소를 열고 설정 줄을 한 번 만들어 둠(못 열면 멈춤). SwiftData는 같은 id를 다시 넣으면 덮어써서(지운 줄도 되살아남) 고정 ID 줄은 있는지 먼저 봄(`Setting.loadOrCreate`). 테스트 9개(고정 ID, 6시·시간대·서머타임, 13개 왕복, 검색, 설정, 덮어쓰기). 리뷰·검증 3회, 디스크 저장소를 sqlite로 확인. 문서: 1-2 문구(벽시계 기준), 10장 설정 묶음 칸 이름·임시 처음 값. 확인 못 함: iOS 17·18 런타임.
 - 2026-10-28 `main` 합침: PR #1(`dev` → `main`, 4·5단계와 글꼴). CI 없음 — 이 맥에서 iOS 테스트·안드로이드 계측 테스트·design 테스트 통과 확인 뒤 머지. `VERSION`은 그대로(0.1.0).

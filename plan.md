@@ -5,10 +5,19 @@
 
 ## 지금 하는 일
 
-**4-1 iOS 저장** (`feature/ios-store`, 아직 시작 안 함)
+**4-1 iOS 저장** (`feature/ios-store`, 2026-10-28 시작)
 
 - 4·5단계와 글꼴은 `main`에 합침(PR #1, 2026-10-28).
-- 할 일: SwiftData 모델·하루 기준(6시)·고정 ID + 테스트. 그다음 5-1 안드로이드 저장(Room).
+- 요구사항: `docs/data-model.md`의 저장 대상 13개(아이·휴양 기간·기록·약·약 주기·인슐린·사료·사료 바꾸기·다과·끼니 계획·사진·사진-아이·함께 쓰는 설정)를 SwiftData 모델로. 하루 기준 6시(`day`), 고정 ID(UUID v3, 네임스페이스 없는 MD5). 화면은 이번 범위 밖(6단계부터).
+- 구현 방식:
+  - 모델끼리 SwiftData 관계를 쓰지 않고 문서대로 ID 칸(`petId` 등)으로 잇는다 — 백업 JSON·Room과 같은 모양.
+  - 모든 모델에 `id`(고유)·`createdAt`·`updatedAt`·`deletedAt`. 선택지는 문서의 영어 값을 원시값으로 갖는 enum. 기록의 `kind`는 검색에 쓰므로 글자로 저장(iOS 17 `#Predicate`가 enum 비교를 못 함). 기록 `data`는 JSON 글자.
+  - 목록·묶음 칸(`times`, `slots`, 설정의 알림 묶음)은 Codable 값.
+  - iOS 17이 최소라 `#Index`(iOS 18+)는 아직 못 씀 — 느려지면 그때.
+  - 앱 시작 때 `ModelContainer` 한 번 만들어 넣는다. 못 만들면 멈춘다(빈 저장소로 덮어쓰지 않게).
+- 영향받는 파일: `ios/Okche/Store/`(모델·하루 기준·고정 ID, 새 폴더), `ios/Okche/OkcheApp.swift`, `ios/OkcheTests/StoreTests.swift`(새 파일), `ios/Okche.xcodeproj`(XcodeGen 다시 생성).
+- 예상 결과·테스트: 고정 ID가 Java `UUID.nameUUIDFromBytes`와 같은 값(`okche:setting` → `c0236f43-0deb-3ae8-a64f-633d62651603`, 한글 이름 포함), 6시 경계(05:59 → 전날, 06:00 → 그날, 시간대 따름, 서머타임 날), 메모리 저장소에 모델 13개 넣고 다시 읽기, 같은 `id` 두 번 넣으면 한 줄.
+- 그다음: 5-1 안드로이드 저장(Room, 같은 고정 ID 값 테스트).
 - 3단계 데이터 구조는 끝남(아래 '끝난 일'). 디자인 남은 것 정리 때 캔버스 판 1793090186-890c → 데이터 구조 검토 반영 뒤 1793110210-fe6a.
 - **다음에 할 것** (순서대로):
   1. 준비: `index.md`·`plan.md`·`docs/data-model.md` 읽기. 디자인을 고칠 일이 있으면 `design/README.md`의 '새 세션에서 준비하기'.

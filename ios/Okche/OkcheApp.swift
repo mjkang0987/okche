@@ -1,7 +1,17 @@
+import SwiftData
 import SwiftUI
 
 @main
 struct OkcheApp: App {
+    /// 못 열면 멈춘다 — 빈 저장소로 새로 만들어 기록을 덮어쓰는 것보다 낫다.
+    private let container: ModelContainer = {
+        do {
+            return try OkcheStore.container()
+        } catch {
+            fatalError("저장소를 열 수 없음: \(error)")
+        }
+    }()
+
     /// 디자인의 탭 막대: 흰 바탕, 위 가는 선(line), 안 고른 탭은 inkMuted. 앱 전체 설정이라 앱 시작 때 한 번.
     init() {
         let appearance = UITabBarAppearance()
@@ -28,5 +38,6 @@ struct OkcheApp: App {
         WindowGroup {
             RootTabView()
         }
+        .modelContainer(container)
     }
 }

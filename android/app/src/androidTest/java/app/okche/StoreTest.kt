@@ -131,6 +131,8 @@ class StoreTest {
         assertEquals("2026-10-28", edited.day)
         assertEquals(100L, edited.updatedAt)
         assertEquals(0L, edited.createdAt)
+        // 화면에서 만드는 경로: day를 안 주면 기기 시간대로 정해진다.
+        assertEquals(OkcheDay.of(t), Record(petId = null, kind = RecordKind.vomit, occurredAt = t).day)
     }
 
     // 저장소
@@ -177,6 +179,14 @@ class StoreTest {
         assertEquals(photo, dao.photos().single())
         val record = dao.records(pet.id, RecordKind.glucose, "2026-10-28").single()
         assertEquals("""{"mgdl":180}""", record.data)
+        // 값을 읽는 함수가 아직 없는 표는 대표 칸을 직접 읽는다.
+        fun one(sql: String) = db.query(sql, null).use { it.moveToFirst(); it.getString(0) }
+        assertEquals(pet.id, one("SELECT pet_id FROM rest_period"))
+        assertEquals("0.5 pill pill medicine", one("SELECT dose_amount || ' ' || unit || ' ' || form || ' ' || category FROM medication"))
+        assertEquals("처방 사료", one("SELECT name FROM food"))
+        assertEquals("gradual 2026-10-28 0", one("SELECT method || ' ' || started_on || ' ' || checked_step FROM food_change"))
+        assertEquals("lickable 0", one("SELECT kind || ' ' || ok_during_food_change FROM snack"))
+        assertEquals("${photo.id} ${pet.id}", one("SELECT photo_id || ' ' || pet_id FROM photo_pet"))
         // 선택지는 문서의 영어 값 글자로 저장된다.
         db.query("SELECT species FROM pet", null).use { it.moveToFirst(); assertEquals("cat", it.getString(0)) }
         db.query("SELECT frequency FROM med_schedule", null).use { it.moveToFirst(); assertEquals("weekdays", it.getString(0)) }

@@ -21,7 +21,6 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "testRun
 androidx-test-espresso = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 
 [plugins]

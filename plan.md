@@ -17,7 +17,7 @@
   - 기록 색인: `pet_id + kind + day`, `slot_key`(문서 3장).
   - 같은 ID를 넣을 때 Room은 기본으로 오류를 낸다(SwiftData처럼 덮어쓰지 않음). 고정 ID 줄은 `IGNORE`로 넣어 없을 때만 만든다.
   - 앱 시작 때 데이터베이스를 열고 설정 줄을 없을 때만 만든다(백그라운드).
-- 영향받는 파일: `android/gradle/libs.versions.toml`, `android/build.gradle.kts`, `android/app/build.gradle.kts`, `android/app/src/main/java/app/okche/store/`(새 폴더), `MainActivity.kt`, `android/app/src/androidTest/java/app/okche/StoreTest.kt`(새 파일), `android/app/schemas/`.
+- 영향받는 파일: `android/gradle/libs.versions.toml`, `android/build.gradle.kts`, `android/app/build.gradle.kts`, `android/app/src/main/java/app/okche/store/`(새 폴더), `MainActivity.kt`, `android/app/src/androidTest/java/app/okche/StoreTest.kt`(새 파일), `android/app/schemas/`, `docs/data-model.md`(1-1 ID 소문자·1-2 문구), `ios/OkcheTests/StoreTests.swift`(선택지 값 테스트).
 - 예상 결과·테스트(에뮬레이터 `Okche_Phone`): 고정 ID 기대값 3개, 6시 경계·시간대·서머타임(iOS와 같은 경우), 13개 넣고 다시 읽기, 기록 검색(지운 줄 빼기), 설정 없을 때만 만들기·같은 ID 넣으면 오류.
 - 뒤 단계로 넘긴 것(4-1에서): 저장소를 App Group으로 옮기기(12단계 위젯 전, 출시 전), 출시 때 SchemaV1을 얼린 모델로 바꾸기(첫 출시 전), 백업 가져오기용 init(`Record.day`·시각을 그대로 받음, 13단계), 급식기 자동 기록은 `updatedAt` = 끼니 예정 시각(8단계 끼니).
 - 뒤 단계로 넘긴 것(5-1에서): ID 글자 소문자 — iOS `slotKey`·백업 내보내기에서 `.lowercased()`, 가져오기에서 소문자로 바꿔 견주기(8·13단계, 문서 1-1). 사진 줄과 파일 이름을 한 번에 만드는 함수(11단계, 안드로이드는 `file`을 호출하는 쪽이 넣음). 기기 자동 백업(안드로이드 `allowBackup`·iOS iCloud 기기 백업)에 저장소·이 기기만의 설정을 넣을지(13단계). 첫 출시 전: 머지 전 확인에 `./gradlew :app:assembleDebug && git diff --exit-code android/app/schemas`(엔티티를 바꾸고 version을 안 올리면 출시된 기기에서 열 때 죽음).

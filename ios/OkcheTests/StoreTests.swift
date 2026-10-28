@@ -13,6 +13,27 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(UUID(fixedName: "옥체").uuidString.lowercased(), "075f430b-623d-35eb-97d9-51fe7a58e9df")
     }
 
+    /// 선택지 저장 값이 문서·안드로이드(`StoreTest.choiceValuesMatchDoc`)와 글자 하나까지 같은지.
+    func testChoiceValuesMatchDoc() {
+        func names<T: CaseIterable & RawRepresentable>(_: T.Type) -> String where T.RawValue == String {
+            T.allCases.map(\.rawValue).joined(separator: " ")
+        }
+        XCTAssertEqual(names(Species.self), "cat dog")
+        XCTAssertEqual(names(RecordKind.self), "vomit stool urine meal snack weight med glucose insulin")
+        XCTAssertEqual(names(MedCategory.self), "medicine supplement")
+        XCTAssertEqual(names(MedForm.self), "pill powder liquid topical injection")
+        XCTAssertEqual(names(DoseUnit.self), "pill ml pack drop")
+        XCTAssertEqual(names(MedFrequency.self), "daily everyNDays weekdays everyNHours asNeeded")
+        XCTAssertEqual(names(HowTo.self), "plain inFood inTreat syringe")
+        XCTAssertEqual(names(Syringe.self), "u40 u100 unknown")
+        XCTAssertEqual(names(FoodChangeMethod.self), "gradual atOnce")
+        XCTAssertEqual(names(SnackKind.self), "lickable freezeDried jerky wet prescription human")
+        XCTAssertEqual(names(MealMode.self), "direct feeder")
+        XCTAssertEqual(names(PhotoKind.self), "normal body")
+        XCTAssertEqual(names(BodyView.self), "top side")
+        XCTAssertEqual(names(CelebrateTone.self), "joseon plain")
+    }
+
     // MARK: 하루 기준 6시 (1-2)
 
     private func date(_ tz: String, _ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int = 0) -> Date {

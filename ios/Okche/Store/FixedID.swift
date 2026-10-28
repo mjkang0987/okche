@@ -16,6 +16,7 @@ extension UUID {
 
     /// 급식기 자동 기록. 같은 차례면 두 기기가 따로 만들어도 같은 ID.
     /// 같은 ID 줄이 없을 때만(지운 줄 포함) 만든다 — 다시 넣으면 지운 기록·고친 기록을 덮어쓴다.
+    /// `updatedAt`은 만든 때가 아니라 끼니 예정 시각(1-5) — 보호자가 고친 기록이 병합에서 이기게.
     static func feederRecord(slotKey: String) -> UUID {
         UUID(fixedName: "okche:feeder:\(slotKey)")
     }

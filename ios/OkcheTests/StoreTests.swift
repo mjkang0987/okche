@@ -162,9 +162,11 @@ final class StoreTests: XCTestCase {
         let context = container.mainContext
         try Setting.loadOrCreate(in: context).lowMedDays = 5
         try context.save()
-        XCTAssertEqual(try Setting.loadOrCreate(in: context).lowMedDays, 5)
-        try context.save()
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Setting>()), 1)
+        // 앱을 다시 켤 때처럼 새 문맥에서 저장된 줄을 찾는다.
+        let fresh = ModelContext(container)
+        XCTAssertEqual(try Setting.loadOrCreate(in: fresh).lowMedDays, 5)
+        try fresh.save()
+        XCTAssertEqual(try fresh.fetchCount(FetchDescriptor<Setting>()), 1)
     }
 
     /// 같은 id를 다시 넣으면 SwiftData가 기존 줄을 덮어쓴다(지운 줄도 되살아남) — 고정 ID 줄을 있는지 먼저 보고 넣어야 하는 이유.

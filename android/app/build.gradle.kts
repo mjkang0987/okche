@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.compose.material.icons)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
+    implementation(libs.datastore.preferences)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

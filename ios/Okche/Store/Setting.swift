@@ -65,7 +65,7 @@ final class Setting {
     }
 
     /// 설정 줄을 읽고, 없을 때만 처음 값으로 만든다. 그냥 넣으면 고른 설정을 처음 값으로 덮어쓴다.
-    @MainActor
+    /// 앱 시작 때 한 번 만들어 저장해 둔다(`OkcheApp`) — 두 문맥이 동시에 처음 만들면 늦게 저장한 쪽이 덮기 때문.
     static func loadOrCreate(in context: ModelContext) throws -> Setting {
         let id = UUID.setting
         if let existing = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.id == id })).first {

@@ -5,7 +5,7 @@ import SwiftData
 // 공통 칸: id(고유) · createdAt · updatedAt(고칠 때마다) · deletedAt(지운 때, 줄은 남김).
 // id가 겹치는 줄을 넣으면 SwiftData는 오류 없이 기존 줄을 통째로 덮어쓴다(지운 줄도 되살아남).
 // 고정 ID 줄은 꼭 있는지 먼저 보고 넣는다(`Setting.loadOrCreate`처럼). 백업 병합도 넣기 전에 11장 규칙으로 고른다.
-// Codable 구조체 칸에 칸을 더할 때는 Optional로 — 이미 저장된 값을 못 읽으면 저장소가 안 열린다.
+// Codable 구조체 칸에 칸을 더할 때는 Optional로 — 이미 저장된 값을 못 읽어 앱이 죽을 수 있다.
 
 enum Species: String, Codable, CaseIterable {
     case cat, dog

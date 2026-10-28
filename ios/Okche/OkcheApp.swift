@@ -6,7 +6,10 @@ struct OkcheApp: App {
     /// 못 열면 멈춘다 — 빈 저장소로 새로 만들어 기록을 덮어쓰는 것보다 낫다.
     private let container: ModelContainer = {
         do {
-            return try OkcheStore.container()
+            let container = try OkcheStore.container()
+            _ = try Setting.loadOrCreate(in: container.mainContext)
+            try container.mainContext.save()
+            return container
         } catch {
             fatalError("저장소를 열 수 없음: \(error)")
         }

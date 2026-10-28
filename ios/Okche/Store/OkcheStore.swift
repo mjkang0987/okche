@@ -9,11 +9,13 @@ enum OkcheStore {
 
     static func container(inMemory: Bool = false) throws -> ModelContainer {
         try ModelContainer(for: Schema(versionedSchema: SchemaV1.self), migrationPlan: MigrationPlan.self,
-                           configurations: ModelConfiguration(isStoredInMemoryOnly: inMemory))
+                           // 백업은 본인 iCloud Drive 파일로 한다. CloudKit 동기화는 쓰지 않는다(켜지면 .unique를 못 씀).
+                           configurations: ModelConfiguration(isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none))
     }
 }
 
-/// 첫 출시 구조. 모델을 바꾸면 지금 모델을 SchemaV1 안으로 얼려 두고 SchemaV2와 옮기는 단계를 더한다.
+/// 첫 출시 구조. 출시한 뒤에는 칸 하나를 더하는 것도 SchemaV2로 한다: 출시 때 모델을 SchemaV1 안으로 얼려 두고
+/// 옮기는 단계를 더한다. 그냥 바꿔도 경량 마이그레이션으로 열리긴 하지만, 나중에 V1을 얼릴 때 버전이 안 맞게 된다.
 enum SchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] { OkcheStore.models }

@@ -8,7 +8,10 @@ struct OkcheApp: App {
         do {
             // 화면 테스트(OkcheUITests)는 빈 저장소에서 시작한다.
             let uiTesting = ProcessInfo.processInfo.arguments.contains("-ui-testing")
-            if uiTesting { UserDefaults.standard.removeObject(forKey: "onboardingDone") }
+            // `-keep-settings`면 기기 설정은 남겨 다시 실행했을 때를 본다.
+            if uiTesting, !ProcessInfo.processInfo.arguments.contains("-keep-settings") {
+                UserDefaults.standard.removeObject(forKey: "onboardingDone")
+            }
             let container = try OkcheStore.container(inMemory: uiTesting)
             _ = try Setting.loadOrCreate(in: container.mainContext)
             try container.mainContext.save()

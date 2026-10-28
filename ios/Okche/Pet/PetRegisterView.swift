@@ -42,8 +42,11 @@ struct PetRegisterView: View {
                             InsulinSection(form: $form, errors: errors, focused: $focused)
                                 .padding(.top, -6)
                         }
-                        Button("모시기") { save(scroller) }
-                            .buttonStyle(.okchePrimary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            OkcheFieldError(message: errors[.save])
+                            Button("모시기") { save(scroller) }
+                                .buttonStyle(.okchePrimary)
+                        }
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
                     .padding(.top, 8)
@@ -53,18 +56,25 @@ struct PetRegisterView: View {
             }
         }
         .background(OkcheColor.hanji)
+        // 숫자 자판에는 리턴 키가 없어 닫는 버튼을 붙인다.
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("완료") { focused = nil }
+            }
+        }
         .sheet(isPresented: $pickingBirth) { BirthPicker(date: $form.birthDate) }
     }
 
     private var header: some View {
         HStack(spacing: 4) {
             Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 18, weight: .medium)).foregroundStyle(OkcheColor.ink)
-                    .frame(width: 44, height: 44).contentShape(Rectangle())
+                Image(systemName: "xmark").font(.title2.weight(.medium)).foregroundStyle(OkcheColor.ink)
+                    .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("닫기")
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) { headerTitle; headerNote }
+                HStack(alignment: .firstTextBaseline, spacing: 8) { headerTitle; headerNote }
                 headerTitle
             }
             .accessibilityElement(children: .combine)
@@ -101,7 +111,7 @@ struct PetRegisterView: View {
                 HStack {
                     Text(form.breed).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).multilineTextAlignment(.leading)
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.down").font(.system(size: 16, weight: .medium)).foregroundStyle(OkcheColor.inkMuted)
+                    Image(systemName: "chevron.down").font(.body.weight(.medium)).foregroundStyle(OkcheColor.inkMuted)
                 }
                 .okcheFieldBox()
             }
@@ -112,8 +122,20 @@ struct PetRegisterView: View {
 
     private var furPicker: some View {
         group("털색") {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(PetCatalog.furColors(form.species), id: \.self) { fur in
+            // 큰 글자에서 이름이 꺾이면 두 줄로.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) { furButtons(PetCatalog.furColors(form.species)) }
+                VStack(alignment: .leading, spacing: 12) {
+                    let furs = PetCatalog.furColors(form.species)
+                    HStack(alignment: .top, spacing: 12) { furButtons(Array(furs.prefix(2))) }
+                    HStack(alignment: .top, spacing: 12) { furButtons(Array(furs.suffix(2))) }
+                }
+            }
+        }
+    }
+
+    private func furButtons(_ furs: [PetCatalog.FurColor]) -> some View {
+                ForEach(furs, id: \.self) { fur in
                     let on = fur.name == form.furColor
                     Button { form.furColor = fur.name } label: {
                         VStack(spacing: 4) {
@@ -124,6 +146,7 @@ struct PetRegisterView: View {
                                 .overlay(Circle().strokeBorder(on ? OkcheColor.namsaek : .clear, lineWidth: 2))
                                 .padding(-5)
                             Text(fur.name).okcheText(OkcheType.label, weight: on ? .bold : .regular).foregroundStyle(OkcheColor.ink)
+                                .fixedSize()
                         }
                         .frame(minWidth: 48)
                         .contentShape(Rectangle())
@@ -132,14 +155,13 @@ struct PetRegisterView: View {
                     .accessibilityLabel(fur.name)
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
-            }
-        }
     }
 
     private var birthSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             if form.birthUnknown {
-                OkcheTextField(label: "나이", note: "(대략)", text: $form.approxAge, unit: "살쯤", keyboard: .numberPad, error: errors[.age])
+                OkcheTextField(label: "나이", note: "(대략)", text: $form.approxAge, unit: "살쯤", keyboard: .numberPad, error: errors[.age],
+                               hint: Self.ageHelp)
                     .focused($focused, equals: .age).id(PetRegistration.Field.age)
             } else {
                 OkcheFieldLabel(title: "생일").accessibilityHidden(true)
@@ -149,7 +171,7 @@ struct PetRegisterView: View {
                             .okcheText(OkcheType.body)
                             .foregroundStyle(form.birthDate == nil ? OkcheColor.inkMuted : OkcheColor.ink)
                         Spacer(minLength: 8)
-                        Image(systemName: "calendar").font(.system(size: 18)).foregroundStyle(OkcheColor.ink)
+                        Image(systemName: "calendar").font(.body).foregroundStyle(OkcheColor.ink)
                     }
                     .okcheFieldBox(isError: errors[.birth] != nil)
                 }
@@ -162,11 +184,14 @@ struct PetRegisterView: View {
             Toggle("생일을 몰라요 (나이를 어림잡아 넣을게요)", isOn: $form.birthUnknown)
                 .toggleStyle(CheckboxStyle())
             if form.birthUnknown {
-                Text("오늘에서 그만큼 거슬러 간 날을 생일로 잡아요. 1살이 안 됐으면 0을 넣어 주세요.")
+                Text(Self.ageHelp)
                     .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    .accessibilityHidden(true) // 나이 칸의 힌트로 읽는다
             }
         }
     }
+
+    private static let ageHelp = "오늘에서 그만큼 거슬러 간 날을 생일로 잡아요. 1살이 안 됐으면 0을 넣어 주세요."
 
     private func save(_ scroller: ScrollViewProxy) {
         do {
@@ -181,9 +206,13 @@ struct PetRegisterView: View {
             if let first = order.first(where: { errors[$0] != nil }) {
                 withAnimation { scroller.scrollTo(first, anchor: .center) }
                 if first != .birth, first != .insulinTimes { focused = first }
+                // 화면 읽기: 오류 수와 첫 오류를 한 번에(같은 오류로 다시 눌러도 다시 알린다).
+                let message = errors.count == 1 ? errors[first]! : "고칠 곳 \(errors.count)개. \(errors[first]!)"
+                AccessibilityNotification.Announcement(message).post()
             }
         } catch {
-            errors = [.name: "저장하지 못했어요. 다시 해 주세요."]
+            errors = [.save: "저장하지 못했어요. 다시 해 주세요."]
+            AccessibilityNotification.Announcement(errors[.save]!).post()
         }
     }
 }
@@ -214,7 +243,7 @@ private struct InsulinSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 OkcheFieldLabel(title: "주사기 종류").accessibilityAddTraits(.isHeader)
                 OkcheChoiceChips(options: [(Syringe.u40, "U-40"), (.u100, "U-100"), (.unknown, "잘 모르겠어요")],
-                                 selection: Binding { form.syringe } set: { form.syringe = $0 ?? .unknown })
+                                 selection: Binding { form.syringe } set: { form.syringe = $0 ?? .unknown }, allowsNone: false)
                 note("인슐린과 맞는 주사기를 쓰길 권해요. 모르면 병원에 물어보길 권해요.")
             }
             note("병원에서 정해 준 양을 넣어 주세요. 나중에 아이 정보에서 바꿀 수 있어요.").padding(.bottom, 8)
@@ -229,31 +258,36 @@ private struct InsulinSection: View {
         let order = ["첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
         let nth = index < order.count ? order[index] : "\(index + 1)번째"
         let error = errors[.insulinUnits(id)]
+        let time = DatePicker("\(nth) 시간", selection: timeBinding(index), displayedComponents: .hourAndMinute)
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .okcheFieldBox()
+        let units = HStack(spacing: 4) {
+            TextField("", text: $form.insulinSlots[index].units)
+                .okcheText(OkcheType.body)
+                .keyboardType(.decimalPad)
+                .focused(focused, equals: .insulinUnits(id))
+                .accessibilityLabel("\(nth) 양 (단위)")
+            Text("단위").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                .fixedSize()
+                .accessibilityHidden(true)
+        }
+        .okcheFieldBox(isError: error != nil)
+        let remove = Button { form.insulinSlots.remove(at: index) } label: {
+            Image(systemName: "xmark").font(.title3.weight(.medium)).foregroundStyle(OkcheColor.lineStrong)
+                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        }
+        .accessibilityLabel("\(nth) 시간 빼기")
+        .disabled(form.insulinSlots.count == 1)
+        .opacity(form.insulinSlots.count == 1 ? 0.4 : 1)
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                DatePicker("\(nth) 시간", selection: timeBinding(index), displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .okcheFieldBox()
-                    .accessibilityLabel("\(nth) 시간")
-                HStack(spacing: 4) {
-                    TextField("", text: $form.insulinSlots[index].units)
-                        .okcheText(OkcheType.body)
-                        .keyboardType(.decimalPad)
-                        .focused(focused, equals: .insulinUnits(id))
-                        .accessibilityLabel("\(nth) 양 (단위)")
-                    Text("단위").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                        .accessibilityHidden(true)
+            // 큰 글자에서 한 줄에 안 들어가면 시간 / 양·빼기로 나눈다.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { time; units.frame(width: 104); remove }
+                VStack(alignment: .leading, spacing: 8) {
+                    time
+                    HStack(spacing: 8) { units; remove }
                 }
-                .okcheFieldBox(isError: error != nil)
-                .frame(width: 104)
-                Button { form.insulinSlots.remove(at: index) } label: {
-                    Image(systemName: "xmark").font(.system(size: 16, weight: .medium)).foregroundStyle(OkcheColor.lineStrong)
-                        .frame(width: 44, height: 44).contentShape(Rectangle())
-                }
-                .accessibilityLabel("\(nth) 시간 빼기")
-                .disabled(form.insulinSlots.count == 1)
-                .opacity(form.insulinSlots.count == 1 ? 0.4 : 1)
             }
             OkcheFieldError(message: error)
         }
@@ -302,7 +336,7 @@ private struct CheckboxStyle: ToggleStyle {
         Button { configuration.isOn.toggle() } label: {
             HStack(spacing: 8) {
                 Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 22))
+                    .font(.title3)
                     .foregroundStyle(configuration.isOn ? OkcheColor.namsaek : OkcheColor.lineStrong)
                 configuration.label.okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).multilineTextAlignment(.leading)
             }

@@ -35,7 +35,7 @@ struct PetRegistration {
     }
 
     enum Field: Hashable {
-        case name, birth, age, weight, insulinTimes
+        case name, birth, age, weight, insulinTimes, save
         case insulinUnits(UUID)
     }
 
@@ -54,14 +54,19 @@ struct PetRegistration {
         } else if let birthDate, calendar.startOfDay(for: birthDate) > calendar.startOfDay(for: today) {
             errors[.birth] = "오늘보다 뒤 날짜는 넣을 수 없어요"
         }
-        if let text = trimmed(weightKg), !(Self.number(text).map { $0 > 0 && $0 <= 100 } ?? false) {
+        // 그램으로 반올림해 1 이상이어야 기록이 의미 있다.
+        if let text = trimmed(weightKg), !(Self.number(text).map { ($0 * 1000).rounded() >= 1 && $0 <= 100 } ?? false) {
             errors[.weight] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
         }
         if hasDiabetes {
-            for slot in insulinSlots where !(trimmed(slot.units).flatMap(Self.number).map { $0 > 0 } ?? false) {
-                errors[.insulinUnits(slot.id)] = "양을 넣어 주세요"
+            for slot in insulinSlots {
+                guard let text = trimmed(slot.units) else { errors[.insulinUnits(slot.id)] = "양을 넣어 주세요"; continue }
+                if !(Self.number(text).map { $0 > 0 && $0 <= 100 } ?? false) {
+                    errors[.insulinUnits(slot.id)] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
+                }
             }
-            if Set(insulinSlots.map(\.time)).count != insulinSlots.count { errors[.insulinTimes] = "같은 시간이 두 번 있어요" }
+            if insulinSlots.isEmpty { errors[.insulinTimes] = "시간을 하나 이상 넣어 주세요" }
+            else if Set(insulinSlots.map(\.time)).count != insulinSlots.count { errors[.insulinTimes] = "같은 시간이 두 번 있어요" }
         }
         return errors
     }
@@ -78,8 +83,9 @@ struct PetRegistration {
                 .flatMap { calendar.date(byAdding: .year, value: -$0, to: now) }
                 .map { Self.day($0, calendar) }
         }
+        // 나이를 비워 날짜가 없으면 어림잡음 표시도 하지 않는다.
         let pet = Pet(now: now, name: trimmed(name)!, species: species, breed: breed, furColor: furColor, sex: sex,
-                      neutered: neutered, birthDate: birth, birthEstimated: birthUnknown, diagnosis: trimmed(diagnosis),
+                      neutered: neutered, birthDate: birth, birthEstimated: birthUnknown && birth != nil, diagnosis: trimmed(diagnosis),
                       hasDiabetes: hasDiabetes)
         context.insert(pet)
         if let kg = trimmed(weightKg).flatMap(Self.number) {
@@ -109,8 +115,9 @@ struct PetRegistration {
     }
 
     /// 소수점은 점·쉼표 모두 받는다(기기 지역 설정에 따라 숫자 자판이 쉼표를 낼 수 있음).
+    /// 유한한 값만(아주 긴 숫자·'inf'는 무한대가 되어 저장할 수 없음).
     static func number(_ text: String) -> Double? {
-        Double(text.replacingOccurrences(of: ",", with: "."))
+        Double(text.replacingOccurrences(of: ",", with: ".")).flatMap { $0.isFinite ? $0 : nil }
     }
 
     /// 기기 달력 날짜 `YYYY-MM-DD`.

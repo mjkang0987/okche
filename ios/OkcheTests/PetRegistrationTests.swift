@@ -86,6 +86,18 @@ final class PetRegistrationTests: XCTestCase {
         XCTAssertEqual(form.validate(today: now, calendar: seoul), [.age: "0에서 30 사이로 넣어 주세요"])
     }
 
+    func testTinyWeightAndEmptyAge() throws {
+        var form = PetRegistration()
+        form.name = "콩이"
+        form.weightKg = "0.0004" // 0g이 된다
+        XCTAssertEqual(form.validate(today: now, calendar: seoul)[.weight], "0보다 크고 100 이하인 숫자로 넣어 주세요")
+        form.weightKg = ""
+        form.birthUnknown = true // 나이를 비우면 날짜도 어림잡음도 없다
+        let pet = try form.save(in: context, now: now, calendar: seoul)
+        XCTAssertNil(pet.birthDate)
+        XCTAssertFalse(pet.birthEstimated)
+    }
+
     func testWeightBecomesGramsRecord() throws {
         var form = PetRegistration()
         form.name = "콩이"
@@ -120,16 +132,20 @@ final class PetRegistrationTests: XCTestCase {
         var form = PetRegistration()
         form.name = "콩이"
         form.hasDiabetes = true
-        let missing = form.insulinSlots[0].id
-        form.insulinSlots = [.init(time: "08:00", units: "2"), .init(time: "08:00", units: "2")]
-        form.insulinSlots.append(.init(time: "12:00", units: "0"))
-        let zero = form.insulinSlots[2].id
+        form.insulinSlots = [.init(time: "08:00", units: "2"), .init(time: "08:00", units: ""),
+                             .init(time: "12:00", units: "0"), .init(time: "13:00", units: "1e400")]
+        let ids = form.insulinSlots.map(\.id)
         let errors = form.validate(today: now, calendar: seoul)
         XCTAssertEqual(errors[.insulinTimes], "같은 시간이 두 번 있어요")
-        XCTAssertEqual(errors[.insulinUnits(zero)], "양을 넣어 주세요")
-        XCTAssertNil(errors[.insulinUnits(missing)])
+        XCTAssertNil(errors[.insulinUnits(ids[0])])
+        XCTAssertEqual(errors[.insulinUnits(ids[1])], "양을 넣어 주세요")
+        XCTAssertEqual(errors[.insulinUnits(ids[2])], "0보다 크고 100 이하인 숫자로 넣어 주세요")
+        // 무한대는 숫자가 아니다(저장하면 SwiftData가 멈춤).
+        XCTAssertEqual(errors[.insulinUnits(ids[3])], "0보다 크고 100 이하인 숫자로 넣어 주세요")
         XCTAssertThrowsError(try form.save(in: context, now: now, calendar: seoul))
         XCTAssertEqual(try count(Pet.self), 0)
+        form.insulinSlots = []
+        XCTAssertEqual(form.validate(today: now, calendar: seoul)[.insulinTimes], "시간을 하나 이상 넣어 주세요")
         // 당뇨를 끄면 인슐린 칸은 보지 않고 저장하지 않는다.
         form.hasDiabetes = false
         try form.save(in: context, now: now, calendar: seoul)

@@ -35,7 +35,7 @@ struct OkcheFieldLabel: View {
     }
 }
 
-/// 칸 아래 오류 글자. 화면 읽기 프로그램이 바로 읽도록 알린다.
+/// 칸 아래 오류 글자. 화면 읽기 알림은 저장하는 쪽이 한 번에 한다(여러 칸이 따로 알리면 겹침).
 struct OkcheFieldError: View {
     let message: String?
 
@@ -44,7 +44,6 @@ struct OkcheFieldError: View {
             Text(message)
                 .okcheText(OkcheType.label, weight: .regular)
                 .foregroundStyle(OkcheColor.yeonji)
-                .onAppear { AccessibilityNotification.Announcement(message).post() }
         }
     }
 }
@@ -58,6 +57,8 @@ struct OkcheTextField: View {
     var unit: String?
     var keyboard: UIKeyboardType = .default
     var error: String?
+    /// 칸 아래 설명처럼 화면 읽기에서 칸과 함께 읽을 말.
+    var hint: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -67,8 +68,9 @@ struct OkcheTextField: View {
                     .okcheText(OkcheType.body)
                     .foregroundStyle(OkcheColor.ink)
                     .keyboardType(keyboard)
-                    .accessibilityLabel(label)
+                    .accessibilityLabel([label, note].compactMap { $0 }.joined(separator: " "))
                     .accessibilityValue(unit.map { text.isEmpty ? "" : "\(text) \($0)" } ?? text)
+                    .accessibilityHint(hint ?? "")
                 if let unit {
                     Text(unit).okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted).accessibilityHidden(true)
                 }
@@ -80,9 +82,11 @@ struct OkcheTextField: View {
 }
 
 /// ② 고르기 칩: 40 높이 알약 중 하나만. `selection`이 nil이면 아무것도 안 고른 상태.
+/// `allowsNone`이면 고른 칩을 다시 눌러 안 고름으로 되돌린다('(선택)' 칸).
 struct OkcheChoiceChips<Value: Hashable>: View {
     let options: [(value: Value, title: String)]
     @Binding var selection: Value?
+    var allowsNone = true
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 40
 
     var body: some View {
@@ -96,7 +100,7 @@ struct OkcheChoiceChips<Value: Hashable>: View {
     private var chips: some View {
         ForEach(options, id: \.value) { option in
             let on = option.value == selection
-            Button { selection = option.value } label: {
+            Button { selection = on && allowsNone ? nil : option.value } label: {
                 Text(option.title)
                     .okcheText(OkcheType.body, weight: on ? .bold : .regular)
                     .fixedSize()
@@ -177,6 +181,8 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
         configuration.label
             .okcheText(OkcheType.heading)
             .foregroundStyle(OkcheColor.paper)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, OkcheSpacing.space4)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
             .opacity(configuration.isPressed ? 0.85 : 1)

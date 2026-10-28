@@ -4,6 +4,8 @@ import SwiftUI
 struct OnboardingView: View {
     @AppStorage("onboardingDone") private var onboardingDone = false
     @State private var registering = false
+    @ScaledMetric(relativeTo: .body) private var iconBox: CGFloat = 44
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         GeometryReader { screen in
@@ -53,6 +55,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24)
+        .padding(.vertical, 28) // 큰 글자에서도 금테(12 안쪽 + 매듭 9) 안에 머물게
         .frame(maxWidth: .infinity, minHeight: 180)
         .background(OkcheColor.namsaekDeep)
         .overlay(GoldFrame(inset: 12).stroke(goldGradient, lineWidth: 1.1).accessibilityHidden(true))
@@ -70,12 +73,15 @@ struct OnboardingView: View {
     }
 
     private func feature(_ icon: String, _ title: String, _ detail: String) -> some View {
-        HStack(spacing: 14) {
+        // 접근성 크기에서는 아이콘을 글자 위에 둬 글자 폭을 지킨다.
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(spacing: 14))
+        return layout {
             Image(systemName: icon)
-                .font(.system(size: 22))
+                .font(.title2)
                 .environment(\.symbolVariants, .none)
                 .foregroundStyle(OkcheColor.namsaekDeep)
-                .frame(width: 44, height: 44)
+                .frame(width: iconBox, height: iconBox)
                 .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusSm))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -84,6 +90,7 @@ struct OnboardingView: View {
             }
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
         .accessibilityElement(children: .combine)

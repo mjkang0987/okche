@@ -11,11 +11,12 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 | 칸 | 형식 | 뜻 |
 |---|---|---|
-| `id` | UUID 문자열 | 고유 ID. 기기에서 만든다(Swift `UUID()`, Kotlin `UUID.randomUUID()`). 하나만 있어야 하는 것은 1-5의 고정 ID를 쓴다. |
+| `id` | UUID 문자열 (소문자) | 고유 ID. 기기에서 만든다(Swift `UUID()`, Kotlin `UUID.randomUUID()`). 하나만 있어야 하는 것은 1-5의 고정 ID를 쓴다. |
 | `createdAt` | UTC 시각 (밀리초) | 처음 만든 때 |
 | `updatedAt` | UTC 시각 (밀리초) | 마지막으로 고친 때. 고칠 때마다 바꾼다. |
 | `deletedAt` | UTC 시각 또는 없음 | 지운 때. 1-4 참고. |
 
+- ID를 글자로 쓸 때(백업 JSON, `slotKey`, 고정 ID 이름, 사진 파일 이름)는 늘 **소문자** (2026-10-28 5-1에서 정함). Swift `uuidString`은 대문자라 `.lowercased()`를 쓴다. 가져올 때도 소문자로 바꿔 견준다 — 안 그러면 같은 줄이 둘이 되고, `slotKey`에서 만든 급식기 고정 ID가 기기마다 달라진다.
 - 시각은 모두 UTC로 저장하고, 화면에 보일 때만 기기 시간대로 바꾼다.
 - 이름 규칙: 문서·백업 JSON·Swift·Kotlin은 `camelCase`, Room 테이블·열 이름은 `snake_case`.
 - 선택지 값은 화면 글자가 아니라 이 문서의 영어 값으로 저장한다(문구를 바꿔도 기록이 깨지지 않게).

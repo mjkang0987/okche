@@ -19,6 +19,8 @@ import app.okche.store.MedSchedule
 import app.okche.store.Medication
 import app.okche.store.DoseUnit
 import app.okche.store.BodyView
+import app.okche.store.CelebrateTone
+import app.okche.store.HowTo
 import app.okche.store.OkcheDatabase
 import app.okche.store.OkcheDay
 import app.okche.store.Pet
@@ -65,6 +67,32 @@ class StoreTest {
         assertEquals("c0236f43-0deb-3ae8-a64f-633d62651603", FixedIds.SETTING)
         assertEquals("92c60769-4d57-30ba-9ba1-6cf8ccd959d9", FixedIds.feederRecord("abc|2026-10-28|08:00"))
         assertEquals("075f430b-623d-35eb-97d9-51fe7a58e9df", fixedId("옥체"))
+    }
+
+    /** 선택지 저장 값이 문서·iOS(`StoreTests.testChoiceValuesMatchDoc`)와 글자 하나까지 같은지. */
+    @Test fun choiceValuesMatchDoc() {
+        val expected = mapOf(
+            "Species" to "cat dog",
+            "RecordKind" to "vomit stool urine meal snack weight med glucose insulin",
+            "MedCategory" to "medicine supplement",
+            "MedForm" to "pill powder liquid topical injection",
+            "DoseUnit" to "pill ml pack drop",
+            "MedFrequency" to "daily everyNDays weekdays everyNHours asNeeded",
+            "HowTo" to "plain inFood inTreat syringe",
+            "Syringe" to "u40 u100 unknown",
+            "FoodChangeMethod" to "gradual atOnce",
+            "SnackKind" to "lickable freezeDried jerky wet prescription human",
+            "MealMode" to "direct feeder",
+            "PhotoKind" to "normal body",
+            "BodyView" to "top side",
+            "CelebrateTone" to "joseon plain",
+        )
+        val actual = listOf(
+            Species.entries, RecordKind.entries, MedCategory.entries, MedForm.entries, DoseUnit.entries, MedFrequency.entries,
+            HowTo.entries, Syringe.entries, FoodChangeMethod.entries, SnackKind.entries, MealMode.entries, PhotoKind.entries,
+            BodyView.entries, CelebrateTone.entries,
+        ).associate { values -> values.first().javaClass.simpleName to values.joinToString(" ") { it.name } }
+        assertEquals(expected, actual)
     }
 
     // 하루 기준 6시 (1-2) — iOS와 같은 경우

@@ -9,7 +9,10 @@ import java.time.ZoneId
 @Suppress("EnumEntryName")
 enum class RecordKind { vomit, stool, urine, meal, snack, weight, med, glucose, insulin }
 
-/** 일기 기록 하나 (3장). 실록 집계가 `petId + kind + day`로 한 번에 되도록 한 테이블. */
+/**
+ * 일기 기록 하나 (3장). 실록 집계가 `petId + kind + day`로 한 번에 되도록 한 테이블.
+ * 시각을 바꿀 때는 `copy(occurredAt = …)`가 아니라 꼭 `withOccurredAt` — 안 그러면 `day`가 옛 날짜로 남는다.
+ */
 @Entity(tableName = "record", indices = [Index("pet_id", "kind", "day"), Index("slot_key")])
 data class Record(
     @PrimaryKey val id: String = newId(),

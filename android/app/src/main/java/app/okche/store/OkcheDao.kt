@@ -37,11 +37,12 @@ abstract class OkcheDao {
         return checkNotNull(setting(FixedIds.SETTING))
     }
 
-    @Query("SELECT * FROM pet ORDER BY created_at") abstract suspend fun pets(): List<Pet>
-    @Query("SELECT * FROM med_schedule") abstract suspend fun medSchedules(): List<MedSchedule>
-    @Query("SELECT * FROM insulin_plan") abstract suspend fun insulinPlans(): List<InsulinPlan>
-    @Query("SELECT * FROM meal_plan") abstract suspend fun mealPlans(): List<MealPlan>
-    @Query("SELECT * FROM photo") abstract suspend fun photos(): List<Photo>
+    // 화면에 보일 목록은 지운 줄을 뺀다(1-4).
+    @Query("SELECT * FROM pet WHERE deleted_at IS NULL ORDER BY created_at") abstract suspend fun pets(): List<Pet>
+    @Query("SELECT * FROM med_schedule WHERE deleted_at IS NULL") abstract suspend fun medSchedules(): List<MedSchedule>
+    @Query("SELECT * FROM insulin_plan WHERE deleted_at IS NULL") abstract suspend fun insulinPlans(): List<InsulinPlan>
+    @Query("SELECT * FROM meal_plan WHERE deleted_at IS NULL") abstract suspend fun mealPlans(): List<MealPlan>
+    @Query("SELECT * FROM photo WHERE deleted_at IS NULL") abstract suspend fun photos(): List<Photo>
 
     /** 실록 집계의 기본 검색: 한 아이·한 종류·한 날의 지우지 않은 기록. */
     @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = :kind AND day = :day AND deleted_at IS NULL ORDER BY occurred_at")

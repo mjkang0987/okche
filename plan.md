@@ -5,26 +5,16 @@
 
 ## 지금 하는 일
 
-**5-1 안드로이드 저장** (`feature/android-store`, 2026-10-28 시작)
+**6단계 아이 등록·아이 정보** (`feature/pet-profile`, 아직 시작 안 함)
 
-- 4-1 iOS 저장은 `dev`에 합침(아래 '끝난 일').
-- 요구사항: iOS `ios/Okche/Store/`와 같은 13개 저장 대상을 Room으로. 칸·선택지 영어 값·처음 값이 iOS와 같고, 하루 기준(벽시계 6시, 서머타임 날도 iOS와 같은 값)·고정 ID(iOS 테스트와 같은 기대값 3개). 화면은 범위 밖.
-- 구현 방식:
-  - Room 2.8.5 + KSP 2.3.12 + Room Gradle 플러그인(스키마 JSON을 `android/app/schemas/`에 남겨 나중 마이그레이션에 씀). Room 3(`androidx.room3`)은 API가 바뀐 새 줄기라 이번엔 쓰지 않음.
-  - 테이블·열 이름은 문서대로 `snake_case`. ID는 UUID 문자열(소문자), 시각은 UTC 밀리초(`Long`), 날짜는 `YYYY-MM-DD` 글자.
-  - 선택지 enum의 이름을 문서의 영어 값 그대로(`cat`, `everyNDays` …) — Room이 이름 글자로 저장.
-  - 목록 칸(`times`, `weekdays`, `slots`)은 JSON 글자(안드로이드 내장 `org.json`), 설정 묶음은 `@Embedded`로 앞말 붙여 펼침.
-  - 기록 색인: `pet_id + kind + day`, `slot_key`(문서 3장).
-  - 같은 ID를 넣을 때 Room은 기본으로 오류를 낸다(SwiftData처럼 덮어쓰지 않음). 고정 ID 줄은 `IGNORE`로 넣어 없을 때만 만든다.
-  - 앱 시작 때 데이터베이스를 열고 설정 줄을 없을 때만 만든다(백그라운드).
-- 영향받는 파일: `android/gradle/libs.versions.toml`, `android/build.gradle.kts`, `android/app/build.gradle.kts`, `android/app/src/main/java/app/okche/store/`(새 폴더), `MainActivity.kt`, `android/app/src/androidTest/java/app/okche/StoreTest.kt`(새 파일), `android/app/schemas/`, `docs/data-model.md`(1-1 ID 소문자·1-2 문구), `ios/OkcheTests/StoreTests.swift`(선택지 값 테스트).
-- 예상 결과·테스트(에뮬레이터 `Okche_Phone`): 고정 ID 기대값 3개, 6시 경계·시간대·서머타임(iOS와 같은 경우), 13개 넣고 다시 읽기, 기록 검색(지운 줄 빼기), 설정 없을 때만 만들기·같은 ID 넣으면 오류.
+- 4-1·5-1 저장은 `dev`에 합침(아래 '끝난 일'). 다음은 `main` PR을 할지 정한 뒤 6단계.
+- 할 일(표 6행): 아이 등록·아이 정보(당뇨 스위치·인슐린 설정 포함). 지운 아이에 딸린 줄 거르기(문서 1-4)를 화면에 붙일 때 같이.
 - 뒤 단계로 넘긴 것(4-1에서): 저장소를 App Group으로 옮기기(12단계 위젯 전, 출시 전), 출시 때 SchemaV1을 얼린 모델로 바꾸기(첫 출시 전), 백업 가져오기용 init(`Record.day`·시각을 그대로 받음, 13단계), 급식기 자동 기록은 `updatedAt` = 끼니 예정 시각(8단계 끼니).
 - 뒤 단계로 넘긴 것(5-1에서): ID 글자 소문자 — iOS `slotKey`·백업 내보내기에서 `.lowercased()`, 가져오기에서 소문자로 바꿔 견주기(8·13단계, 문서 1-1). 사진 줄과 파일 이름을 한 번에 만드는 함수(11단계, 안드로이드는 `file`을 호출하는 쪽이 넣음). 기기 자동 백업(안드로이드 `allowBackup`·iOS iCloud 기기 백업)에 저장소·이 기기만의 설정을 넣을지(13단계). 첫 출시 전: 머지 전 확인에 `./gradlew :app:assembleDebug && git diff --exit-code android/app/schemas`(엔티티를 바꾸고 version을 안 올리면 출시된 기기에서 열 때 죽음).
 - 3단계 데이터 구조는 끝남(아래 '끝난 일'). 디자인 남은 것 정리 때 캔버스 판 1793090186-890c → 데이터 구조 검토 반영 뒤 1793110210-fe6a.
 - **다음에 할 것** (순서대로):
   1. 준비: `index.md`·`plan.md`·`docs/data-model.md` 읽기. 디자인을 고칠 일이 있으면 `design/README.md`의 '새 세션에서 준비하기'.
-  2. 5-1 안드로이드 저장 → 6단계 아이 등록
+  2. 6단계 아이 등록
   - 따로 남은 디자인: 출처 줄이 없는 의학 안내 화면(혈당·인슐린·인슐린 설정·아이 등록·실록·탕약 시트·바꾼 뒤 비교·체형 비교)에 출처 달기 — 출처를 먼저 확인해야 해서 보류. 축하 카드 '쉬운 말' 7종, 추억 쪽 '편지 써 보기'·'도움 받을 곳'(보류).
 - 정기 작업: 매달 1일·15일 오전 10:17 '옥체 앱 자료 정기 점검'(예약 작업)이 `research/날짜` 브랜치에 보고서를 남김. 첫 실행 2026-11-01.
 - 정함 (2026-10-27): 사료 바꾸기는 7·10·12·14일째 문안 카드로 '다 바꿨나요?' 확인, 14일까지 답 없으면 기간 끝. 종별 '사료 바꾸는 법' 레이어(고양이 길게는 40일, 강아지 7일 — 미국 동물병원협회) 디자인 추가.
@@ -68,6 +58,7 @@
 
 ## 끝난 일
 
+- 2026-10-28 5-1 안드로이드 저장·`dev` 합침: `android/app/src/main/java/app/okche/store/` — Room 2.8.5 + KSP 2.3.12, 엔티티 13개(테이블·열 `snake_case`, ID 소문자 글자, 시각 UTC 밀리초, 선택지 enum 이름 = 문서 영어 값, 목록 칸 JSON, 설정 묶음 `@Embedded`), 색인 `record(pet_id, kind, day)`·`record(slot_key)`·`photo_pet` 두 칸, `OkcheDay`(`LocalDateTime` 벽시계 6시), `fixedId`(`UUID.nameUUIDFromBytes`). 같은 id 넣기는 오류(덮어쓰지 않음), 설정 줄은 `IGNORE`로 없을 때만. 앱 시작 때 설정 줄 만들기. 스키마 JSON `android/app/schemas/` 커밋. 테스트 11개(iOS와 같은 고정 ID·6시·서머타임 기대값, 13개 왕복, 검색, 목록에서 지운 줄 빼기, 설정, 같은 id 오류, 선택지 값 14종 — iOS에도 같은 선택지 테스트 추가). 리뷰·검증 3회, R8 출시 빌드 실행·DB를 sqlite로 확인. 문서 1-1에 ID 소문자 규칙.
 - 2026-10-28 4-1 iOS 저장·`dev` 합침: `ios/Okche/Store/` — SwiftData 모델 13개(관계 대신 ID 칸, 선택지는 영어 원시값, 기록 `kind`는 글자), `OkcheDay`(벽시계 6시 기준), 고정 ID(`UUID(fixedName:)`, Java와 같은 값), `SchemaV1`·`MigrationPlan`, CloudKit 끔. 앱 시작 때 저장소를 열고 설정 줄을 한 번 만들어 둠(못 열면 멈춤). SwiftData는 같은 id를 다시 넣으면 덮어써서(지운 줄도 되살아남) 고정 ID 줄은 있는지 먼저 봄(`Setting.loadOrCreate`). 테스트 9개(고정 ID, 6시·시간대·서머타임, 13개 왕복, 검색, 설정, 덮어쓰기). 리뷰·검증 3회, 디스크 저장소를 sqlite로 확인. 문서: 1-2 문구(벽시계 기준), 10장 설정 묶음 칸 이름·임시 처음 값. 확인 못 함: iOS 17·18 런타임.
 - 2026-10-28 `main` 합침: PR #1(`dev` → `main`, 4·5단계와 글꼴). CI 없음 — 이 맥에서 iOS 테스트·안드로이드 계측 테스트·design 테스트 통과 확인 뒤 머지. `VERSION`은 그대로(0.1.0).
 - 2026-10-28 5단계 안드로이드 뼈대·`dev` 합침: `android/`(Gradle 9.8.1·AGP 9.4.1·Kotlin 2.4.21·Compose BOM 2026.09.00, compileSdk 37·targetSdk 36·minSdk 26, `app.okche`). 토큰·글꼴·라이선스·`VERSION`을 `design/`에서 그대로 읽음. Material3 하단 탭(흰 바탕+위 선, 선택 알약 없음, 키보드 포커스 남색 테두리), 탭 첫 화면 머리(iOS와 같은 규칙, 한 줄 제목 높이 36 — Compose가 글꼴 높이보다 작게 안 줄여 `singleLineHeight`로 맞춤), 다크 모드에서도 밝은 상태바, 큰 글자에서 탭 이름 줄임·아이콘 높이 고정. 계측 테스트 4개(탭 전환·머리말, 줄 높이, 상태바, 글꼴·라이선스·색). Espresso 3.7.0(3.5.0은 Android 17에서 실패). 릴리스 R8 2.6MB. 리뷰·검증 3회. 받아들임: 탭 높이 80dp(디자인 72), 실록 아이콘 채운 막대, 세로 고정은 큰 화면에서 무시, 뒤로 버튼은 앱 종료, lint 경고 5건. 6단계에서: 탭 바꿀 때 스크롤 위치 유지. 이 맥의 기존 에뮬레이터와 겹치지 않게 `Okche_Phone` AVD(Small_Phone 복사)를 만들어 씀.

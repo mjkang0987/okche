@@ -205,6 +205,21 @@ class StoreTest {
         assertEquals(1, dao.records(pet, RecordKind.vomit, "2026-10-28").size)
     }
 
+    /** 화면에 보일 목록은 지운 줄을 뺀다(1-4). */
+    @Test fun listsSkipDeletedRows() = runBlocking {
+        val dao = db.dao()
+        for (deletedAt in listOf(null, 1L)) {
+            dao.insert(Pet(name = "콩이", species = Species.cat, breed = "", furColor = "", deletedAt = deletedAt))
+            dao.insert(MedSchedule(petId = "p", medicationId = "m", amount = 1.0, unit = DoseUnit.pill,
+                frequency = MedFrequency.daily, activeFrom = 0, deletedAt = deletedAt))
+            dao.insert(InsulinPlan(petId = "p", slots = emptyList(), activeFrom = 0, deletedAt = deletedAt))
+            dao.insert(MealPlan(petId = "p", mode = MealMode.direct, slots = emptyList(), activeFrom = 0, deletedAt = deletedAt))
+            dao.insert(Photo(takenAt = 0, localDate = "2026-10-28", file = "x.jpg", deletedAt = deletedAt))
+        }
+        assertEquals(listOf(1, 1, 1, 1, 1), listOf(dao.pets().size, dao.medSchedules().size, dao.insulinPlans().size,
+            dao.mealPlans().size, dao.photos().size))
+    }
+
     /** 설정은 있으면 그대로 읽고 없을 때만 만든다 — 지운 줄도 되살리지 않는다. */
     @Test fun loadOrCreateSettingKeepsExisting() = runBlocking {
         val dao = db.dao()

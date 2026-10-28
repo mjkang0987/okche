@@ -11,11 +11,12 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 | 칸 | 형식 | 뜻 |
 |---|---|---|
-| `id` | UUID 문자열 | 고유 ID. 기기에서 만든다(Swift `UUID()`, Kotlin `UUID.randomUUID()`). 하나만 있어야 하는 것은 1-5의 고정 ID를 쓴다. |
+| `id` | UUID 문자열 (소문자) | 고유 ID. 기기에서 만든다(Swift `UUID()`, Kotlin `UUID.randomUUID()`). 하나만 있어야 하는 것은 1-5의 고정 ID를 쓴다. |
 | `createdAt` | UTC 시각 (밀리초) | 처음 만든 때 |
 | `updatedAt` | UTC 시각 (밀리초) | 마지막으로 고친 때. 고칠 때마다 바꾼다. |
 | `deletedAt` | UTC 시각 또는 없음 | 지운 때. 1-4 참고. |
 
+- ID를 글자로 쓸 때(백업 JSON, `slotKey`, 고정 ID 이름, 사진 파일 이름)는 늘 **소문자** (2026-10-28 5-1에서 정함). Swift `uuidString`은 대문자라 `.lowercased()`를 쓴다. 가져올 때도 소문자로 바꿔 견준다 — 안 그러면 같은 줄이 둘이 되고, `slotKey`에서 만든 급식기 고정 ID가 기기마다 달라진다.
 - 시각은 모두 UTC로 저장하고, 화면에 보일 때만 기기 시간대로 바꾼다.
 - 이름 규칙: 문서·백업 JSON·Swift·Kotlin은 `camelCase`, Room 테이블·열 이름은 `snake_case`.
 - 선택지 값은 화면 글자가 아니라 이 문서의 영어 값으로 저장한다(문구를 바꿔도 기록이 깨지지 않게).
@@ -24,7 +25,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 ### 1-2. 하루 기준: 새벽 6시
 
 - 하루는 **새벽 6시부터 다음 날 새벽 6시까지**다. 탕약 줄 초기화, '오늘' 기록, 실록 일별 집계가 모두 이 기준을 따른다.
-- 기록마다 `day`(`YYYY-MM-DD`)를 저장한다: **기기 현지 시각에서 6시간을 뺀 날짜**. 예: 10/28 새벽 2시 기록 → `day = 2026-10-27`.
+- 기록마다 `day`(`YYYY-MM-DD`)를 저장한다: **기기 현지 벽시계로 6시 전이면 달력의 전날, 6시부터는 그날**(경과 시간 6시간을 빼는 게 아니다 — 서머타임 날에 달라짐. Kotlin은 `LocalDateTime`으로 판단). 예: 10/28 새벽 2시 기록 → `day = 2026-10-27`.
 - `day`는 기록할 때 계산해 저장한다. 시간대를 옮겨도(해외여행) 이미 남긴 기록의 날짜는 바뀌지 않는다. '시간 바꾸기'로 `occurredAt`을 고치면 그때 기기 시간대로 `day`를 다시 계산한다.
 - 6시 전 먹일 시간(예: 05:30)은 **전날 하루의 마지막 차례**다.
 - 사진의 '작년 오늘'은 예외로 6시 규칙을 쓰지 않고 찍은 곳의 달력 날짜(`localDate`)를 쓴다.
@@ -277,6 +278,8 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 ## 10. 설정
 
 **함께 쓰는 설정 (`Setting`, 고정 ID 하나, 백업·병합에 들어감)**: `quietHours`(밤 알림 쉬기 켜짐·시작·끝 — 이 시간의 알림은 보내지 않고 버린다. 줄·카드는 그대로), `notify`(탕약 시간·인슐린 시간·남은 약·체중 재기·기쁜 날·작년 오늘 켜짐), `weightReminder`(요일·시각, 기본 일요일 10:00), `lowMedDays`(남은 약 알림 기준 일수, 기본 3), `celebrateTone`(`joseon` / `plain` — 축하 카드 문구).
+
+- 묶음 칸 이름 (2026-10-28 4-1에서 정함): `quietHours` = `{enabled, start, end}`(`HH:mm`) · `notify` = `{medTime, insulinTime, lowMed, weighIn, goodDay, lastYearToday}`(참/거짓) · `weightReminder` = `{weekday(ISO), time(HH:mm)}`. 밤 알림 쉬기·알림 켜짐·`celebrateTone`의 처음 값은 아직 안 정함 — 코드는 임시로 꺼짐 22:00~07:00 · 모두 켜짐 · `joseon`, 설정 화면 때 디자인과 맞춘다.
 
 **이 기기만의 설정 (백업에 안 넣음)**: iOS `UserDefaults`, 안드로이드 DataStore에 둔다. 아이폰 백업을 안드로이드로 가져와도 'iCloud에 백업' 같은 값이 넘어오지 않게.
 - 백업: `backupTarget`(`icloud` / `googleDrive` / `none`), `autoBackupNightly`, `backupPhotos`, `wifiOnly`, `lastBackupAt`

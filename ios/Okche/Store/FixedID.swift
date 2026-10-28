@@ -15,6 +15,7 @@ extension UUID {
     static let setting = UUID(fixedName: "okche:setting")
 
     /// 급식기 자동 기록. 같은 차례면 두 기기가 따로 만들어도 같은 ID.
+    /// 같은 ID 줄이 없을 때만(지운 줄 포함) 만든다 — 다시 넣으면 지운 기록·고친 기록을 덮어쓴다.
     static func feederRecord(slotKey: String) -> UUID {
         UUID(fixedName: "okche:feeder:\(slotKey)")
     }

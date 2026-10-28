@@ -26,7 +26,7 @@ final class Record {
     /// 앱이 저절로 만든 기록(급식기).
     var auto: Bool
 
-    init(id: UUID = UUID(), now: Date = .now, petId: UUID?, kind: RecordKind, occurredAt: Date, timeZone: TimeZone = .current,
+    init(id: UUID = UUID(), now: Date = .now, petId: UUID?, kind: RecordKind, occurredAt: Date, timeZone: TimeZone = .autoupdatingCurrent,
          slotKey: String? = nil, data: String = "{}", auto: Bool = false) {
         self.id = id
         createdAt = now
@@ -41,7 +41,7 @@ final class Record {
     }
 
     /// '시간 바꾸기': 그때 기기 시간대로 `day`를 다시 정한다.
-    func setOccurredAt(_ date: Date, timeZone: TimeZone = .current, now: Date = .now) {
+    func setOccurredAt(_ date: Date, timeZone: TimeZone = .autoupdatingCurrent, now: Date = .now) {
         occurredAt = date
         day = OkcheDay.of(date, in: timeZone)
         updatedAt = now

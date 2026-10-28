@@ -63,4 +63,16 @@ final class Setting {
         self.lowMedDays = lowMedDays
         self.celebrateTone = celebrateTone
     }
+
+    /// 설정 줄을 읽고, 없을 때만 처음 값으로 만든다. 그냥 넣으면 고른 설정을 처음 값으로 덮어쓴다.
+    @MainActor
+    static func loadOrCreate(in context: ModelContext) throws -> Setting {
+        let id = UUID.setting
+        if let existing = try context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.id == id })).first {
+            return existing
+        }
+        let setting = Setting()
+        context.insert(setting)
+        return setting
+    }
 }

@@ -3,6 +3,9 @@ import SwiftData
 
 // 모든 모델은 docs/data-model.md를 따른다. 모델끼리는 SwiftData 관계 대신 ID 칸으로 잇는다(백업 JSON·Room과 같은 모양).
 // 공통 칸: id(고유) · createdAt · updatedAt(고칠 때마다) · deletedAt(지운 때, 줄은 남김).
+// id가 겹치는 줄을 넣으면 SwiftData는 오류 없이 기존 줄을 통째로 덮어쓴다(지운 줄도 되살아남).
+// 고정 ID 줄은 꼭 있는지 먼저 보고 넣는다(`Setting.loadOrCreate`처럼). 백업 병합도 넣기 전에 11장 규칙으로 고른다.
+// Codable 구조체 칸에 칸을 더할 때는 Optional로 — 이미 저장된 값을 못 읽으면 저장소가 안 열린다.
 
 enum Species: String, Codable, CaseIterable {
     case cat, dog
@@ -18,8 +21,9 @@ final class Pet {
 
     var name: String
     var species: Species
-    var breed: String?
-    var furColor: String?
+    /// 목록에서 고르거나 '믹스 · 잘 모르겠어요'
+    var breed: String
+    var furColor: String
     /// `YYYY-MM-DD`
     var birthDate: String?
     var birthEstimated: Bool
@@ -30,7 +34,7 @@ final class Pet {
     var memorializedAt: Date?
     var profilePhotoId: UUID?
 
-    init(id: UUID = UUID(), now: Date = .now, name: String, species: Species, breed: String? = nil, furColor: String? = nil,
+    init(id: UUID = UUID(), now: Date = .now, name: String, species: Species, breed: String, furColor: String,
          birthDate: String? = nil, birthEstimated: Bool = false, familyDate: String? = nil, diagnosis: String? = nil,
          hasDiabetes: Bool = false, memorializedAt: Date? = nil, profilePhotoId: UUID? = nil) {
         self.id = id

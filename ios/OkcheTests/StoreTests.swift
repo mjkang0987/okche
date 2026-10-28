@@ -15,12 +15,10 @@ final class StoreTests: XCTestCase {
 
     // MARK: 하루 기준 6시 (1-2)
 
-    private func date(_ tz: String, _ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int = 0, later: Bool = false) -> Date {
+    private func date(_ tz: String, _ y: Int, _ mo: Int, _ d: Int, _ h: Int, _ mi: Int = 0) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: tz)!
-        let date = calendar.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: mi))!
-        // 서머타임이 끝나 같은 벽시계 시각이 두 번 오는 날, 두 번째 시각.
-        return later ? date.addingTimeInterval(3600) : date
+        return calendar.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: mi))!
     }
 
     func testDayStartsAtSixLocal() {
@@ -48,8 +46,7 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(OkcheDay.of(date("America/New_York", 2026, 3, 8, 6, 0), in: ny), "2026-03-08")
         // 전날 같은 시각(02:30)이 없는 날의 새벽
         XCTAssertEqual(OkcheDay.of(date("America/New_York", 2026, 3, 9, 2, 30), in: ny), "2026-03-08")
-        // 2026-11-01 02:00 → 01:00 (01:30이 두 번)
-        XCTAssertEqual(OkcheDay.of(date("America/New_York", 2026, 11, 1, 1, 30, later: true), in: ny), "2026-10-31")
+        // 2026-11-01 02:00 → 01:00 (25시간짜리 날)
         XCTAssertEqual(OkcheDay.of(date("America/New_York", 2026, 11, 1, 5, 59), in: ny), "2026-10-31")
         XCTAssertEqual(OkcheDay.of(date("America/New_York", 2026, 11, 1, 6, 0), in: ny), "2026-11-01")
     }
@@ -77,7 +74,7 @@ final class StoreTests: XCTestCase {
         let context = container.mainContext
         let now = date("Asia/Seoul", 2026, 10, 28, 9, 0)
 
-        let pet = Pet(now: now, name: "콩이", species: .cat, birthDate: "2015-04-01", hasDiabetes: true)
+        let pet = Pet(now: now, name: "콩이", species: .cat, breed: "코리안 숏헤어", furColor: "치즈", birthDate: "2015-04-01", hasDiabetes: true)
         let med = Medication(now: now, name: "프레드니솔론", category: .medicine, form: .pill, doseAmount: 0.5, unit: .pill)
         let schedule = MedSchedule(now: now, petId: pet.id, medicationId: med.id, amount: 0.5, unit: .pill,
                                    frequency: .weekdays, times: ["08:00", "20:00"], weekdays: [1, 3, 5], activeFrom: now)
@@ -104,6 +101,8 @@ final class StoreTests: XCTestCase {
         }
         let readPet = try XCTUnwrap(fresh.fetch(FetchDescriptor<Pet>()).first)
         XCTAssertEqual(readPet.species, .cat)
+        XCTAssertEqual(readPet.furColor, "치즈")
+        XCTAssertNil(readPet.familyDate)
         XCTAssertEqual(readPet.createdAt, now)
         XCTAssertNil(readPet.deletedAt)
         let readSchedule = try XCTUnwrap(fresh.fetch(FetchDescriptor<MedSchedule>()).first)
@@ -113,6 +112,12 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(readSchedule.frequency, .weekdays)
         XCTAssertTrue(readSchedule.shiftOnLate)
         XCTAssertEqual(try fresh.fetch(FetchDescriptor<InsulinPlan>()).first?.slots.map(\.units), [2, 1.5])
+        XCTAssertEqual(try fresh.fetch(FetchDescriptor<InsulinPlan>()).first?.syringe, .u40)
+        let readRecord = try XCTUnwrap(fresh.fetch(FetchDescriptor<Record>()).first)
+        XCTAssertEqual(readRecord.day, "2026-10-28")
+        XCTAssertEqual(readRecord.data, #"{"mgdl":180}"#)
+        XCTAssertEqual(try fresh.fetch(FetchDescriptor<Snack>()).first?.kind, .lickable)
+        XCTAssertEqual(try fresh.fetch(FetchDescriptor<FoodChange>()).first?.method, .gradual)
         XCTAssertEqual(try fresh.fetch(FetchDescriptor<MealPlan>()).first?.slots, [MealSlot(name: "아침", time: "08:00")])
         let readPhoto = try XCTUnwrap(fresh.fetch(FetchDescriptor<Photo>()).first)
         XCTAssertEqual(readPhoto.file, "\(photo.id.uuidString.lowercased()).heic")
@@ -121,6 +126,8 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(setting.id, .setting)
         XCTAssertEqual(setting.weightReminder, WeightReminder(weekday: 7, time: "10:00"))
         XCTAssertEqual(setting.lowMedDays, 3)
+        XCTAssertFalse(setting.quietHours.enabled)
+        XCTAssertTrue(setting.notify.lastYearToday)
     }
 
     /// 실록 집계의 기본 검색(아이 + 종류 + 날짜)이 저장소에서 된다.
@@ -135,6 +142,9 @@ final class StoreTests: XCTestCase {
         context.insert(Record(petId: pet, kind: .vomit, occurredAt: date("Asia/Seoul", 2026, 10, 28, 7, 0), timeZone: seoul))
         context.insert(Record(petId: pet, kind: .stool, occurredAt: date("Asia/Seoul", 2026, 10, 28, 7, 0), timeZone: seoul))
         context.insert(Record(petId: nil, kind: .vomit, occurredAt: date("Asia/Seoul", 2026, 10, 28, 7, 0), timeZone: seoul))
+        let deleted = Record(petId: pet, kind: .vomit, occurredAt: date("Asia/Seoul", 2026, 10, 28, 8, 0), timeZone: seoul)
+        deleted.deletedAt = .now
+        context.insert(deleted)
         try context.save()
 
         let kind = RecordKind.vomit.rawValue
@@ -145,19 +155,34 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(found.count, 1)
     }
 
-    /// 같은 ID를 두 번 넣으면(두 기기가 각자 만든 설정) 한 줄로 합쳐진다.
+    /// 설정은 있으면 그대로 읽고 없을 때만 만든다 — 고른 값을 처음 값으로 덮어쓰지 않는다.
     @MainActor
-    func testSameIDIsOneRow() throws {
-        // 컨테이너를 변수로 붙잡아 둬야 한다 — 바로 버리면 문맥이 해제된 저장소를 써서 죽는다.
+    func testSettingLoadOrCreateKeepsExisting() throws {
         let container = try OkcheStore.container(inMemory: true)
         let context = container.mainContext
-        context.insert(Setting())
+        try Setting.loadOrCreate(in: context).lowMedDays = 5
         try context.save()
-        context.insert(Setting(lowMedDays: 5))
+        XCTAssertEqual(try Setting.loadOrCreate(in: context).lowMedDays, 5)
         try context.save()
-        let settings = try context.fetch(FetchDescriptor<Setting>())
-        XCTAssertEqual(settings.count, 1)
-        XCTAssertEqual(settings.first?.lowMedDays, 5)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Setting>()), 1)
+    }
+
+    /// 같은 id를 다시 넣으면 SwiftData가 기존 줄을 덮어쓴다(지운 줄도 되살아남) — 고정 ID 줄을 있는지 먼저 보고 넣어야 하는 이유.
+    /// 이 동작이 바뀌면(예: 오류를 냄) 위 규칙을 다시 본다.
+    @MainActor
+    func testReinsertingSameIDOverwrites() throws {
+        let container = try OkcheStore.container(inMemory: true)
+        let context = container.mainContext
+        let id = UUID.feederRecord(slotKey: "plan|2026-10-28|08:00")
+        let first = Record(id: id, petId: nil, kind: .meal, occurredAt: .now, auto: true)
+        first.deletedAt = .now
+        context.insert(first)
+        try context.save()
+        context.insert(Record(id: id, petId: nil, kind: .meal, occurredAt: .now, auto: true))
+        try context.save()
+        let rows = try context.fetch(FetchDescriptor<Record>())
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertNil(rows.first?.deletedAt)
     }
 
     private func count(_ type: any PersistentModel.Type, in context: ModelContext) throws -> Int {

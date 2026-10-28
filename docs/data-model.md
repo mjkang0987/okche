@@ -278,6 +278,8 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 **함께 쓰는 설정 (`Setting`, 고정 ID 하나, 백업·병합에 들어감)**: `quietHours`(밤 알림 쉬기 켜짐·시작·끝 — 이 시간의 알림은 보내지 않고 버린다. 줄·카드는 그대로), `notify`(탕약 시간·인슐린 시간·남은 약·체중 재기·기쁜 날·작년 오늘 켜짐), `weightReminder`(요일·시각, 기본 일요일 10:00), `lowMedDays`(남은 약 알림 기준 일수, 기본 3), `celebrateTone`(`joseon` / `plain` — 축하 카드 문구).
 
+- 묶음 칸 이름 (2026-10-28 4-1에서 정함): `quietHours` = `{enabled, start, end}`(`HH:mm`) · `notify` = `{medTime, insulinTime, lowMed, weighIn, goodDay, lastYearToday}`(참/거짓) · `weightReminder` = `{weekday(ISO), time(HH:mm)}`. 밤 알림 쉬기·알림 켜짐·`celebrateTone`의 처음 값은 아직 안 정함 — 코드는 임시로 꺼짐 22:00~07:00 · 모두 켜짐 · `joseon`, 설정 화면 때 디자인과 맞춘다.
+
 **이 기기만의 설정 (백업에 안 넣음)**: iOS `UserDefaults`, 안드로이드 DataStore에 둔다. 아이폰 백업을 안드로이드로 가져와도 'iCloud에 백업' 같은 값이 넘어오지 않게.
 - 백업: `backupTarget`(`icloud` / `googleDrive` / `none`), `autoBackupNightly`, `backupPhotos`, `wifiOnly`, `lastBackupAt`
 - 기타: `lastPetId`(마지막으로 보던 아이), `lastOpenedAt`(앱을 오래 안 열면 알림을 줄이는 데 씀), `shownCelebrations`(이미 보여 준 축하 카드 `{petId}|{종류}|{날짜}` 목록)

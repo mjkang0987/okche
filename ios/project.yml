@@ -62,12 +62,25 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  OkcheUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - OkcheUITests
+    dependencies:
+      - target: Okche
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Okche
 schemes:
   Okche:
     build:
       targets:
         Okche: all
         OkcheTests: [test]
+        OkcheUITests: [test]
     test:
       targets:
         - OkcheTests
+        - OkcheUITests

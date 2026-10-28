@@ -6,7 +6,10 @@ struct OkcheApp: App {
     /// 못 열면 멈춘다 — 빈 저장소로 새로 만들어 기록을 덮어쓰는 것보다 낫다.
     private let container: ModelContainer = {
         do {
-            let container = try OkcheStore.container()
+            // 화면 테스트(OkcheUITests)는 빈 저장소에서 시작한다.
+            let uiTesting = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+            if uiTesting { UserDefaults.standard.removeObject(forKey: "onboardingDone") }
+            let container = try OkcheStore.container(inMemory: uiTesting)
             _ = try Setting.loadOrCreate(in: container.mainContext)
             try container.mainContext.save()
             return container
@@ -39,7 +42,7 @@ struct OkcheApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            RootView()
         }
         .modelContainer(container)
     }

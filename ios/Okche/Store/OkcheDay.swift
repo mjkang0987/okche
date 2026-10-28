@@ -15,3 +15,12 @@ enum OkcheDay {
         return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
 }
+
+extension Calendar {
+    /// 날짜 글자(`YYYY-MM-DD`)를 만들 때 쓰는 달력: 서력 + 기기 시간대. 기기 달력(불기·일본 연호 등)과 상관없이 같은 해가 나온다.
+    static var okcheDevice: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .autoupdatingCurrent
+        return calendar
+    }
+}

@@ -5,10 +5,20 @@
 
 ## 지금 하는 일
 
-**5-1 안드로이드 저장** (`feature/android-store`, 아직 시작 안 함)
+**5-1 안드로이드 저장** (`feature/android-store`, 2026-10-28 시작)
 
 - 4-1 iOS 저장은 `dev`에 합침(아래 '끝난 일').
-- 할 일: Room 엔티티 13개(`docs/data-model.md`, iOS `ios/Okche/Store/`와 같은 칸·영어 값), 하루 기준(`LocalDateTime`으로 벽시계 6시 — 서머타임 날도 iOS와 같게), 고정 ID(`UUID.nameUUIDFromBytes`, iOS 테스트와 같은 기대값 3개) + 테스트.
+- 요구사항: iOS `ios/Okche/Store/`와 같은 13개 저장 대상을 Room으로. 칸·선택지 영어 값·처음 값이 iOS와 같고, 하루 기준(벽시계 6시, 서머타임 날도 iOS와 같은 값)·고정 ID(iOS 테스트와 같은 기대값 3개). 화면은 범위 밖.
+- 구현 방식:
+  - Room 2.8.5 + KSP 2.3.12 + Room Gradle 플러그인(스키마 JSON을 `android/app/schemas/`에 남겨 나중 마이그레이션에 씀). Room 3(`androidx.room3`)은 API가 바뀐 새 줄기라 이번엔 쓰지 않음.
+  - 테이블·열 이름은 문서대로 `snake_case`. ID는 UUID 문자열(소문자), 시각은 UTC 밀리초(`Long`), 날짜는 `YYYY-MM-DD` 글자.
+  - 선택지 enum의 이름을 문서의 영어 값 그대로(`cat`, `everyNDays` …) — Room이 이름 글자로 저장.
+  - 목록 칸(`times`, `weekdays`, `slots`)은 JSON 글자(안드로이드 내장 `org.json`), 설정 묶음은 `@Embedded`로 앞말 붙여 펼침.
+  - 기록 색인: `pet_id + kind + day`, `slot_key`(문서 3장).
+  - 같은 ID를 넣을 때 Room은 기본으로 오류를 낸다(SwiftData처럼 덮어쓰지 않음). 고정 ID 줄은 `IGNORE`로 넣어 없을 때만 만든다.
+  - 앱 시작 때 데이터베이스를 열고 설정 줄을 없을 때만 만든다(백그라운드).
+- 영향받는 파일: `android/gradle/libs.versions.toml`, `android/build.gradle.kts`, `android/app/build.gradle.kts`, `android/app/src/main/java/app/okche/store/`(새 폴더), `MainActivity.kt`, `android/app/src/androidTest/java/app/okche/StoreTest.kt`(새 파일), `android/app/schemas/`.
+- 예상 결과·테스트(에뮬레이터 `Okche_Phone`): 고정 ID 기대값 3개, 6시 경계·시간대·서머타임(iOS와 같은 경우), 13개 넣고 다시 읽기, 기록 검색(지운 줄 빼기), 설정 없을 때만 만들기·같은 ID 넣으면 오류.
 - 뒤 단계로 넘긴 것(4-1에서): 저장소를 App Group으로 옮기기(12단계 위젯 전, 출시 전), 출시 때 SchemaV1을 얼린 모델로 바꾸기(첫 출시 전), 백업 가져오기용 init(`Record.day`·시각을 그대로 받음, 13단계), 급식기 자동 기록은 `updatedAt` = 끼니 예정 시각(8단계 끼니).
 - 3단계 데이터 구조는 끝남(아래 '끝난 일'). 디자인 남은 것 정리 때 캔버스 판 1793090186-890c → 데이터 구조 검토 반영 뒤 1793110210-fe6a.
 - **다음에 할 것** (순서대로):

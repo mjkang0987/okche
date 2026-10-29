@@ -5,6 +5,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasContentDescription
@@ -17,7 +20,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -107,6 +109,18 @@ class OnboardingTest {
         rule.onNodeWithContentDescription("생일 지우기").assertDoesNotExist()
     }
 
+    /** 이름 칸이 화면 밖일 때 '모시기'를 누르면 이름 칸으로 스크롤하고 포커스를 옮긴다. */
+    @Test fun firstErrorFieldScrollsIntoViewAndFocuses() {
+        startRegister()
+        rule.onNodeWithText("모시기").performScrollTo()
+        val name = rule.onNode(hasSetTextAction().and(hasText("이름")))
+        name.assertIsNotDisplayed()
+        rule.onNodeWithText("모시기").performClick()
+        rule.waitUntil(5_000) { runCatching { name.assertIsFocused() }.isSuccess }
+        name.assertIsDisplayed()
+        rule.onNodeWithText("이름을 넣어 주세요").assertIsDisplayed()
+    }
+
     @Test fun closeGoesBackToStart() {
         startRegister()
         rule.onNodeWithContentDescription("닫기").performClick()
@@ -148,12 +162,13 @@ class OnboardingTest {
         startRegister()
         rule.onNodeWithText("여아").performScrollTo().performClick().assertIsSelected()
         rule.onNodeWithText("여아").performClick().assertIsNotSelected()
-        // TalkBack 경로: 고른 칩에도 '선택 해제' 누르기 동작이 있어 읽기 도구로 풀 수 있다.
+        // TalkBack 경로: 고른 칩엔 사용자 지정 동작 '선택 해제'가 있어 읽기 도구로 풀 수 있다.
         rule.onNodeWithText("남아").performClick().assertIsSelected()
-        rule.onNode(hasText("남아").and(SemanticsMatcher("선택 해제 동작") {
-            it.config.getOrNull(SemanticsActions.OnClick)?.label == "선택 해제"
-        })).performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithText("남아").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            .single { it.label == "선택 해제" }.action()
         rule.onNodeWithText("남아").assertIsNotSelected()
+        // 안 고른 칩엔 없다.
+        assertEquals(null, rule.onNodeWithText("남아").fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions))
         rule.onNode(isToggleable().and(hasText("당뇨가 있어요"))).performScrollTo().performClick()
         rule.onNodeWithText("잘 모르겠어요").performScrollTo().assertIsSelected().performClick().assertIsSelected()
     }

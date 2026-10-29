@@ -65,6 +65,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.LaunchedEffect
 import app.okche.store.OkcheDao
 import androidx.compose.foundation.layout.offset
@@ -129,6 +131,12 @@ class PetRegisterSaver : ViewModel() {
         viewModelScope.launch {
             try {
                 result = registerPet(dao, form)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // registerPet이 저장소 오류를 잡지만, 그 밖의 예외로도 앱이 죽지 않고 같은 문구를 보이게.
+                Log.e("Okche", "아이 등록 실패", e)
+                result = mapOf("save" to "저장하지 못했어요. 다시 해 주세요.")
             } finally {
                 saving = false
             }
@@ -166,11 +174,17 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val result = saver.result
     LaunchedEffect(result) {
         if (result == null) return@LaunchedEffect
-        saver.consume()
         errors = result
-        val first = result.keys.firstOrNull() ?: return@LaunchedEffect onSaved()
+        val first = result.keys.firstOrNull()
+        if (first == null) {
+            saver.consume()
+            onSaved()
+            return@LaunchedEffect
+        }
+        // consume은 맨 뒤에: result가 바뀌면 이 효과가 취소돼 스크롤(bringIntoView)이 중간에 끊긴다.
         bring[first]?.bringIntoView()
         focus[first]?.requestFocus()
+        saver.consume()
     }
 
     // 저장 중엔 닫지 않는다(닫으면 끝난 결과가 남아 다음 등록 화면에 옛 결과가 뜸). 닫을 때 남은 결과도 버린다.

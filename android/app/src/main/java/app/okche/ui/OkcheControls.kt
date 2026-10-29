@@ -44,7 +44,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.error
@@ -254,10 +255,11 @@ fun <T> OkcheChoiceChips(
                         .selectable(isSelected, role = Role.RadioButton, onClick = {
                             if (isSelected && onDeselect != null) onDeselect() else onSelect(value)
                         })
-                        // 고른 라디오는 읽기 도구에서 누르기 동작이 빠지므로, 풀 수 있는 칩엔 '선택 해제'를 따로 단다.
+                        // 고른 라디오는 기기 접근성 노드에서 누르기 동작이 빠지므로(Compose 규칙), 풀 수 있는 칩엔
+                        // '선택 해제'를 사용자 지정 동작으로 단다(TalkBack 동작 메뉴).
                         .then(
                             if (isSelected && onDeselect != null) {
-                                Modifier.semantics { onClick(label = "선택 해제") { onDeselect(); true } }
+                                Modifier.semantics { customActions = listOf(CustomAccessibilityAction("선택 해제") { onDeselect(); true }) }
                             } else {
                                 Modifier
                             },

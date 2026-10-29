@@ -144,6 +144,17 @@ class PetRegisterTest {
         assertEquals(1, count("pet"))
     }
 
+    /** 저장 중 저장소가 오류를 내도 앱이 죽지 않고 '모시기' 위 문구로 끝난다. */
+    @Test fun saverReportsStoreFailure() {
+        val saver = PetRegisterSaver()
+        db.close()
+        saver.save(db.dao(), PetForm(name = "콩이"))
+        val deadline = System.currentTimeMillis() + 5_000
+        while (saver.result == null && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        assertEquals(mapOf("save" to "저장하지 못했어요. 다시 해 주세요."), saver.result)
+        assertEquals(false, saver.saving)
+    }
+
     @Test fun weightBecomesGramsRecord() = runBlocking {
         save(PetForm(name = "콩이", weight = "4.6"))
         save(PetForm(name = "보리", weight = "100"))

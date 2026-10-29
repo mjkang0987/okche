@@ -92,6 +92,13 @@ final class PetRegistrationTests: XCTestCase {
         XCTAssertNil(PetRegistration.number("nan"))
         XCTAssertNil(PetRegistration.number("inf"))
         XCTAssertEqual(PetRegistration.number("4,6"), 4.6)
+        // 안드로이드 PetRegisterTest.numbersAreAsciiOnly와 같은 입력
+        for text in ["5", "5.", ".5", "5,", "1,5"] { XCTAssertNotNil(PetRegistration.number(text), text) }
+        for text in ["+5", "-1", "1e1", "0x1p3", "1.5f", "1.2.3", "５", "٥", " 5", ""] {
+            XCTAssertNil(PetRegistration.number(text), text)
+        }
+        XCTAssertEqual(PetRegistration.wholeNumber("12"), 12)
+        for text in ["+3", "-0", "３", "1.0", ""] { XCTAssertNil(PetRegistration.wholeNumber(text), text) }
     }
 
     func testTinyWeightAndEmptyAge() throws {
@@ -105,6 +112,7 @@ final class PetRegistrationTests: XCTestCase {
         XCTAssertNil(pet.birthDate)
         XCTAssertFalse(pet.birthEstimated)
     }
+
 
     func testWeightBecomesGramsRecord() throws {
         var form = PetRegistration()

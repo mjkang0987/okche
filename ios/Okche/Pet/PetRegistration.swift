@@ -36,6 +36,8 @@ struct PetRegistration {
 
     enum Field: Hashable {
         case name, birth, age, weight, insulinTimes, save
+        /// 오류는 없고 키보드 초점만 쓰는 칸
+        case diagnosis, insulinName
         case insulinUnits(UUID)
     }
 
@@ -48,7 +50,7 @@ struct PetRegistration {
         var errors: [Field: String] = [:]
         if trimmed(name) == nil { errors[.name] = "이름을 넣어 주세요" }
         if birthUnknown {
-            if let text = trimmed(approxAge), !(Int(text).map { (0...30).contains($0) } ?? false) {
+            if let text = trimmed(approxAge), !(Self.wholeNumber(text).map { (0...30).contains($0) } ?? false) {
                 errors[.age] = "0에서 30 사이로 넣어 주세요"
             }
         } else if let birthDate, calendar.startOfDay(for: birthDate) > calendar.startOfDay(for: today) {
@@ -79,7 +81,7 @@ struct PetRegistration {
 
         var birth = birthDate.map { Self.day($0, calendar) }
         if birthUnknown {
-            birth = trimmed(approxAge).flatMap(Int.init)
+            birth = trimmed(approxAge).flatMap(Self.wholeNumber)
                 .flatMap { calendar.date(byAdding: .year, value: -$0, to: now) }
                 .map { Self.day($0, calendar) }
         }
@@ -115,9 +117,16 @@ struct PetRegistration {
     }
 
     /// 소수점은 점·쉼표 모두 받는다(기기 지역 설정에 따라 숫자 자판이 쉼표를 낼 수 있음).
-    /// 유한한 값만(아주 긴 숫자·'inf'는 무한대가 되어 저장할 수 없음).
+    /// ASCII 숫자와 소수점(점·쉼표) 하나만 — 안드로이드와 같은 규칙('+3'·'1e1'·전각 숫자는 숫자가 아님).
+    /// 유한한 값만(아주 긴 숫자는 무한대가 되어 저장할 수 없음).
     static func number(_ text: String) -> Double? {
-        Double(text.replacingOccurrences(of: ",", with: ".")).flatMap { $0.isFinite ? $0 : nil }
+        guard text.wholeMatch(of: /[0-9]+[.,]?[0-9]*|[.,][0-9]+/) != nil else { return nil }
+        return Double(text.replacingOccurrences(of: ",", with: ".")).flatMap { $0.isFinite ? $0 : nil }
+    }
+
+    /// 나이: ASCII 숫자만.
+    static func wholeNumber(_ text: String) -> Int? {
+        text.wholeMatch(of: /[0-9]+/) != nil ? Int(text) : nil
     }
 
     /// 기기 달력 날짜 `YYYY-MM-DD`.

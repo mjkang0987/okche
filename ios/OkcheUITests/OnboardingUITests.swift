@@ -53,6 +53,44 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(app.buttons["닫기"].frame.minX, 0)
     }
 
+    /// 칸을 고치면 그 칸 오류만 사라지고, 생일은 고른 뒤 취소하면 그대로·지우기면 안 고름. 시간 고르기 이름.
+    func testErrorsClearAndBirthCanBeCleared() {
+        let app = launch()
+        app.buttons["아이 등록하고 시작하기"].tap()
+        let weight = app.textFields["체중 (kg)"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 5))
+        weight.tap()
+        weight.typeText("0")
+        app.buttons["모시기"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        app.textFields["이름"].tap()
+        app.textFields["이름"].typeText("콩")
+        XCTAssertFalse(app.staticTexts["이름을 넣어 주세요"].exists)
+        XCTAssertTrue(app.staticTexts["0보다 크고 100 이하인 숫자로 넣어 주세요"].exists)
+        app.buttons["완료"].firstMatch.tap()
+
+        let birth = app.buttons["생일"]
+        birth.tap()
+        app.buttons["고르기"].tap()
+        XCTAssertNotEqual(birth.value as? String, "안 고름")
+        birth.tap()
+        app.buttons["취소"].tap()
+        XCTAssertNotEqual(birth.value as? String, "안 고름")
+        birth.tap()
+        app.buttons["지우기"].tap()
+        XCTAssertEqual(birth.value as? String, "안 고름")
+
+        let diabetes = app.switches["당뇨가 있어요"].firstMatch
+        while !diabetes.isHittable { app.swipeUp() }
+        diabetes.tap()
+        let first = app.buttons["첫 번째 시간"]
+        XCTAssertTrue(first.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["시간 선택기"].exists)
+        first.tap()
+        XCTAssertTrue(app.buttons["고르기"].waitForExistence(timeout: 3))
+        app.buttons["취소"].tap()
+    }
+
     func testBrowseFirstSkipsOnboarding() {
         let app = launch()
         app.buttons["먼저 둘러볼게요"].tap()

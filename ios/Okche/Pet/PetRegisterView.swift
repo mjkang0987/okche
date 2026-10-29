@@ -36,6 +36,7 @@ struct PetRegisterView: View {
                             .focused($focused, equals: .weight).id(PetRegistration.Field.weight)
                         VStack(alignment: .leading, spacing: 6) {
                             OkcheTextField(label: "진단명", note: "(있을 때만)", text: $form.diagnosis, placeholder: "예: 염증성 장질환(IBD)")
+                                .focused($focused, equals: .diagnosis)
                             Text("적어 두면 실록과 탕약 알림을 투병 관리에 맞춰 쓸 수 있어요.")
                                 .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                         }
@@ -238,11 +239,14 @@ private struct InsulinSection: View {
     @Binding var form: PetRegistration
     let errors: [PetRegistration.Field: String]
     var focused: FocusState<PetRegistration.Field?>.Binding
+    /// 시각을 고르는 줄(시트).
+    @State private var pickingTime: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("인슐린").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink).accessibilityAddTraits(.isHeader)
             OkcheTextField(label: "인슐린 이름", note: "(몰라도 돼요)", text: $form.insulinName, placeholder: "예: 병원에서 받은 인슐린 이름")
+                .focused(focused, equals: .insulinName)
             VStack(alignment: .leading, spacing: 0) {
                 OkcheFieldLabel(title: "맞는 시간과 양").padding(.bottom, 8).accessibilityAddTraits(.isHeader)
                 ForEach(Array(form.insulinSlots.enumerated()), id: \.element.id) { index, slot in
@@ -251,7 +255,7 @@ private struct InsulinSection: View {
                         .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
                 }
                 OkcheFieldError(message: errors[.insulinTimes]).id(PetRegistration.Field.insulinTimes)
-                Button { form.insulinSlots.append(.init(time: "12:00")) } label: {
+                Button { form.insulinSlots.append(.init(time: nextFreeTime())) } label: {
                     Text("+ 시간 추가")
                         .okcheText(OkcheType.body, weight: .medium)
                         .foregroundStyle(OkcheColor.namsaek)
@@ -271,20 +275,35 @@ private struct InsulinSection: View {
         .padding(.top, 14)
         .padding(.bottom, 6)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+        .sheet(item: $pickingTime) { id in
+            if let index = form.insulinSlots.firstIndex(where: { $0.id == id }) {
+                TimeSheet(time: timeBinding(index))
+            }
+        }
     }
 
     private func slotRow(index: Int, id: UUID) -> some View {
         let order = ["첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
         let nth = index < order.count ? order[index] : "\(index + 1)번째"
         let error = errors[.insulinUnits(id)]
-        let time = DatePicker("\(nth) 시간", selection: timeBinding(index), displayedComponents: .hourAndMinute)
-            .labelsHidden()
-            .accessibilityLabel("\(nth) 시간") // labelsHidden이면 화면 읽기 이름이 '시간 선택기'가 됨
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // 기본 compact 시간 고르기는 안쪽 버튼 이름이 '시간 선택기'로 고정돼 몇 번째 시간인지 못 읽는다 — 칸 + 시트로.
+        let shown = timeBinding(index).wrappedValue.formatted(date: .omitted, time: .shortened)
+        let time = Button { pickingTime = id } label: {
+            HStack {
+                Text(shown).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                Spacer(minLength: 8)
+                Image(systemName: "clock").font(.body).foregroundStyle(OkcheColor.ink)
+            }
             .okcheFieldBox()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(nth) 시간")
+        .accessibilityValue(shown)
         let units = HStack(spacing: 4) {
             TextField("", text: $form.insulinSlots[index].units)
                 .okcheText(OkcheType.body)
+                .frame(maxWidth: .infinity, maxHeight: .infinity) // 테두리 안 어디를 눌러도 칸이 잡히게
                 .keyboardType(.decimalPad)
                 .focused(focused, equals: .insulinUnits(id))
                 .accessibilityLabel("\(nth) 양 (단위)")
@@ -312,6 +331,12 @@ private struct InsulinSection: View {
             OkcheFieldError(message: error)
         }
         .id(PetRegistration.Field.insulinUnits(id))
+    }
+
+    /// 새 줄 시각: 12:00부터 한 시간씩 넘겨 아직 없는 시각(두 번 눌러도 같은 시간이 생기지 않게).
+    private func nextFreeTime() -> String {
+        let used = Set(form.insulinSlots.map(\.time))
+        return (0..<24).map { String(format: "%02d:00", (12 + $0) % 24) }.first { !used.contains($0) } ?? "12:00"
     }
 
     /// `HH:mm` 글자를 시계 고르기와 잇는다(날짜는 쓰지 않음).
@@ -359,6 +384,34 @@ private struct BirthPicker: View {
     }
 }
 
+/// 인슐린 시각 고르기: 돌림판에서 고른 뒤 '고르기'.
+private struct TimeSheet: View {
+    @Binding var time: Date
+    @Environment(\.dismiss) private var dismiss
+    @State private var picked = Date.now
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Button("취소") { dismiss() }
+                Spacer()
+            }
+            .okcheText(OkcheType.body, weight: .medium)
+            .foregroundStyle(OkcheColor.namsaek)
+            .frame(minHeight: 44)
+            DatePicker("시간", selection: $picked, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+            Button("고르기") { time = picked; dismiss() }
+                .buttonStyle(.okchePrimary)
+        }
+        .padding(OkcheSpacing.space4)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .presentationDetents([.medium, .large])
+        .onAppear { picked = time }
+    }
+}
+
 /// 네모 체크 상자(디자인의 checkbox). iOS에 기본 체크 상자가 없어 Toggle 모양만 바꾼다.
 private struct CheckboxStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -375,4 +428,9 @@ private struct CheckboxStyle: ToggleStyle {
         .buttonStyle(.plain)
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
     }
+}
+
+// `.sheet(item:)`에 줄 ID를 바로 쓰려고.
+extension UUID: @retroactive Identifiable {
+    public var id: UUID { self }
 }

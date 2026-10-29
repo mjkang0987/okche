@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.collectionInfo
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +49,10 @@ import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 
-/** 첫 실행 '시작하기'(디자인 보드 Onboarding). 큰 글자로 넘치면 스크롤하고, 남으면 버튼을 아래에 붙인다. */
+/**
+ * 첫 실행 '시작하기'(디자인 보드 Onboarding). 큰 글자로 넘치면 스크롤하고, 남으면 버튼을 아래에 붙인다(margin-top: auto).
+ * 낮은 화면(360×640 등)에선 위 여백 72를 24로 줄여 주 버튼이 첫 화면에 보이게 한다.
+ */
 @Composable
 fun OnboardingScreen(onRegister: () -> Unit, onBrowse: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
@@ -55,19 +60,28 @@ fun OnboardingScreen(onRegister: () -> Unit, onBrowse: () -> Unit) {
             Modifier
                 .verticalScroll(rememberScrollState())
                 .heightIn(min = maxHeight)
-                // 위 72·아이콘 줄 사이 28·14는 보드 값(토큰에 없음).
-                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 72.dp, bottom = OkcheSpacing.Space6),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+                // 위 72·묶음 사이 28·아이콘 줄 14는 보드 값(토큰에 없음).
+                .padding(
+                    start = OkcheSpacing.Space4, end = OkcheSpacing.Space4,
+                    top = if (maxHeight < 720.dp) OkcheSpacing.Space6 else 72.dp, bottom = OkcheSpacing.Space6,
+                ),
         ) {
             BrandPlaque()
+            Spacer(Modifier.height(28.dp))
             Column(
-                Modifier.semantics { collectionInfo = CollectionInfo(3, 1) },
+                Modifier.semantics {
+                    collectionInfo = CollectionInfo(3, 1)
+                    contentDescription = "옥체로 할 수 있는 일"
+                },
                 verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
             ) {
                 Feature(Icons.Outlined.Description, "승정원일기", "구토·변·약을 한 번 눌러 기록해요")
                 Feature(Icons.Outlined.BarChart, "실록", "병원에 그대로 보여 줄 기록이 쌓여요")
                 Feature(Icons.Outlined.Image, "어진첩", "사진과 나이가 함께 남아요")
             }
+            // 카드와 버튼 사이 최소 28, 남는 높이는 그 아래 빈칸이 가져가 버튼이 바닥에 붙는다(margin-top: auto).
+            // 버튼 묶음에 weight를 주면 스크롤 안에서 내용이 화면보다 길 때 묶음 높이가 0이 돼 버튼이 잘린다.
+            Spacer(Modifier.height(28.dp))
             Spacer(Modifier.weight(1f))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OkchePrimaryButton("아이 등록하고 시작하기", onRegister)
@@ -117,15 +131,14 @@ private fun BrandPlaque() {
                     // dp 좌표로 그리려고 density만큼 키운다. 선 굵기도 같이 커지므로 1.1dp.
                     scale(density, pivot = Offset.Zero) { drawPath(frame, brush, style = Stroke(1.1f)) }
                 }
-            }
-            .semantics(mergeDescendants = true) { heading() },
+            },
         verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val brand = OkcheType.Display.toTextStyle().copy(fontSize = 56.sp, lineHeight = 64.sp, letterSpacing = 6.sp)
         Text(
             "옥체",
-            Modifier.singleLineHeight(brand.lineHeight),
+            Modifier.singleLineHeight(brand.lineHeight).semantics { heading() },
             color = OkcheColor.GeumLight,
             style = brand,
             maxLines = 1,

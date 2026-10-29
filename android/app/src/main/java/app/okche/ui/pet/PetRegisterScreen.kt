@@ -49,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,6 +60,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.selected
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.LaunchedEffect
+import app.okche.store.OkcheDao
+import app.okche.ui.choiceGroup
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -104,16 +113,44 @@ private fun ordinal(n: Int) =
     listOf("첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열").getOrNull(n - 1)?.let { "$it 번째" } ?: "$n 번째"
 
 /**
+ * '모시기' 저장을 화면 밖(화면 활동의 ViewModel)에서 한다: 저장 중 화면이 다시 만들어져도 저장이 끊기지 않고,
+ * 결과는 새 화면이 받아 처리한다. 저장 중 다시 누르면 무시한다.
+ */
+class PetRegisterSaver : ViewModel() {
+    var saving by mutableStateOf(false)
+        private set
+
+    /** 처리 안 한 저장 결과(빈 맵 = 저장됨, 아니면 오류). 화면이 받으면 [consume]. */
+    var result by mutableStateOf<Map<String, String>?>(null)
+        private set
+
+    fun save(dao: OkcheDao, form: PetForm) {
+        if (saving) return
+        saving = true
+        viewModelScope.launch {
+            try {
+                result = registerPet(dao, form)
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    fun consume() {
+        result = null
+    }
+}
+
+/**
  * 아이 등록(디자인 보드 Profile·ProfileDog). 프로필 사진 칸은 11단계(사진 저장)에서.
  * 닫기·시스템 뒤로는 `onClose`, '모시기'가 저장되면 `onSaved`.
  */
 @Composable
 fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val saver = remember { ViewModelProvider(context as ComponentActivity)[PetRegisterSaver::class.java] }
     var form by rememberSaveable { mutableStateOf(PetForm()) }
-    var errors by remember { mutableStateOf(emptyMap<String, String>()) }
-    var saving by remember { mutableStateOf(false) }
+    var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
     // 오류가 난 첫 칸으로 옮겨 가려고 칸마다 단다.
     val bring = remember { mutableMapOf<String, BringIntoViewRequester>() }
     val focus = remember { mutableMapOf<String, FocusRequester>() }
@@ -125,6 +162,16 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         form = form.change()
         if (key != null) errors = errors - key
         if (form.insulinRows.size != rows) errors = errors.filterKeys { !it.startsWith("time") && !it.startsWith("units") }
+    }
+    // 저장 결과 받기(저장 중 화면이 다시 만들어졌어도 여기서 받는다).
+    val result = saver.result
+    LaunchedEffect(result) {
+        if (result == null) return@LaunchedEffect
+        saver.consume()
+        errors = result
+        val first = result.keys.firstOrNull() ?: return@LaunchedEffect onSaved()
+        bring[first]?.bringIntoView()
+        focus[first]?.requestFocus()
     }
 
     BackHandler(onBack = onClose)
@@ -177,7 +224,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                 if (form.birthUnknown) {
                     OkcheTextField(
                         form.age, { edit("age") { copy(age = it) } }, "나이", Modifier.anchor("age"), hint = "(대략)", suffix = "살쯤",
-                        error = errors["age"], keyboardOptions = numberKeys,
+                        error = errors["age"], keyboardOptions = numberKeys, description = AGE_HELP,
                     )
                 } else {
                     OkchePickerField(
@@ -194,6 +241,8 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                         placeholder = "날짜를 골라 주세요",
                         icon = Icons.Outlined.CalendarMonth,
                         error = errors["birthDate"],
+                        onClear = { edit("birthDate") { copy(birthDate = null) } },
+                        clearLabel = "생일 지우기",
                     )
                 }
                 Row(
@@ -214,7 +263,8 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                     Text("생일을 몰라요 (나이를 어림잡아 넣을게요)", color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
                 }
                 if (form.birthUnknown) {
-                    HelpText("오늘에서 그만큼 거슬러 간 날을 생일로 잡아요. 1살이 안 됐으면 0을 넣어 주세요.")
+                    // 나이 칸 설명으로 이미 읽으므로 여기선 보이기만.
+                    HelpText(AGE_HELP, Modifier.clearAndSetSemantics {})
                 }
             }
             OkcheTextField(
@@ -229,26 +279,24 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             }
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", form.hasDiabetes, { edit { copy(hasDiabetes = it) } })
-                if (form.hasDiabetes) InsulinBox(form, errors, ::edit) { key -> Modifier.anchor(key) }
+                if (form.hasDiabetes) InsulinBox(form, errors, ::edit, { errors = errors.filterKeys { !it.startsWith("time") } }) { key ->
+                    Modifier.anchor(key)
+                }
             }
             errors["save"]?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("모시기", enabled = !saving, onClick = {
-                saving = true
-                scope.launch {
-                    errors = registerPet(OkcheDatabase.get(context).dao(), form)
-                    saving = false
-                    val first = errors.keys.firstOrNull() ?: return@launch onSaved()
-                    bring[first]?.bringIntoView()
-                    focus[first]?.requestFocus()
-                }
-            })
+            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = { saver.save(OkcheDatabase.get(context).dao(), form) })
         }
     }
 }
 
+/** 털색 고른 고리가 동그라미 밖으로 나가는 폭(한지 틈 3 + 남색 고리 2). */
+private val Ring = 5.dp
+
+private const val AGE_HELP = "오늘에서 그만큼 거슬러 간 날을 생일로 잡아요. 1살이 안 됐으면 0을 넣어 주세요."
+
 @Composable
-private fun HelpText(text: String) {
-    Text(text, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+private fun HelpText(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
 }
 
 /** 품종: 입력칸 모양을 누르면 그 종의 목록 메뉴가 열린다(셀렉트). */
@@ -265,6 +313,7 @@ private fun BreedField(species: Species, breed: String, onSelect: (String) -> Un
                             style = OkcheType.Body.toTextStyle(if (name == breed) FontWeight.Bold else FontWeight.Normal))
                     },
                     onClick = { onSelect(name); open = false },
+                    modifier = Modifier.semantics { selected = name == breed },
                 )
             }
         }
@@ -277,25 +326,30 @@ private fun FurColorPicker(species: Species, selected: String, onSelect: (String
     BoxWithConstraints {
         val width = maxWidth
         Column {
-            OkcheFieldLabel("털색", Modifier.padding(bottom = OkcheSpacing.Space2))
-            // 이름표가 세 글자까지라 칸 너비 = max(동그라미 48, 글자 세 개). 넷이 한 줄에 안 들어가면 3+1 대신 2+2.
-            val itemWidth = maxOf(48.dp, with(LocalDensity.current) { OkcheType.Label.fontSize.toDp() } * 3)
-            val fitsOneRow = itemWidth * 4 + OkcheSpacing.Space3 * 3 <= width
+            // 고른 고리(동그라미 밖 5)까지 칸 안에 들도록 칸을 사방 5 넓히고, 그만큼 간격을 줄여 보드와 같은 자리에 둔다.
+            OkcheFieldLabel("털색", Modifier.padding(bottom = OkcheSpacing.Space2 - Ring).clearAndSetSemantics {})
+            // 이름표가 세 글자까지라 칸 너비 = max(동그라미+고리 58, 글자 세 개). 넷이 한 줄에 안 들어가면 3+1 대신 2+2.
+            val itemWidth = maxOf(48.dp + Ring * 2, with(LocalDensity.current) { OkcheType.Label.fontSize.toDp() } * 3)
+            val gap = OkcheSpacing.Space3 - Ring * 2
+            val fitsOneRow = itemWidth * 4 + gap * 3 <= width
             FlowRow(
-                Modifier.selectableGroup(),
+                Modifier.choiceGroup("털색"),
                 maxItemsInEachRow = if (fitsOneRow) 4 else 2,
-                horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
+                horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
             ) {
                 for (fur in furColors.getValue(species)) {
                     val isSelected = fur.name == selected
+                    // 누름·포커스 덧칠이 네모로 삐져나오지 않게 칸 모양으로 자른다.
                     Column(
-                        Modifier.selectable(isSelected, role = Role.RadioButton) { onSelect(fur.name) },
-                        verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
+                        Modifier
+                            .clip(RoundedCornerShape(OkcheRadius.RadiusSm))
+                            .selectable(isSelected, role = Role.RadioButton) { onSelect(fur.name) },
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(
                             Modifier
+                                .padding(Ring)
                                 .size(48.dp)
                                 .drawBehind {
                                     if (isSelected) drawCircle(OkcheColor.Namsaek, radius = 28.dp.toPx(), style = Stroke(2.dp.toPx()))
@@ -305,6 +359,7 @@ private fun FurColorPicker(species: Species, selected: String, onSelect: (String
                         )
                         Text(
                             fur.name,
+                            Modifier.padding(horizontal = Ring),
                             color = OkcheColor.Ink,
                             style = OkcheType.Label.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
                         )
@@ -321,6 +376,7 @@ private fun InsulinBox(
     form: PetForm,
     errors: Map<String, String>,
     edit: (String?, PetForm.() -> PetForm) -> Unit,
+    clearTimeErrors: () -> Unit,
     anchor: (String) -> Modifier,
 ) {
     val context = LocalContext.current
@@ -355,11 +411,15 @@ private fun InsulinBox(
                                     val t = LocalTime.parse(row.time)
                                     TimePickerDialog(context, { _, h, min ->
                                         val time = "%02d:%02d".format(h, min)
-                                        edit("time$i") { copy(insulinRows = insulinRows.toMutableList().also { it[i] = it[i].copy(time = time) }) }
+                                        // 시간 하나를 바꾸면 다른 줄의 '같은 시간' 오류도 풀릴 수 있어 시간 오류를 모두 지운다.
+                                        edit(null) { copy(insulinRows = insulinRows.toMutableList().also { it[i] = it[i].copy(time = time) }) }
+                                        clearTimeErrors()
                                     }, t.hour, t.minute, DateFormat.is24HourFormat(context)).show()
                                 },
                                 anchor("time$i").then(m),
                                 showLabel = false,
+                                error = errors["time$i"],
+                                showError = false,
                                 icon = Icons.Outlined.Schedule,
                             )
                         }
@@ -370,6 +430,8 @@ private fun InsulinBox(
                                 "$n 양 (단위)",
                                 anchor("units$i").then(if (stacked) Modifier.weight(1f) else Modifier.width(104.dp)),
                                 showLabel = false,
+                                error = errors["units$i"],
+                                showError = false,
                                 suffix = "단위",
                                 suffixStyle = OkcheType.Label,
                                 keyboardOptions = decimalKeys,

@@ -11,6 +11,7 @@ import app.okche.store.Species
 import app.okche.store.Syringe
 import app.okche.ui.pet.InsulinRow
 import app.okche.ui.pet.PetForm
+import app.okche.ui.pet.PetRegisterSaver
 import app.okche.ui.pet.registerPet
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -110,6 +111,37 @@ class PetRegisterTest {
     @Test fun storeFailureIsSaveError() {
         db.close()
         assertEquals(mapOf("save" to "저장하지 못했어요. 다시 해 주세요."), save(PetForm(name = "콩이", weight = "4")))
+    }
+
+    /** iOS와 같은 숫자 규칙: ASCII 숫자와 점·쉼표 하나만. */
+    @Test fun numbersAreAsciiOnly() {
+        val weightError = mapOf("weight" to "0보다 크고 100 이하인 숫자로 넣어 주세요")
+        for (weight in listOf("４.５", "٤", "1.5f", "1e1", "+3", "0x1", "1.2.3", "1,2,3", "4 5", ".", "1d")) {
+            assertEquals(weight, weightError, save(PetForm(name = "콩이", weight = weight)))
+        }
+        val ageError = mapOf("age" to "0에서 30 사이로 넣어 주세요")
+        for (age in listOf("３", "٣", "+3", "3.0", "1e1", "99999999999999999999")) {
+            assertEquals(age, ageError, save(PetForm(name = "콩이", birthUnknown = true, age = age)))
+        }
+        val units = mapOf("units0" to "0보다 크고 100 이하인 숫자로 넣어 주세요")
+        assertEquals(units, save(PetForm(name = "콩이", hasDiabetes = true, insulinRows = listOf(InsulinRow("08:00", "2.5f")))))
+        assertNothingSaved()
+        // 받는 꼴: 앞뒤 빈칸, 쉼표 소수점, 끝 점, 앞 점, 0으로 시작하는 나이.
+        for ((weight, age) in listOf(" 4.5 " to " 03 ", "4," to "0", ".5" to "30")) {
+            assertEquals(weight, emptyMap<String, String>(), save(PetForm(name = "콩이", weight = weight, birthUnknown = true, age = age)))
+        }
+    }
+
+    /** 저장 중 '모시기'를 또 눌러도 한 번만 저장한다. */
+    @Test fun saverIgnoresSecondTapWhileSaving() {
+        val saver = PetRegisterSaver()
+        val form = PetForm(name = "콩이")
+        saver.save(db.dao(), form)
+        saver.save(db.dao(), form)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (saver.result == null && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        assertEquals(emptyMap<String, String>(), saver.result)
+        assertEquals(1, count("pet"))
     }
 
     @Test fun weightBecomesGramsRecord() = runBlocking {

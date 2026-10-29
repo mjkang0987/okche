@@ -23,6 +23,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -35,6 +39,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -55,25 +66,44 @@ private val FieldHeight = 52.dp
 private val FieldGap = 6.dp
 private val FieldPadding = 14.dp
 
-/** 칸 이름표: 14 medium inkMuted, 뒤에 붙는 말('(선택)')은 보통 굵기. `visible`이 거짓이면 화면에서만 숨긴다(읽기는 됨). */
+/** 화면에서만 숨기고 읽기는 되게(HTML sr-only). */
+private fun Modifier.visuallyHidden() = layout { m, c -> m.measure(c).let { layout(0, 0) {} } }
+
+private fun labelText(label: String, hint: String?) = if (hint == null) label else "$label $hint"
+
+/** 칸 이름표: 14 medium inkMuted, 뒤에 붙는 말('(선택)')은 보통 굵기. */
 @Composable
-fun OkcheFieldLabel(label: String, modifier: Modifier = Modifier, hint: String? = null, visible: Boolean = true) {
+fun OkcheFieldLabel(label: String, modifier: Modifier = Modifier, hint: String? = null) {
     Text(
         buildAnnotatedString {
             append(label)
             if (hint != null) withStyle(SpanStyle(fontWeight = FontWeight.Normal)) { append(" $hint") }
         },
-        if (visible) modifier else modifier.layout { m, c -> m.measure(c).let { layout(0, 0) {} } },
+        modifier,
         color = OkcheColor.InkMuted,
         style = OkcheType.Label.toTextStyle(),
     )
 }
 
-/** 칸 아래 오류 글자(연지색 14). */
+/** 칸 아래 오류 글자(연지색 14). 나타나면 TalkBack이 알린다. */
 @Composable
 fun OkcheErrorText(message: String, modifier: Modifier = Modifier) {
-    Text(message, modifier, color = OkcheColor.Yeonji, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+    Text(
+        message,
+        modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        color = OkcheColor.Yeonji,
+        style = OkcheType.Label.toTextStyle(FontWeight.Normal),
+    )
 }
+
+/** 고르기 묶음 이름(fieldset legend): 화면 글자는 읽지 않고 묶음 자체에 이름을 붙인다(묶음에 들어가면 이름부터 읽음). */
+@Composable
+private fun GroupLegend(label: String, hint: String?, modifier: Modifier) {
+    OkcheFieldLabel(label, modifier.clearAndSetSemantics {}, hint)
+}
+
+/** 고르기 묶음 틀: 하나만 고르는 묶음 + 이름. */
+fun Modifier.choiceGroup(name: String) = selectableGroup().semantics { contentDescription = name }
 
 /** 52 높이·테두리 1.5·모서리 8·흰 바탕 칸 틀. 포커스면 남색 2 테두리. */
 private fun Modifier.fieldBox(focused: Boolean) = this
@@ -84,7 +114,8 @@ private fun Modifier.fieldBox(focused: Boolean) = this
 
 /**
  * 글자 입력칸: 위 이름표 + 52 칸(+ 끝 단위 글자) + 오류 글자. 이름표·오류가 입력칸 안에 함께 묶여(TalkBack 한 덩어리),
- * 이름표를 눌러도 입력칸으로 간다(HTML label과 같음).
+ * 이름표를 눌러도 입력칸으로 간다(HTML label과 같음). 이름표를 숨기면(`showLabel` 거짓) 이름은 contentDescription으로.
+ * `showError`가 거짓이면 오류 글자는 부르는 쪽이 보이고 여기선 읽기용 오류만 단다. `description`은 칸 설명(aria-describedby)으로 함께 읽는다.
  */
 @Composable
 fun OkcheTextField(
@@ -98,6 +129,8 @@ fun OkcheTextField(
     suffix: String? = null,
     suffixStyle: OkcheTextStyle = OkcheType.Body,
     error: String? = null,
+    showError: Boolean = true,
+    description: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -105,7 +138,10 @@ fun OkcheTextField(
     BasicTextField(
         value,
         onValueChange,
-        modifier.fillMaxWidth().semantics { if (error != null) error(error) },
+        modifier.fillMaxWidth().semantics {
+            if (error != null) error(error)
+            if (!showLabel) contentDescription = labelText(label, hint)
+        },
         textStyle = OkcheType.Body.toTextStyle().copy(color = OkcheColor.Ink),
         keyboardOptions = keyboardOptions,
         singleLine = true,
@@ -113,7 +149,7 @@ fun OkcheTextField(
         cursorBrush = SolidColor(OkcheColor.Namsaek),
         decorationBox = { inner ->
             Column(verticalArrangement = Arrangement.spacedBy(FieldGap)) {
-                OkcheFieldLabel(label, hint = hint, visible = showLabel)
+                if (showLabel) OkcheFieldLabel(label, hint = hint)
                 Row(Modifier.fieldBox(focused), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         if (value.isEmpty() && placeholder != null) {
@@ -122,11 +158,13 @@ fun OkcheTextField(
                         inner()
                     }
                     if (suffix != null) {
-                        Text(suffix, Modifier.padding(start = OkcheSpacing.Space2), color = OkcheColor.InkMuted,
+                        // 단위 글자는 이름표에 이미 있거나 값만으로 뜻이 통해 읽지 않는다(두 번 읽힘 방지).
+                        Text(suffix, Modifier.padding(start = OkcheSpacing.Space2).clearAndSetSemantics {}, color = OkcheColor.InkMuted,
                             style = suffixStyle.toTextStyle(FontWeight.Normal))
                     }
                 }
-                if (error != null) OkcheErrorText(error)
+                if (description != null) Text(description, Modifier.visuallyHidden())
+                if (error != null && showError) OkcheErrorText(error)
             }
         },
     )
@@ -135,6 +173,8 @@ fun OkcheTextField(
 /**
  * 입력칸 모양의 고르기 칸(날짜·시간·품종): 누르면 기본 고르기 창이나 메뉴를 연다.
  * 이름표·값·오류를 한 덩어리로 읽고, 역할은 `role`(날짜·시간은 버튼, 품종은 펼침 목록).
+ * 이름표를 숨기면 이름은 contentDescription, 값은 stateDescription(이름 → 값 순서로 읽힘).
+ * `onClear`를 주면 값이 있을 때 끝 아이콘 자리에 지우기 버튼(44, 이름 `clearLabel`)이 나온다(고른 값을 '안 고름'으로).
  */
 @Composable
 fun OkchePickerField(
@@ -148,26 +188,42 @@ fun OkchePickerField(
     icon: ImageVector? = null,
     role: Role = Role.Button,
     error: String? = null,
+    showError: Boolean = true,
+    onClear: (() -> Unit)? = null,
+    clearLabel: String = "",
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Column(
         modifier
-            .semantics(mergeDescendants = true) { if (error != null) error(error) }
+            .semantics(mergeDescendants = true) {
+                if (error != null) error(error)
+                if (!showLabel) {
+                    contentDescription = labelText(label, hint)
+                    stateDescription = value ?: placeholder.orEmpty()
+                }
+            }
             .clickable(interaction, indication = null, role = role, onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(FieldGap),
     ) {
-        OkcheFieldLabel(label, hint = hint, visible = showLabel)
+        if (showLabel) OkcheFieldLabel(label, hint = hint)
         Row(Modifier.fillMaxWidth().fieldBox(focused), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 value ?: placeholder.orEmpty(),
-                Modifier.weight(1f),
+                Modifier.weight(1f).then(if (showLabel) Modifier else Modifier.clearAndSetSemantics {}),
                 color = if (value == null) OkcheColor.InkMuted else OkcheColor.Ink,
                 style = OkcheType.Body.toTextStyle(),
             )
-            if (icon != null) Icon(icon, null, Modifier.padding(start = OkcheSpacing.Space2).size(20.dp), tint = OkcheColor.InkMuted)
+            if (onClear != null && value != null) {
+                // 칸 오른쪽 여백(14) 안으로 버튼 터치 자리를 당겨 칸 높이는 그대로 둔다.
+                IconButton(onClear, Modifier.padding(start = OkcheSpacing.Space1).offset(x = 12.dp).size(44.dp)) {
+                    Icon(Icons.Outlined.Close, clearLabel, Modifier.size(20.dp), tint = OkcheColor.InkMuted)
+                }
+            } else if (icon != null) {
+                Icon(icon, null, Modifier.padding(start = OkcheSpacing.Space2).size(20.dp), tint = OkcheColor.InkMuted)
+            }
         }
-        if (error != null) OkcheErrorText(error)
+        if (error != null && showError) OkcheErrorText(error)
     }
 }
 
@@ -188,16 +244,18 @@ fun <T> OkcheChoiceChips(
     onDeselect: (() -> Unit)? = null,
 ) {
     Column(modifier) {
-        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp), hint = hint)
+        GroupLegend(label, hint, Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp))
         FlowRow(
-            Modifier.selectableGroup(),
+            Modifier.choiceGroup(labelText(label, hint)),
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
         ) {
             for ((value, text) in options) {
                 val isSelected = value == selected
+                // 누름·포커스 덧칠이 알약 모양 안에만 보이게 잘라 둔다.
                 Box(
                     Modifier
+                        .clip(RoundedCornerShape(OkcheRadius.RadiusPill))
                         .selectable(isSelected, role = Role.RadioButton, onClick = {
                             if (isSelected && onDeselect != null) onDeselect() else onSelect(value)
                         })
@@ -236,8 +294,8 @@ fun <T> OkcheChoiceCards(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
-        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2))
-        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+        GroupLegend(label, null, Modifier.padding(bottom = OkcheSpacing.Space2))
+        Row(Modifier.choiceGroup(label), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
             for ((value, text) in options) {
                 val isSelected = value == selected
                 val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
@@ -247,6 +305,7 @@ fun <T> OkcheChoiceCards(
                         .heightIn(min = FieldHeight)
                         .background(if (isSelected) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
                         .border(1.5.dp, if (isSelected) OkcheColor.Namsaek else OkcheColor.Line, shape)
+                        .clip(shape)
                         .selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(value) })
                         .padding(horizontal = OkcheSpacing.Space2),
                     contentAlignment = Alignment.Center,
@@ -278,6 +337,7 @@ fun OkcheSwitchRow(
             .heightIn(min = FieldHeight)
             .background(OkcheColor.Paper, shape)
             .border(1.5.dp, OkcheColor.Line, shape)
+            .clip(shape)
             .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(horizontal = OkcheSpacing.Space4, vertical = FieldPadding),
         horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
@@ -316,6 +376,6 @@ fun OkchePrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = M
             disabledContentColor = OkcheColor.Paper,
         ),
     ) {
-        Text(text, style = OkcheType.Heading.toTextStyle())
+        Text(text, style = OkcheType.Heading.toTextStyle(), textAlign = TextAlign.Center)
     }
 }

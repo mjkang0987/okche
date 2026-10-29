@@ -71,8 +71,16 @@ data class PetForm(
         copy(species = species, breed = breeds.getValue(species).first(), furColor = furColors.getValue(species).first().name)
 }
 
-/** 소수 입력 — 쉼표 소수점(일부 키보드)도 받는다. 무한대·NaN은 숫자로 안 본다. */
-private fun String.toDecimal() = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
+// iOS와 같은 숫자 규칙: ASCII 숫자만(전각·아랍 숫자 거절), 소수점은 점이나 쉼표(일부 키보드) 하나.
+// Kotlin toDouble이 받는 '1.5f'·'1e3'·'+3'·'NaN' 같은 글은 숫자가 아니다.
+private val decimalPattern = Regex("[0-9]+([.,][0-9]*)?|[.,][0-9]+")
+private val integerPattern = Regex("[0-9]+")
+
+/** 소수 입력. 유한한 값만(아주 긴 숫자가 무한대가 되면 숫자 아님). */
+private fun String.toDecimal() = trim().takeIf { decimalPattern.matches(it) }?.replace(',', '.')?.toDouble()?.takeIf { it.isFinite() }
+
+/** 정수 입력(나이). 너무 길어 Int에 안 들어가면 숫자 아님. */
+private fun String.toWholeNumber() = trim().takeIf { integerPattern.matches(it) }?.toIntOrNull()
 
 /**
  * 검사해서 오류가 있으면 아무것도 저장하지 않고 오류를 돌려준다(칸 열쇠 → 문구, 화면 위에서부터 순서).
@@ -91,7 +99,7 @@ suspend fun registerPet(
     var birth: LocalDate? = null
     if (form.birthUnknown) {
         if (form.age.isNotBlank()) {
-            val age = form.age.trim().toIntOrNull()
+            val age = form.age.toWholeNumber()
             // 2/29에서 해를 빼면 java.time 규칙대로 2/28.
             if (age == null || age !in 0..30) errors["age"] = "0에서 30 사이로 넣어 주세요" else birth = today.minusYears(age.toLong())
         }

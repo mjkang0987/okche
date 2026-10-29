@@ -31,6 +31,7 @@ import app.okche.store.Record
 import app.okche.store.RecordKind
 import app.okche.store.RestPeriod
 import app.okche.store.Setting
+import app.okche.store.Sex
 import app.okche.store.Snack
 import app.okche.store.SnackKind
 import app.okche.store.Species
@@ -73,6 +74,7 @@ class StoreTest {
     @Test fun choiceValuesMatchDoc() {
         val expected = mapOf(
             "Species" to "cat dog",
+            "Sex" to "male female",
             "RecordKind" to "vomit stool urine meal snack weight med glucose insulin",
             "MedCategory" to "medicine supplement",
             "MedForm" to "pill powder liquid topical injection",
@@ -88,7 +90,7 @@ class StoreTest {
             "CelebrateTone" to "joseon plain",
         )
         val actual = listOf(
-            Species.entries, RecordKind.entries, MedCategory.entries, MedForm.entries, DoseUnit.entries, MedFrequency.entries,
+            Species.entries, Sex.entries, RecordKind.entries, MedCategory.entries, MedForm.entries, DoseUnit.entries, MedFrequency.entries,
             HowTo.entries, Syringe.entries, FoodChangeMethod.entries, SnackKind.entries, MealMode.entries, PhotoKind.entries,
             BodyView.entries, CelebrateTone.entries,
         ).associate { values -> values.first().javaClass.simpleName to values.joinToString(" ") { it.name } }

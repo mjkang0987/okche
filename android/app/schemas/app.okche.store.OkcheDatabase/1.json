@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "11195425e5477f417878cde33b638519",
+    "identityHash": "d08c42be1fd6c1837c54a50067f2412d",
     "entities": [
       {
         "tableName": "pet",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `name` TEXT NOT NULL, `species` TEXT NOT NULL, `breed` TEXT NOT NULL, `fur_color` TEXT NOT NULL, `birth_date` TEXT, `birth_estimated` INTEGER NOT NULL, `family_date` TEXT, `diagnosis` TEXT, `has_diabetes` INTEGER NOT NULL, `memorialized_at` INTEGER, `profile_photo_id` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `name` TEXT NOT NULL, `species` TEXT NOT NULL, `breed` TEXT NOT NULL, `fur_color` TEXT NOT NULL, `sex` TEXT, `neutered` INTEGER, `birth_date` TEXT, `birth_estimated` INTEGER NOT NULL, `family_date` TEXT, `diagnosis` TEXT, `has_diabetes` INTEGER NOT NULL, `memorialized_at` INTEGER, `profile_photo_id` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -54,6 +54,16 @@
             "columnName": "fur_color",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "sex",
+            "columnName": "sex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "neutered",
+            "columnName": "neutered",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "birthDate",
@@ -1063,7 +1073,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '11195425e5477f417878cde33b638519')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd08c42be1fd6c1837c54a50067f2412d')"
     ]
   }
 }

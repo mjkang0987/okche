@@ -18,15 +18,23 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.test.platform.app.InstrumentationRegistry
+import app.okche.store.setOnboardingDone
 import app.okche.ui.theme.OkcheColor
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 
 class RootTabsTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    // 아이가 없어도 시작하기 대신 탭이 뜨게 '먼저 둘러볼게요'를 누른 상태로 연다.
+    @get:Rule(order = 0) val browsed = object : ExternalResource() {
+        override fun before() = runBlocking { InstrumentationRegistry.getInstrumentation().targetContext.setOnboardingDone(true) }
+    }
+
+    @get:Rule(order = 1) val rule = createAndroidComposeRule<MainActivity>()
 
     private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 

@@ -12,6 +12,10 @@ enum Species: String, Codable, CaseIterable {
     case cat, dog
 }
 
+enum Sex: String, Codable, CaseIterable {
+    case male, female
+}
+
 /// 아이 (2장).
 @Model
 final class Pet {
@@ -25,6 +29,10 @@ final class Pet {
     /// 목록에서 고르거나 '믹스 · 잘 모르겠어요'
     var breed: String
     var furColor: String
+    /// 선택 — 없으면 안 고름
+    var sex: Sex?
+    /// 중성화(선택) — 없으면 안 고름
+    var neutered: Bool?
     /// `YYYY-MM-DD`
     var birthDate: String?
     var birthEstimated: Bool
@@ -35,7 +43,7 @@ final class Pet {
     var memorializedAt: Date?
     var profilePhotoId: UUID?
 
-    init(id: UUID = UUID(), now: Date = .now, name: String, species: Species, breed: String, furColor: String,
+    init(id: UUID = UUID(), now: Date = .now, name: String, species: Species, breed: String, furColor: String, sex: Sex? = nil, neutered: Bool? = nil,
          birthDate: String? = nil, birthEstimated: Bool = false, familyDate: String? = nil, diagnosis: String? = nil,
          hasDiabetes: Bool = false, memorializedAt: Date? = nil, profilePhotoId: UUID? = nil) {
         self.id = id
@@ -45,6 +53,8 @@ final class Pet {
         self.species = species
         self.breed = breed
         self.furColor = furColor
+        self.sex = sex
+        self.neutered = neutered
         self.birthDate = birthDate
         self.birthEstimated = birthEstimated
         self.familyDate = familyDate

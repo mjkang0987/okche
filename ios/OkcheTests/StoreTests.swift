@@ -19,6 +19,7 @@ final class StoreTests: XCTestCase {
             T.allCases.map(\.rawValue).joined(separator: " ")
         }
         XCTAssertEqual(names(Species.self), "cat dog")
+        XCTAssertEqual(names(Sex.self), "male female")
         XCTAssertEqual(names(RecordKind.self), "vomit stool urine meal snack weight med glucose insulin")
         XCTAssertEqual(names(MedCategory.self), "medicine supplement")
         XCTAssertEqual(names(MedForm.self), "pill powder liquid topical injection")

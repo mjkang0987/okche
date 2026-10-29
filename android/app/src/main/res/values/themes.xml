@@ -3,7 +3,10 @@
     <!-- 토큰이 밝은 한 벌뿐이라 밝은 테마만. 바탕은 hanji(시작 화면에도 보임). -->
     <style name="Theme.Okche" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/hanji</item>
+        <!-- 기본 날짜·시간 고르기 창의 강조색 -->
+        <item name="android:colorAccent">@color/namsaek</item>
     </style>
     <!-- 에셋 색은 토큰을 쓸 수 없어 값을 따로 적었다(계측 테스트가 토큰과 같은지 확인). -->
     <color name="hanji">#FBF7EF</color>
+    <color name="namsaek">#2F4B7C</color>
 </resources>

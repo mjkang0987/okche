@@ -14,6 +14,10 @@ fun newId(): String = UUID.randomUUID().toString()
 @Suppress("EnumEntryName")
 enum class Species { cat, dog }
 
+/** 성별 — 남아·여아. */
+@Suppress("EnumEntryName")
+enum class Sex { male, female }
+
 /** 아이 (2장). */
 @Entity(tableName = "pet")
 data class Pet(
@@ -26,6 +30,10 @@ data class Pet(
     /** 목록에서 고르거나 '믹스 · 잘 모르겠어요' */
     val breed: String,
     @ColumnInfo(name = "fur_color") val furColor: String,
+    /** 성별(선택), 없으면 안 고름. */
+    val sex: Sex? = null,
+    /** 중성화(선택) — 했어요 참·안 했어요 거짓, 없으면 안 고름. */
+    val neutered: Boolean? = null,
     /** `YYYY-MM-DD` */
     @ColumnInfo(name = "birth_date") val birthDate: String? = null,
     @ColumnInfo(name = "birth_estimated") val birthEstimated: Boolean = false,

@@ -8,6 +8,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.TextUnit
 import app.okche.R
 import app.okche.ui.theme.OkcheFontFamily
@@ -24,6 +26,10 @@ fun OkcheTextStyle.toTextStyle(weight: FontWeight = fontWeight) = TextStyle(
     fontSize = fontSize,
     lineHeight = lineHeight,
     fontWeight = weight,
+    // 디자인 word-break: keep-all — 한국어를 낱말(띄어쓰기) 단위로 줄바꿈(안드로이드 13+, 그 아래는 글자 단위).
+    // 구절 줄바꿈은 글자 언어가 한국어일 때만 먹어서, 기기 언어가 영어여도 한국어로 둔다(앱 문구가 한국어뿐).
+    lineBreak = LineBreak.Paragraph.copy(wordBreak = LineBreak.WordBreak.Phrase),
+    localeList = LocaleList("ko"),
 )
 
 /**

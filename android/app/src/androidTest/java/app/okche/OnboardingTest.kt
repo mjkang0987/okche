@@ -1,7 +1,9 @@
 package app.okche
 
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -145,6 +148,12 @@ class OnboardingTest {
         startRegister()
         rule.onNodeWithText("여아").performScrollTo().performClick().assertIsSelected()
         rule.onNodeWithText("여아").performClick().assertIsNotSelected()
+        // TalkBack 경로: 고른 칩에도 '선택 해제' 누르기 동작이 있어 읽기 도구로 풀 수 있다.
+        rule.onNodeWithText("남아").performClick().assertIsSelected()
+        rule.onNode(hasText("남아").and(SemanticsMatcher("선택 해제 동작") {
+            it.config.getOrNull(SemanticsActions.OnClick)?.label == "선택 해제"
+        })).performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithText("남아").assertIsNotSelected()
         rule.onNode(isToggleable().and(hasText("당뇨가 있어요"))).performScrollTo().performClick()
         rule.onNodeWithText("잘 모르겠어요").performScrollTo().assertIsSelected().performClick().assertIsSelected()
     }

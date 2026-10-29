@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.error
@@ -96,14 +97,7 @@ fun OkcheErrorText(message: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** 고르기 묶음 이름(fieldset legend): 화면 글자는 읽지 않고 묶음 자체에 이름을 붙인다(묶음에 들어가면 이름부터 읽음). */
-@Composable
-private fun GroupLegend(label: String, hint: String?, modifier: Modifier) {
-    OkcheFieldLabel(label, modifier.clearAndSetSemantics {}, hint)
-}
 
-/** 고르기 묶음 틀: 하나만 고르는 묶음 + 이름. */
-fun Modifier.choiceGroup(name: String) = selectableGroup().semantics { contentDescription = name }
 
 /** 52 높이·테두리 1.5·모서리 8·흰 바탕 칸 틀. 포커스면 남색 2 테두리. */
 private fun Modifier.fieldBox(focused: Boolean) = this
@@ -244,9 +238,10 @@ fun <T> OkcheChoiceChips(
     onDeselect: (() -> Unit)? = null,
 ) {
     Column(modifier) {
-        GroupLegend(label, hint, Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp))
+        // 묶음 이름(legend)은 화면 글자 그대로 읽힌다 — 바로 뒤가 그 묶음의 칩들.
+        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp), hint = hint)
         FlowRow(
-            Modifier.choiceGroup(labelText(label, hint)),
+            Modifier.selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
         ) {
@@ -259,6 +254,14 @@ fun <T> OkcheChoiceChips(
                         .selectable(isSelected, role = Role.RadioButton, onClick = {
                             if (isSelected && onDeselect != null) onDeselect() else onSelect(value)
                         })
+                        // 고른 라디오는 읽기 도구에서 누르기 동작이 빠지므로, 풀 수 있는 칩엔 '선택 해제'를 따로 단다.
+                        .then(
+                            if (isSelected && onDeselect != null) {
+                                Modifier.semantics { onClick(label = "선택 해제") { onDeselect(); true } }
+                            } else {
+                                Modifier
+                            },
+                        )
                         .padding(vertical = 2.dp),
                 ) {
                     val shape = RoundedCornerShape(OkcheRadius.RadiusPill)
@@ -294,8 +297,8 @@ fun <T> OkcheChoiceCards(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
-        GroupLegend(label, null, Modifier.padding(bottom = OkcheSpacing.Space2))
-        Row(Modifier.choiceGroup(label), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2))
+        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
             for ((value, text) in options) {
                 val isSelected = value == selected
                 val shape = RoundedCornerShape(OkcheRadius.RadiusMd)

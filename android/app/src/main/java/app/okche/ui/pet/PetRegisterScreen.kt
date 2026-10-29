@@ -64,12 +64,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.activity.ComponentActivity
 import androidx.compose.runtime.LaunchedEffect
 import app.okche.store.OkcheDao
-import app.okche.ui.choiceGroup
+import androidx.compose.foundation.layout.offset
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -148,7 +147,7 @@ class PetRegisterSaver : ViewModel() {
 @Composable
 fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val context = LocalContext.current
-    val saver = remember { ViewModelProvider(context as ComponentActivity)[PetRegisterSaver::class.java] }
+    val saver: PetRegisterSaver = viewModel()
     var form by rememberSaveable { mutableStateOf(PetForm()) }
     var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
     // 오류가 난 첫 칸으로 옮겨 가려고 칸마다 단다.
@@ -174,14 +173,21 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         focus[first]?.requestFocus()
     }
 
-    BackHandler(onBack = onClose)
+    // 저장 중엔 닫지 않는다(닫으면 끝난 결과가 남아 다음 등록 화면에 옛 결과가 뜸). 닫을 때 남은 결과도 버린다.
+    val close = {
+        if (!saver.saving) {
+            saver.consume()
+            onClose()
+        }
+    }
+    BackHandler(onBack = close)
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = OkcheSpacing.Space2),
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClose, Modifier.size(44.dp)) {
+            IconButton(close, Modifier.size(44.dp), enabled = !saver.saving) {
                 Icon(Icons.Outlined.Close, "닫기", Modifier.size(22.dp), tint = OkcheColor.Ink)
             }
             // 큰 글자에서 한 줄에 안 들어가면 '아이 등록'이 아래로 내려간다. TalkBack은 한 머리말로 읽는다.
@@ -327,13 +333,14 @@ private fun FurColorPicker(species: Species, selected: String, onSelect: (String
         val width = maxWidth
         Column {
             // 고른 고리(동그라미 밖 5)까지 칸 안에 들도록 칸을 사방 5 넓히고, 그만큼 간격을 줄여 보드와 같은 자리에 둔다.
-            OkcheFieldLabel("털색", Modifier.padding(bottom = OkcheSpacing.Space2 - Ring).clearAndSetSemantics {})
+            OkcheFieldLabel("털색", Modifier.padding(bottom = OkcheSpacing.Space2 - Ring))
             // 이름표가 세 글자까지라 칸 너비 = max(동그라미+고리 58, 글자 세 개). 넷이 한 줄에 안 들어가면 3+1 대신 2+2.
             val itemWidth = maxOf(48.dp + Ring * 2, with(LocalDensity.current) { OkcheType.Label.fontSize.toDp() } * 3)
             val gap = OkcheSpacing.Space3 - Ring * 2
             val fitsOneRow = itemWidth * 4 + gap * 3 <= width
+            // 첫 동그라미가 보드처럼 왼쪽 여백 16에 붙게 고리 여백만큼 왼쪽으로 당긴다.
             FlowRow(
-                Modifier.choiceGroup("털색"),
+                Modifier.offset(x = -Ring).selectableGroup(),
                 maxItemsInEachRow = if (fitsOneRow) 4 else 2,
                 horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),

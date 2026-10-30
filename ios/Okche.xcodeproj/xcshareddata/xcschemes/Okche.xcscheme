@@ -35,6 +35,20 @@
                ReferencedContainer = "container:Okche.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C1608C891581ACA9BB8F5E49"
+               BuildableName = "OkcheUITests.xctest"
+               BlueprintName = "OkcheUITests"
+               ReferencedContainer = "container:Okche.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "7C56F5D7F75564FBCA16A36A"
                BuildableName = "OkcheTests.xctest"
                BlueprintName = "OkcheTests"
+               ReferencedContainer = "container:Okche.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C1608C891581ACA9BB8F5E49"
+               BuildableName = "OkcheUITests.xctest"
+               BlueprintName = "OkcheUITests"
                ReferencedContainer = "container:Okche.xcodeproj">
             </BuildableReference>
          </TestableReference>

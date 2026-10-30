@@ -37,6 +37,14 @@ abstract class OkcheDao {
         return checkNotNull(setting(FixedIds.SETTING))
     }
 
+    /** 아이 등록: 아이·첫 체중 기록·인슐린 계획을 한 번에 저장한다(하나라도 실패하면 아무것도 안 남음). */
+    @Transaction
+    open suspend fun insertPetRegistration(pet: Pet, weight: Record?, plan: InsulinPlan?) {
+        insert(pet)
+        weight?.let { insert(it) }
+        plan?.let { insert(it) }
+    }
+
     // 화면에 보일 목록은 지운 줄을 뺀다(1-4).
     @Query("SELECT * FROM pet WHERE deleted_at IS NULL ORDER BY created_at") abstract suspend fun pets(): List<Pet>
     @Query("SELECT * FROM med_schedule WHERE deleted_at IS NULL") abstract suspend fun medSchedules(): List<MedSchedule>

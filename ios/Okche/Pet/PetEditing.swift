@@ -130,8 +130,7 @@ struct PetEditing {
         }
     }
 
-    /// 동행 N일: 가족 된 날을 1일로 센다(기기 달력).
-    /// shortcut: 기획 문서에 세는 법이 없어 임시로 정함(plan.md 6-2), 축하 카드(동행 100일)를 만들 때 확정한다.
+    /// 동행 N일: 가족 된 날을 1일로 센다(기기 달력, 2026-10-31 사용자 확정 — 데이터 2장).
     static func companionDays(_ familyDate: String?, today: Date = .now, calendar: Calendar = .okcheDevice) -> Int? {
         guard let start = familyDate.flatMap({ PetRegistration.date($0, calendar) }),
               let days = calendar.dateComponents([.day], from: start, to: calendar.startOfDay(for: today)).day,

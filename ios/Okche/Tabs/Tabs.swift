@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 // 탭 첫 화면들. 내용은 6단계부터 채운다.
@@ -24,5 +25,35 @@ struct AlbumTab: View {
 }
 
 struct MoreTab: View {
-    var body: some View { TabScreen(title: "더보기") }
+    @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
+
+    var body: some View {
+        NavigationStack {
+            TabScreen(title: "더보기") {
+                // shortcut: 아이 정보로 가는 임시 줄(아이마다 한 줄), 6-3 아이 바꾸기·더보기 화면을 만들 때 디자인 `More`대로 바꾼다.
+                if !pets.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
+                            NavigationLink { PetEditScreen(pet: pet) } label: { row(pet) }
+                                .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private func row(_ pet: Pet) -> some View {
+        HStack(spacing: 12) {
+            Text("\(pet.name) · 아이 정보").okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.body.weight(.medium)).foregroundStyle(OkcheColor.lineStrong)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
+    }
 }

@@ -114,4 +114,53 @@ final class OnboardingUITests: XCTestCase {
         app.switches["생일을 몰라요 (나이를 어림잡아 넣을게요)"].firstMatch.tap()
         XCTAssertTrue(app.textFields["나이 (대략)"].waitForExistence(timeout: 3))
     }
+
+    /// 더보기 임시 줄 → 아이 정보 고치기 → 인슐린 설정 → 저장 (6-2).
+    func testEditPetFromMore() {
+        let app = launch()
+        app.buttons["아이 등록하고 시작하기"].tap()
+        let name = app.textFields["이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("콩이")
+        app.buttons["모시기"].firstMatch.tap()
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+
+        app.buttons["콩이 · 아이 정보"].tap()
+        let editName = app.textFields["이름"]
+        XCTAssertTrue(editName.waitForExistence(timeout: 5))
+        editName.tap()
+        editName.typeText("이")
+        app.buttons["완료"].firstMatch.tap()
+
+        // 당뇨를 켜고 인슐린 없이 저장하면 오류
+        let diabetes = app.switches["당뇨가 있어요"].firstMatch
+        while !diabetes.isHittable { app.swipeUp() }
+        diabetes.tap()
+        let save = app.buttons["저장하기"].firstMatch
+        while !save.isHittable { app.swipeUp() }
+        save.tap()
+        XCTAssertTrue(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].waitForExistence(timeout: 3))
+
+        let setupLink = app.buttons["인슐린 이름·양·시간 설정 ›"]
+        while !setupLink.isHittable { app.swipeDown() }
+        setupLink.tap()
+        for nth in ["첫 번째", "두 번째"] {
+            let units = app.textFields["\(nth) 양 (단위)"]
+            XCTAssertTrue(units.waitForExistence(timeout: 3))
+            units.tap()
+            units.typeText("2")
+        }
+        app.buttons["완료"].firstMatch.tap()
+        let setupSave = app.buttons["저장하기"].firstMatch
+        while !setupSave.isHittable { app.swipeUp() }
+        setupSave.tap()
+
+        // 아이 정보로 돌아와 저장하면 더보기 줄 이름이 바뀐다.
+        XCTAssertTrue(save.waitForExistence(timeout: 3))
+        while !save.isHittable { app.swipeUp() }
+        save.tap()
+        XCTAssertTrue(app.buttons["콩이이 · 아이 정보"].waitForExistence(timeout: 5))
+    }
 }

@@ -5,7 +5,7 @@
 
 ## 지금 하는 일
 
-**6-2 아이 정보 고치기·인슐린 설정·휴양** (작업 브랜치 `claude/blissful-thompson-arfrk9` — 클라우드 세션이 정한 브랜치, 진행 중)
+**6-2 아이 정보 고치기·인슐린 설정·휴양** (작업 브랜치 `claude/blissful-thompson-arfrk9` — 클라우드 세션이 정한 브랜치. 코드·리뷰 1회차 끝, 맥에서 빌드·검증 기다림)
 
 - 6-1 첫 실행·아이 등록은 `main`에 합침(PR #3, 2026-10-30). 디자인 보드: '아이 정보 고치기'(PetEdit), '인슐린 · 설정'(InsulinSetup).
 - **정한 것 (2026-10-31 사용자)**: ① 코드도 이 클라우드 세션에서 쓴다 — 리눅스라 Xcode가 없고 안드로이드 SDK 내려받기가 막혀 **빌드·테스트를 못 함**. 검증은 맥에서 따로(아래 '검증 못 한 것'). ② PetEdit에 종·품종·털색·성별·중성화·'생일을 몰라요'를 넣는다(디자인 먼저). ③ InsulinSetup 알림 스위치를 두 칸으로: '인슐린 시간 알림'(설정 `notify.insulinTime` — 모든 아이 공통) + '밤에도 울리기'(계획 `ringDuringQuiet`). ④ 들어가는 길은 더보기 탭의 임시 줄(아이마다 한 줄 → 그 아이 정보), 아직 없는 화면으로 가는 줄(사료·체중·추억·지우기)은 디자인대로 보이되 아직 누를 수 없음.
@@ -21,6 +21,8 @@
   - 체중 줄: 그 아이의 지우지 않은 마지막 `weight` 기록 '4.62kg · 10월 25일', 없으면 '아직 없어요'. 사료 줄: 8단계 전이라 '아직 없어요'.
 - **영향받는 파일**: 디자인 캔버스 `PetEdit`·`InsulinSetup`(+ 부모 복사본을 깐 `PetDelete`·`MemoryKeep`·`Food`), `design/canvas-check/guide.js`(PetEdit 털색 예외), `design/README.md`(예외 목록). iOS `Okche/Pet/PetEditing.swift`·`PetEditView.swift`·`InsulinSetupView.swift`(새), `Okche/Pet/PetRegisterView.swift`(공용으로 뺄 조각), `Okche/Tabs/Tabs.swift`(더보기 임시 줄), `OkcheTests/PetEditingTests.swift`(새). 안드로이드 `ui/pet/PetEditSaver.kt`·`PetEditScreen.kt`·`InsulinSetupScreen.kt`(새), `ui/pet/PetForm.kt`·`PetRegisterScreen.kt`(공용 조각), `ui/Tabs.kt`·`RootTabs.kt`(더보기 임시 줄·화면 이동), `androidTest/PetEditTest.kt`(새). `docs/data-model.md`(정한 것), `index.md`·`plan.md`.
 - **예상 결과·테스트**: 저장 함수 단위 테스트(이름 비면 안 됨·아무것도 안 바뀜, 바꾼 칸만·`updatedAt`, 어림 생일 그대로/나이 고치면 다시 계산, 당뇨 끄면 열린 줄 닫힘, 켰는데 계획 없으면 오류, 휴양 켜기·이미 열림·끄면 열린 기간 둘 닫힘, 인슐린 시간·양 바꾸면 새 줄·이름만 바꾸면 그 줄·안 바뀌면 그대로·열린 줄 둘이면 모두 닫음, 인슐린 저장하면 당뇨 참·알림 설정), 화면 테스트(더보기 → 아이 정보 → 저장, 인슐린 설정 저장).
+- **진행 (2026-10-31)**: 디자인 캔버스 버전 109(가이드 검사 0) → iOS·안드로이드 코드·테스트 → 리뷰 1회차(코드를 읽는 리뷰, 컴파일 없이): 안드로이드 인슐린 설정을 다시 열면 취소한 입력이 남던 것, iOS가 안 고친 31살 어림 나이를 오류로 막던 것, iOS 하단 탭이 보이던 것, iOS `InsulinSlotsEditor` 만들기 접근 수준, 안드로이드 화면 테스트 이름 넣기를 고침. 테스트 iOS 단위 15·화면 1, 안드로이드 15·화면 1 추가(돌려 보지 못함).
+- **남은 일**: 맥에서 ① `cd ios && xcodegen generate`(project.pbxproj를 손으로 고쳤음) ② iOS·안드로이드 빌드와 모든 테스트 ③ 디자인 보드와 화면 대조·큰 글자·VoiceOver/TalkBack ④ 리뷰 2·3회차 ⑤ `dev`에 합치기(지금은 세션 브랜치에만 있음).
 - **검증 못 한 것 (이 세션)**: 두 플랫폼 컴파일·단위 테스트·화면 테스트, 디자인 대조 화면 캡처, 큰 글자·VoiceOver/TalkBack. → 맥 세션에서 `cd ios && xcodegen generate && xcodebuild test …`, `cd android && ./gradlew :app:connectedDebugAndroidTest` 후 리뷰·검증 3회.
 - 이번에 안 하는 것: 사진 바꾸기(11단계), 사료 줄 내용·사료 바꾸기 시트(8단계), 체중 화면, 추억·지우기(6-4), 알림 실제로 보내기·멈추기(8·9단계), 호칭 '마마'(6-3).
 - 6단계 나눔(2026-10-28 사용자 결정): 6-1 첫 실행·아이 등록(인슐린 포함) → 6-2 아이 정보 고치기·인슐린 설정·휴양 → 6-3 아이 바꾸기(낙관형 표시·호칭) → 6-4 지우기·추억으로 간직. 각각 iOS·안드로이드, 리뷰·검증 3회(1회차 전체, 2·3회차는 바뀐 곳 위주 — 2026-10-29). 프로필 사진은 11단계(사진 저장) 때.

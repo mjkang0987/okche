@@ -54,6 +54,7 @@ struct InsulinSetupView: View {
         }
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar) // 탭 아래 화면은 하단 탭 없음(디자인 화면 짜임새)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()

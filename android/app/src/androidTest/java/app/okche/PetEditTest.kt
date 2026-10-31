@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -123,6 +124,16 @@ class PetEditTest {
         save(load(id).copy(birthUnknown = false, birthDate = LocalDate.of(2021, 3, 1)))
         assertEquals("2021-03-01", pet(id).birthDate)
         assertFalse(pet(id).birthEstimated)
+    }
+
+    /** 30살로 어림잡은 아이가 한 해 지나 31살로 보여도, 나이를 안 고치면 그대로 저장된다. */
+    @Test fun unchangedEstimatedAgeOver30Saves() = runBlocking {
+        val id = makePet(age = "30")
+        val nextYear = today.plusYears(1)
+        val form = checkNotNull(PetEditForm.load(dao, id, nextYear))
+        assertEquals("31", form.age)
+        assertEquals(emptyMap<String, String>(), savePetEdit(dao, form.copy(name = "보리"), now, nextYear))
+        assertEquals(listOf("1996-10-28", "보리"), pet(id).let { listOf(it.birthDate, it.name) })
     }
 
     @Test fun diabetesOffClosesOpenPlans() {
@@ -254,7 +265,8 @@ class PetEditFlowTest {
         waitFor(hasText("콩이 · 아이 정보"))
         rule.onNodeWithText("콩이 · 아이 정보").performClick()
         waitFor(hasSetTextAction().and(hasText("이름")))
-        rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput("이")
+        // performTextInput은 커서(처음엔 맨 앞) 자리에 넣어서 바꾸기로.
+        rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextReplacement("콩이이")
 
         // 당뇨를 켜고 인슐린 없이 저장하면 오류
         rule.onNodeWithText("당뇨가 있어요").performScrollTo().performClick()

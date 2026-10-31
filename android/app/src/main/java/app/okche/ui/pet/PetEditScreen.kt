@@ -112,7 +112,13 @@ fun PetEditFlow(petId: String, onClose: () -> Unit) {
     var insulin by rememberSaveable { mutableStateOf(false) }
     val states = rememberSaveableStateHolder()
     if (insulin) {
-        states.SaveableStateProvider("insulin") { InsulinSetupScreen(petId, onClose = { insulin = false }) }
+        // 닫으면(저장·뒤로) 그 화면 입력은 버린다 — 다시 열면 저장된 계획부터(iOS와 같음).
+        states.SaveableStateProvider("insulin") {
+            InsulinSetupScreen(petId, onClose = {
+                states.removeState("insulin")
+                insulin = false
+            })
+        }
     } else {
         states.SaveableStateProvider("edit") { PetEditScreen(petId, onClose, onInsulin = { insulin = true }) }
     }

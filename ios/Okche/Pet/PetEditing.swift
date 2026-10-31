@@ -52,12 +52,18 @@ struct PetEditing {
 
     typealias Field = PetRegistration.Field
 
+    /// 어림잡은 생일이고 나이를 안 고침 → 저장된 생일을 그대로 둔다.
+    private var keepsEstimatedBirth: Bool {
+        pet.birthEstimated && PetRegistration.trimmed(approxAge) == PetRegistration.trimmed(loadedAge)
+    }
+
     /// 칸마다 오류 글(저장소를 봐야 하는 '인슐린 계획 없음'은 `save`에서).
     func validate(today: Date = .now, calendar: Calendar = .okcheDevice) -> [Field: String] {
         var errors: [Field: String] = [:]
         if PetRegistration.trimmed(name) == nil { errors[.name] = "이름을 넣어 주세요" }
         if birthUnknown {
-            errors[.age] = PetRegistration.ageError(approxAge)
+            // 안 고친 어림 나이는 생일을 그대로 두므로 검사하지 않는다(30살을 넘겨도 저장할 수 있게, 안드로이드와 같음).
+            if !keepsEstimatedBirth { errors[.age] = PetRegistration.ageError(approxAge) }
         } else {
             errors[.birth] = PetRegistration.futureDayError(birthDate, today: today, calendar: calendar)
         }
@@ -75,7 +81,7 @@ struct PetEditing {
         var birth = birthDate.map { PetRegistration.day($0, calendar) }
         var estimated = false
         if birthUnknown {
-            if pet.birthEstimated && PetRegistration.trimmed(approxAge) == PetRegistration.trimmed(loadedAge) {
+            if keepsEstimatedBirth {
                 birth = pet.birthDate
             } else {
                 birth = PetRegistration.trimmed(approxAge).flatMap(PetRegistration.wholeNumber)

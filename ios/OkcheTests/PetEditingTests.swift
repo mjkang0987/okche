@@ -105,6 +105,18 @@ final class PetEditingTests: XCTestCase {
         XCTAssertFalse(pet.birthEstimated)
     }
 
+    /// 30살로 어림잡은 아이가 한 해 지나 31살로 보여도, 나이를 안 고치면 그대로 저장된다.
+    func testUnchangedEstimatedAgeOver30Saves() throws {
+        let pet = try makePet(approxAge: "30")
+        let nextYear = seoul.date(byAdding: .year, value: 1, to: now)!
+        var form = PetEditing(pet: pet, context: context, today: nextYear, calendar: seoul)
+        XCTAssertEqual(form.approxAge, "31")
+        form.name = "보리"
+        try form.save(in: context, now: nextYear, calendar: seoul)
+        XCTAssertEqual(pet.birthDate, "1996-10-28")
+        XCTAssertEqual(pet.name, "보리")
+    }
+
     func testDiabetesOffClosesOpenPlans() throws {
         let pet = try makePet(diabetes: true)
         var form = editing(pet)

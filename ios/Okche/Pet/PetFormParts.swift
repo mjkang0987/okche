@@ -195,7 +195,7 @@ struct InsulinSlotsEditor: View {
     let errors: [PetRegistration.Field: String]
     var focused: FocusState<PetRegistration.Field?>.Binding
     /// 시각을 고르는 줄(시트).
-    @State private var pickingTime: UUID?
+    @State private var pickingTime: UUID? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

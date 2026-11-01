@@ -48,7 +48,7 @@ UI는 디자인 캔버스를 먼저 고친 다음 코드에 반영한다. 코드
 | `.gitignore` | 있음 | 파이썬 캐시·맥 파일·Xcode 사용자 파일·Gradle·`local.properties`·빌드 결과 무시 |
 | `.gitattributes` | 있음 | `gradlew`는 LF, `.bat`은 CRLF 줄 끝 고정 |
 | `VERSION` | 있음 | 앱 버전 (지금 `0.1.0`) |
-| `docs/` | 있음 | `data-model.md` 데이터 구조(확정 2026-10-27) |
+| `docs/` | 있음 | `data-model.md` 데이터 구조(확정 2026-10-27), `research/날짜.md` 앱 안내 자료 정기 점검 보고서 |
 | `design/` | 있음 | 디자인 토큰 `tokens.json`과 생성 스크립트, 생성된 `generated/OkcheTokens.swift`·`OkcheTokens.kt`, 고운바탕 글꼴 `res/font/`(라이선스 `fonts/`), 디자인 가이드 검사 `canvas-check/` (자세한 건 `design/README.md`) |
 | `ios/` | 있음 | Xcode 프로젝트 (SwiftUI, iOS 17+). `project.yml`(XcodeGen)로 `Okche.xcodeproj` 생성 — 고친 뒤 `cd ios && xcodegen generate`(XcodeGen 2.45+, `brew install xcodegen`). Xcode 26 기준(프로젝트 형식은 Xcode 16+). 토큰은 `design/generated/OkcheTokens.swift`를 그대로 씀. 기기 안 저장은 `Okche/Store/`(SwiftData, `docs/data-model.md` 그대로). 첫 실행·아이 등록은 `Okche/Pet/`, 공용 입력 컴포넌트는 `Okche/Design/FormControls.swift`. 화면 흐름 테스트 `OkcheUITests`(앱은 `-ui-testing`이면 빈 메모리 저장소, 디버그 빌드만). 실기기 서명 팀 ID는 아직 없음 — TestFlight 단계에서 `project.yml`에 넣는다(Xcode에서 고르면 다음 생성 때 지워짐) |
 | `android/` | 있음 | Android 프로젝트 (Jetpack Compose, API 26+, `app.okche`). Gradle 9.8.1·AGP 9.4.1, JDK 17+, SDK platform 37. SDK 위치는 `ANDROID_HOME` 또는 `android/local.properties`의 `sdk.dir`. 빌드 `cd android && ./gradlew :app:assembleDebug`, 테스트 `./gradlew :app:connectedDebugAndroidTest`(에뮬레이터 필요). 토큰·글꼴·라이선스·버전은 `design/`·`VERSION`을 그대로 읽음. 기기 안 저장은 `app/src/main/java/app/okche/store/`(Room 2.8.5 + KSP, `docs/data-model.md` 그대로) — 스키마 JSON `app/schemas/`도 커밋 대상. 이 기기만의 설정은 DataStore(`store/DeviceSettings.kt`). 첫 실행은 `ui/OnboardingScreen.kt`, 아이 등록은 `ui/pet/`, 공용 입력 컴포넌트는 `ui/OkcheControls.kt` |

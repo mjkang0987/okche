@@ -22,7 +22,7 @@ const names=Object.keys(canvas.boards);
         if(r.right>W+1||r.bottom>H+1||r.left<-1) { if(!e.closest('[aria-hidden="true"]')) iss.push(`overflow: <${e.tagName.toLowerCase()}> "${(e.textContent||'').trim().slice(0,18)}" ${Math.round(r.right)}x${Math.round(r.bottom)}`); }
         if(e.scrollWidth>e.clientWidth+2 && getComputedStyle(e).overflowX!=='visible' && e.clientWidth>0 && !['svg'].includes(e.tagName.toLowerCase())) iss.push(`clipped-x: <${e.tagName.toLowerCase()}> "${(e.textContent||'').trim().slice(0,18)}"`);
       }
-      for(const i of document.querySelectorAll('input,select,textarea')){ const id=i.id; const lab=i.closest('label')||(id&&document.querySelector(`label[for="${id}"]`))||i.getAttribute('aria-label'); if(!lab) iss.push('unlabeled '+i.type); }
+      for(const i of document.querySelectorAll('input,select,textarea')){ if(i.closest('[aria-hidden="true"]')) continue; const id=i.id; const lab=i.closest('label')||(id&&document.querySelector(`label[for="${id}"]`))||i.getAttribute('aria-label'); if(!lab) iss.push('unlabeled '+i.type); }
       for(const btn of document.querySelectorAll('button,a[href]')){ const t=(btn.textContent||'').trim()||btn.getAttribute('aria-label'); if(!t) iss.push('no-name '+btn.tagName); const r=btn.getBoundingClientRect(); if(r.height&&r.height<24) iss.push(`small-target ${Math.round(r.width)}x${Math.round(r.height)} "${t&&t.slice(0,15)}"`); }
       const ids={}; for(const e of document.querySelectorAll('[id]')) ids[e.id]=(ids[e.id]||0)+1; for(const k in ids) if(ids[k]>1) iss.push('dup id '+k);
       const lum=c=>{const m=c.match(/[\d.]+/g).map(Number); const [r,g,b]=m.slice(0,3).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)}); return 0.2126*r+0.7152*g+0.0722*b};

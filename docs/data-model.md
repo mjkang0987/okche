@@ -166,6 +166,10 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 `frequency` 값: `daily`(매일), `everyNDays`(며칠마다), `weekdays`(요일 정해서), `everyNHours`(몇 시간마다), `asNeeded`(필요할 때만 — 줄·알림에 안 나옴).
 
+- **같이 먹는 약 (2026-11-01 사용자)**: 약 추가에서 아이를 여럿 고르면 아이마다 줄을 하나씩 만든다(같은 설정·같은 `activeFrom`, `seriesId`는 각자). 기록은 아이마다 따로 남긴다. 따로 묶음 칸은 두지 않는다 — 탕약 화면은 같은 `medicationId`이고 `amount`·`unit`·`frequency`·`times`(정렬)·`everyDays`·`startDate`·`weekdays`·`everyHours`·`firstAt`·`shiftOnLate`·`howTo`·`reminder`·`leadMinutes`가 모두 같은 열린 줄을 카드 하나로 묶는다. 카드에서 고치면 카드의 모든 줄에 같은 규칙(아래)을 쓰므로 묶음이 유지된다.
+- 고치기에서 아이를 더하면 그 아이에게 새 줄(새 `seriesId`, `activeFrom` = 고친 때), 빼면 그 아이 줄만 `activeUntil` = 고친 때. 그만 먹이기는 카드의 모든 줄을 닫는다. 약은 고치기에서 바꾸지 않는다(그만 먹이고 새로 추가).
+- `unit`은 그 약의 단위(4장)를 그대로 쓴다.
+
 - **횟수·시간·양을 바꾸면 고치지 않고 새 줄을 만든다.** 원래 줄에 `activeUntil`을 넣고 새 줄을 같은 시각의 `activeFrom`으로 만든다. 그래야 지난 기간의 '몇 번 중 몇 번'이 그때 주기로 계산되고, 실록 금색 선(6-4)도 여기서 나온다. 며칠마다는 새 줄에도 `startDate`를 그대로 옮겨 셈이 다시 시작되지 않게 한다.
 - 알림·몇 분 전·먹이는 방법만 바꾸면 그 줄을 그대로 고친다(금색 선이 생기지 않게).
 - 몇 시간마다의 `shiftOnLate`만 바꾸면 시간이 달라지므로 새 줄을 만들되, 금색 선은 긋지 않는다(6-4).

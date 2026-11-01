@@ -2,6 +2,18 @@ import SwiftUI
 
 // 아이 등록(6-1)과 아이 정보 고치기·인슐린 설정(6-2)이 함께 쓰는 입력 조각.
 
+/// 인슐린 안내의 출처 줄(안내 문구 규칙 — 2026-11-01 정기 점검 반영).
+let diabetesSourceNote = "출처: 미국 동물병원협회 「2026 AAHA Diabetes Management Guidelines for Cats」·「2026 AAHA Diabetes Management Guidelines for Dogs」. 위 내용은 이 단체의 권고사항이고, 아이마다 다를 수 있어요."
+
+/// 출처 줄(12, 흐린 글자).
+struct SourceNote: View {
+    let text: String
+
+    var body: some View {
+        Text(text).okcheText(OkcheType.caption, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+    }
+}
+
 /// 이름표 + 내용. 이름표는 화면 읽기에서 머리말.
 struct FieldGroup<Content: View>: View {
     let title: String

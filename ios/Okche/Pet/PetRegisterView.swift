@@ -122,7 +122,8 @@ private struct InsulinSection: View {
                                  selection: Binding { form.syringe } set: { form.syringe = $0 ?? .unknown }, allowsNone: false)
                 note("인슐린과 맞는 주사기를 쓰길 권해요. 모르면 병원에 물어보길 권해요.")
             }
-            note("병원에서 정해 준 양을 넣어 주세요. 나중에 아이 정보에서 바꿀 수 있어요.").padding(.bottom, 8)
+            note("병원에서 정해 준 양을 넣어 주세요. 나중에 아이 정보에서 바꿀 수 있어요.")
+            SourceNote(text: diabetesSourceNote).padding(.bottom, 8)
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)

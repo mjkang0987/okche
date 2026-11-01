@@ -236,9 +236,9 @@ private fun InsulinBox(
         }
         Text(
             "병원에서 정해 준 양을 넣어 주세요. 나중에 아이 정보에서 바꿀 수 있어요.",
-            Modifier.padding(bottom = OkcheSpacing.Space2),
             color = OkcheColor.InkMuted,
             style = OkcheType.Label.toTextStyle(FontWeight.Normal),
         )
+        SourceNote(DIABETES_SOURCE, Modifier.padding(bottom = OkcheSpacing.Space2))
     }
 }

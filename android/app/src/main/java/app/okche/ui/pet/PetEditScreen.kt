@@ -367,6 +367,7 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
             OkcheSwitchRow("인슐린 시간 알림", "끄면 모든 아이의 인슐린 알림이 멈춰요", f.notify, { edit { copy(notify = it) } })
             OkcheSwitchRow("밤에도 울리기", "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요", f.ringDuringQuiet, { edit { copy(ringDuringQuiet = it) } })
             LeadPicker(f.leadMinutes) { edit { copy(leadMinutes = it) } }
+            SourceNote(DIABETES_SOURCE)
             errors["save"]?.let { OkcheErrorText(it) }
             OkchePrimaryButton("저장하기", enabled = !saver.saving, onClick = { saver.save { saveInsulinSetup(dao, f) } })
         }

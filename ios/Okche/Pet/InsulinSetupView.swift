@@ -38,6 +38,7 @@ struct InsulinSetupView: View {
                         OkcheSwitchRow(title: "밤에도 울리기", detail: "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요",
                                        isOn: $form.ringDuringQuiet)
                         leadPicker
+                        SourceNote(text: diabetesSourceNote)
                         VStack(alignment: .leading, spacing: 8) {
                             OkcheFieldError(message: errors[.save])
                             Button("저장하기") { save(scroller) }

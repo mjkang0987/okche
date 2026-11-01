@@ -113,7 +113,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 | `vomit` | 구토 | `contents`: `kibble`(사료 알갱이), `digested`(죽처럼 불은 사료), `liquidFoam`(액체·거품), `hairball`(헤어볼), `plant`(풀·식물), `foreign`(이물질) 중 여러 개 · `color`: `food`(사료 색), `yellow`, `clear`(투명·흰색), `green`, `red`(피), `darkRed`(검붉은·커피색) · `count`: 1, 2, 3(3번 이상) |
 | `stool` | 매화 | `shape`: `hard`(단단해요), `normal`(정상), `soft`(물러요), `loose`(묽어요), `watery`(물 같아요) · `color`: `brown`, `yellowOrange`, `green`, `black`(짜장처럼), `pale`(회백색) · `signs`: `blood`, `mucus`, `foreign` 중 여러 개 |
 | `urine` | 소피 | `amount`: `little`(찔끔), `normal`(보통), `much`(많음) · `color`: `paleYellow`(보통), `clear`, `darkYellow`, `pinkRed` · `signs`: `straining`(힘만 주고 안 나옴), `frequent`(자주 들락거림), `outside`(화장실 밖), `pain`(볼 때 울거나 아파함) 중 여러 개 |
-| `meal` | 수라 | `result`: `all`, `some`, `none` · `foodId`(그때 먹던 사료) · `slotName`(아침·점심·저녁 같은 끼니 이름 또는 없음) |
+| `meal` | 수라 | `result`: `all`, `some`, `none` · `foodId`(그때 먹던 사료) · `slotName`(아침·점심·저녁 같은 끼니 이름 또는 없음) · `givenGrams`(준 양 g, 정수 또는 없음 — 그 끼니에 정해 둔 양을 기록할 때 옮겨 둠) · `leftGrams`(남은 양 g, 정수 또는 없음 — `some`일 때만, 선택) (2026-11-01 추가) |
 | `snack` | 다과 | `snackId` · `amount`: 글자 또는 없음 ('얼마나 줬나요? (선택)') |
 | `weight` | 옥체 | `grams`: 정수 (화면엔 kg 소수 둘째 자리로) |
 | `med` | 탕약 | `scheduleId`(예정에 없던 약이면 없음) · `medicationId` · `status`: `given`(줬어요), `skipped`(건너뜀), `vomited`(먹고 토함) · `amount`, `unit` |
@@ -256,11 +256,12 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 **다과 (`Snack`)**: `name`, `kind`: `lickable`(짜 먹는 간식), `freezeDried`, `jerky`(져키·스틱), `wet`(캔·파우치), `prescription`(처방 간식), `human`(사람 음식) · `okDuringFoodChange`(수라 바꾸기 중에도 괜찮은 간식) · `ingredientPhotoId`.
 
-**끼니 계획 (`MealPlan`)**: `petId`, `mode`: `direct`(직접 급여) / `feeder`(급식기, 수라간), `slots`: `{name, time: HH:mm}` 목록, `activeFrom`, `activeUntil`(UTC 시각, 5장과 같은 방식).
+**끼니 계획 (`MealPlan`)**: `petId`, `mode`: `direct`(직접 급여) / `feeder`(급식기, 수라간), `slots`: `{name, time: HH:mm, grams: 정수 또는 없음}` 목록(`grams` = 그 끼니에 주는 양, 선택 — 2026-11-01 추가), `activeFrom`, `activeUntil`(UTC 시각, 5장과 같은 방식).
 - 수라 화면의 '아침 · 08:10', '저녁 · 아직 기록 전'과 실록의 '다 먹은 끼니 52/60' 분모가 여기서 나온다. 끼니 차례의 `slotKey = {planId}|{day}|{HH:mm}`.
 - 일기 빠른 버튼·위젯으로 남긴 `meal` 기록은 7장과 같은 구간 규칙으로 **지금 끼니 차례**에 넣는다. 그 차례에 이미 기록이 있으면 `slotKey` 없이 남긴다(분자에 안 들어가는 추가 식사). 수라 화면에서 끼니를 골라 남기면 그 끼니 차례.
 - 급식기 모드면 끼니 시간이 되면 `meal` 기록(`result = all`, `auto = true`)을 고정 ID(1-5)로 만든다 — 두 기기가 각자 만들어도 하나로 합쳐진다.
 - 시간을 바꾸면 그 시각에 새 줄을 만든다 = '바꾼 시간은 아직 지나지 않은 끼니부터 바로 적용돼요. 지난 기록은 그대로예요.'
+- **그램 (선택, 2026-11-01 사용자 결정)**: 기획 문서의 '그램 단위 입력은 받지 않음'을 바꿔, 넣고 싶은 보호자만 쓰는 선택 칸으로 둔다. 끼니마다 준 양(`slots.grams`)을 정해 두면 그 끼니 기록에 `givenGrams`로 옮기고, '남김'일 때 남은 양(`leftGrams`)을 넣을 수 있다. 먹은 양 = `all`이면 준 양, `some`이면 준 양 − 남은 양(남은 양이 없으면 모름), `none`이면 0 — 준 양이 없으면 모름. 준 양·남은 양은 0~2000 정수. 끼니 없이 남긴 수라·일기 바로 기록은 그램 없이. 준 양만 바꾸는 것도 시간을 바꾸는 것과 같이 새 줄(지난 기록의 `givenGrams`는 그대로).
 
 ## 9. 사진 (`Photo`, `PhotoPet`)
 

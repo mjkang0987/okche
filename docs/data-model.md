@@ -161,6 +161,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 | `howTo` | `plain`, `inFood`, `inTreat`, `syringe` 또는 없음 | 먹이는 방법 |
 | `reminder` | 참/거짓 | 알림 보내기. 설정 `notify`의 탕약 시간과 둘 다 켜져야 울린다. |
 | `leadMinutes` | 0, 5, 10, 15, 30, 60 | 알림 보낼 때 (기본 10) |
+| `remindAgainMinutes` | 0, 10, 30, 60 | 안 줬으면 다시 알림 (기본 0 = 안 함, 2026-11-02 사용자). 먹일 시각 + 이 분에 차례가 남아 있으면 한 번 더 |
 | `activeFrom` | UTC 시각 | 이 주기를 쓰기 시작한 때 |
 | `activeUntil` | UTC 시각 또는 없음 | 그만 쓴 때(이 시각 포함 안 함) |
 
@@ -170,7 +171,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 - `unit`은 그 약의 단위(4장)를 그대로 쓴다.
 
 - **횟수·시간·양을 바꾸면 고치지 않고 새 줄을 만든다.** 원래 줄에 `activeUntil`을 넣고 새 줄을 같은 시각의 `activeFrom`으로 만든다. 그래야 지난 기간의 '몇 번 중 몇 번'이 그때 주기로 계산되고, 실록 금색 선(6-4)도 여기서 나온다. 며칠마다는 새 줄에도 `startDate`를 그대로 옮겨 셈이 다시 시작되지 않게 한다.
-- 알림·몇 분 전·먹이는 방법만 바꾸면 그 줄을 그대로 고친다(금색 선이 생기지 않게).
+- 알림·몇 분 전·다시 알림·먹이는 방법만 바꾸면 그 줄을 그대로 고친다(금색 선이 생기지 않게).
 - 몇 시간마다의 `shiftOnLate`만 바꾸면 시간이 달라지므로 새 줄을 만들되, 금색 선은 긋지 않는다(6-4).
 - **바로 앞 줄** = 같은 `seriesId`이고 `activeUntil`이 이 줄의 `activeFrom`과 같은 줄. 추억 되돌리기로 다시 연 줄은 사이가 비어 바로 앞 줄이 없다.
 - 같은 `seriesId`에 열린 줄(`activeUntil` 없음)이 둘 이상이면(백업 병합 — 한 기기가 바꾸고 다른 기기가 옛 줄의 알림만 고친 경우 등) `activeFrom`이 늦은 것, 같으면 `updatedAt`이 늦은 것 하나만 쓴다(7장 인슐린과 같은 규칙).
@@ -290,9 +291,11 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 - 묶음 칸 이름 (2026-10-28 4-1에서 정함): `quietHours` = `{enabled, start, end}`(`HH:mm`) · `notify` = `{medTime, insulinTime, lowMed, weighIn, goodDay, lastYearToday}`(참/거짓) · `weightReminder` = `{weekday(ISO), time(HH:mm)}`. 밤 알림 쉬기·알림 켜짐·`celebrateTone`의 처음 값은 아직 안 정함 — 코드는 임시로 꺼짐 22:00~07:00 · 모두 켜짐 · `joseon`, 설정 화면 때 디자인과 맞춘다.
 
+- 탕약 알림 (2026-11-02 사용자): 밤 알림 쉬기와 상관없이 울린다. 휴양 중인 아이의 차례는 울리지 않는다. 같은 시각 알림은 하나로 묶는다. 앱을 마지막으로 연 때부터 3일치만 걸어 두고, 앱을 열 때마다 다시 건다.
+
 **이 기기만의 설정 (백업에 안 넣음)**: iOS `UserDefaults`, 안드로이드 DataStore에 둔다. 아이폰 백업을 안드로이드로 가져와도 'iCloud에 백업' 같은 값이 넘어오지 않게.
 - 백업: `backupTarget`(`icloud` / `googleDrive` / `none`), `autoBackupNightly`, `backupPhotos`, `wifiOnly`, `lastBackupAt`
-- 기타: `onboardingDone`('먼저 둘러볼게요'를 누름 — 아이가 없어도 시작하기 화면을 다시 안 띄움, 2026-10-28 추가), `lastPetId`(마지막으로 보던 아이), `lastOpenedAt`(앱을 오래 안 열면 알림을 줄이는 데 씀), `shownCelebrations`(이미 보여 준 축하 카드 `{petId}|{종류}|{날짜}` 목록)
+- 기타: `onboardingDone`('먼저 둘러볼게요'를 누름 — 아이가 없어도 시작하기 화면을 다시 안 띄움, 2026-10-28 추가), `lastPetId`(마지막으로 보던 아이), `lastOpenedAt`(앱을 오래 안 열면 알림을 줄이는 데 씀), `shownCelebrations`(이미 보여 준 축하 카드 `{petId}|{종류}|{날짜}` 목록), `lowMedSent`(남은 약 알림을 보낸 `{medicationId}|{stockCountedAt}` 목록 — 같은 약을 남은 양을 다시 적기 전까지 한 번만), `notifyAsked`(알림 허락 안내를 보였는지)
 
 **축하 카드** (2026-10-27 결정): 그날 앱을 처음 열 때 **한 번만** 띄운다. 그날 앱을 안 열면 지나간다(다음 날 늦게 띄우지 않음). 날짜는 기기 현지 달력 날짜.
 

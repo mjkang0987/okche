@@ -297,7 +297,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 - 탕약 알림 (2026-11-02 사용자): 밤 알림 쉬기와 상관없이 울린다. 휴양 중인 아이의 차례는 울리지 않는다. 같은 시각 알림은 하나로 묶는다. 앱을 마지막으로 연 때부터 3일치만 걸어 두고, 앱을 열 때마다 다시 건다.
 
 **이 기기만의 설정 (백업에 안 넣음)**: iOS `UserDefaults`, 안드로이드 DataStore에 둔다. 아이폰 백업을 안드로이드로 가져와도 'iCloud에 백업' 같은 값이 넘어오지 않게.
-- 백업: `backupTarget`(`icloud` / `googleDrive` / `none`), `autoBackupNightly`, `backupPhotos`, `wifiOnly`, `lastBackupAt`
+- 백업: `backupTarget`(아이폰 `icloud` / `none`, 안드로이드 `googleDrive` / `none` — 2026-11-02 사용자: 휴대폰 기본만, 다른 휴대폰으로는 백업 파일 내보내기로 옮김; 백업 파일은 최근 7개 보관), `autoBackupNightly`, `backupPhotos`, `wifiOnly`, `lastBackupAt`
 - 기타: `onboardingDone`('먼저 둘러볼게요'를 누름 — 아이가 없어도 시작하기 화면을 다시 안 띄움, 2026-10-28 추가), `lastPetId`(마지막으로 보던 아이), `lastOpenedAt`(앱을 오래 안 열면 알림을 줄이는 데 씀), `shownCelebrations`(이미 보여 준 축하 카드 `{petId}|{종류}|{날짜}` 목록), `lowMedSent`(남은 약 알림을 보낸 `{medicationId}|{stockCountedAt}` 목록 — 같은 약을 남은 양을 다시 적기 전까지 한 번만), `notifyAsked`(알림 허락 안내를 보였는지)
 
 **축하 카드** (2026-10-27 결정): 그날 앱을 처음 열 때 **한 번만** 띄운다. 그날 앱을 안 열면 지나간다(다음 날 늦게 띄우지 않음). 날짜는 기기 현지 달력 날짜.

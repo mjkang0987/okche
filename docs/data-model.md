@@ -292,7 +292,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 
 **함께 쓰는 설정 (`Setting`, 고정 ID 하나, 백업·병합에 들어감)**: `quietHours`(밤 알림 쉬기 켜짐·시작·끝 — 이 시간의 알림은 보내지 않고 버린다. 줄·카드는 그대로), `notify`(탕약 시간·인슐린 시간·남은 약·체중 재기·기쁜 날·작년 오늘 켜짐), `weightReminder`(요일·시각, 기본 일요일 10:00), `lowMedDays`(남은 약 알림 기준 일수, 기본 3), `celebrateTone`(`joseon` / `plain` — 축하 카드 문구).
 
-- 묶음 칸 이름 (2026-10-28 4-1에서 정함): `quietHours` = `{enabled, start, end}`(`HH:mm`) · `notify` = `{medTime, insulinTime, lowMed, weighIn, goodDay, lastYearToday}`(참/거짓) · `weightReminder` = `{weekday(ISO), time(HH:mm)}`. 밤 알림 쉬기·알림 켜짐·`celebrateTone`의 처음 값은 아직 안 정함 — 코드는 임시로 꺼짐 22:00~07:00 · 모두 켜짐 · `joseon`, 설정 화면 때 디자인과 맞춘다.
+- 묶음 칸 이름 (2026-10-28 4-1에서 정함): `quietHours` = `{enabled, start, end}`(`HH:mm`) · `notify` = `{medTime, insulinTime, lowMed, weighIn, goodDay, lastYearToday, bodyPhoto}`(참/거짓 — `bodyPhoto` 체형 사진 알림은 2026-11-02 11-3에서 더함) · `weightReminder` = `{weekday(ISO), time(HH:mm)}`. 밤 알림 쉬기·알림 켜짐·`celebrateTone`의 처음 값은 아직 안 정함 — 코드는 임시로 꺼짐 22:00~07:00 · 모두 켜짐 · `joseon`, 설정 화면 때 디자인과 맞춘다.
 
 - 탕약 알림 (2026-11-02 사용자): 밤 알림 쉬기와 상관없이 울린다. 휴양 중인 아이의 차례는 울리지 않는다. 같은 시각 알림은 하나로 묶는다. 앱을 마지막으로 연 때부터 3일치만 걸어 두고, 앱을 열 때마다 다시 건다.
 

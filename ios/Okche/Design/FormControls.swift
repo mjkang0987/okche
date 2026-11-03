@@ -64,7 +64,8 @@ struct OkcheTextField: View {
         VStack(alignment: .leading, spacing: 6) {
             OkcheFieldLabel(title: label, note: note).accessibilityHidden(true)
             HStack(spacing: 8) {
-                TextField(placeholder, text: $text)
+                // 보기 글은 흐린 글자 색(시스템 기본 회색은 대비가 모자람)
+                TextField(text: $text, prompt: Text(placeholder).foregroundStyle(OkcheColor.inkMuted)) { Text(label) }
                     .okcheText(OkcheType.body)
                     .frame(maxWidth: .infinity, maxHeight: .infinity) // 테두리 안 어디를 눌러도 칸이 잡히게
                     .foregroundStyle(OkcheColor.ink)

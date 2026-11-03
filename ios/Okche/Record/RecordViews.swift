@@ -128,6 +128,7 @@ struct RecentRecordSection: View {
     let justSaved: UUID?
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }) private var pets: [Pet]
+    // shortcut: 지우지 않은 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 날 조건을 넣는다.
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }, sort: \Record.createdAt, order: .reverse) private var records: [Record]
     @State private var deleting: Record?
 
@@ -221,6 +222,7 @@ private struct DeleteRecordDialog: ViewModifier {
                                        record = nil
                                    } catch {
                                        failed = true
+                                       AccessibilityNotification.Announcement("지우지 못했어요. 다시 해 주세요.").post()
                                    }
                                }) {
                 // 보드 `DeleteConfirm`: 기록 요약 칸이 안내 글보다 위.

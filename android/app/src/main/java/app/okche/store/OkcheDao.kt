@@ -1,5 +1,6 @@
 package app.okche.store
 
+import kotlinx.coroutines.flow.Flow
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -90,6 +91,12 @@ abstract class OkcheDao {
 
     // 화면에 보일 목록은 지운 줄을 뺀다(1-4).
     @Query("SELECT * FROM pet WHERE deleted_at IS NULL ORDER BY created_at") abstract suspend fun pets(): List<Pet>
+
+    /** 지운 줄 뺀 아이들(모신 순), 바뀌면 다시 내보냄 — 낙관·아이 바꾸기·더보기(6-3). */
+    @Query("SELECT * FROM pet WHERE deleted_at IS NULL ORDER BY created_at") abstract fun petsFlow(): Flow<List<Pet>>
+
+    /** 열린 휴양 기간 전부, 바뀌면 다시 내보냄(6-3). */
+    @Query("SELECT * FROM rest_period WHERE deleted_at IS NULL AND ended_at IS NULL") abstract fun openRestPeriodsFlow(): Flow<List<RestPeriod>>
     @Query("SELECT * FROM med_schedule WHERE deleted_at IS NULL") abstract suspend fun medSchedules(): List<MedSchedule>
     @Query("SELECT * FROM insulin_plan WHERE deleted_at IS NULL") abstract suspend fun insulinPlans(): List<InsulinPlan>
     @Query("SELECT * FROM meal_plan WHERE deleted_at IS NULL") abstract suspend fun mealPlans(): List<MealPlan>

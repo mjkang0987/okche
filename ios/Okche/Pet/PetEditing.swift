@@ -120,15 +120,7 @@ struct PetEditing {
                 plan.updatedAt = now
             }
         }
-        // 휴양: 켤 때는 열린 기간이 없을 때만 새로, 끌 때는 열린 기간을 모두 닫는다(데이터 2-1).
-        if resting && rests.isEmpty {
-            context.insert(RestPeriod(now: now, petId: pet.id, startedAt: now))
-        } else if !resting {
-            for rest in rests {
-                rest.endedAt = now
-                rest.updatedAt = now
-            }
-        }
+        RestPeriod.apply(resting, open: rests, petId: pet.id, now: now, in: context)
         do {
             try context.save()
         } catch {
@@ -232,6 +224,30 @@ extension InsulinPlan {
 }
 
 extension RestPeriod {
+    /// 휴양: 켤 때는 열린 기간이 없을 때만 새로, 끌 때는 열린 기간을 모두 닫는다(데이터 2-1). 저장은 부르는 쪽에서.
+    static func apply(_ resting: Bool, open rests: [RestPeriod], petId: UUID, now: Date, in context: ModelContext) {
+        if resting && rests.isEmpty {
+            context.insert(RestPeriod(now: now, petId: petId, startedAt: now))
+        } else if !resting {
+            for rest in rests {
+                rest.endedAt = now
+                rest.updatedAt = now
+            }
+        }
+    }
+
+    /// 더보기 '휴양 중 · 관리 쉬기' 스위치: 바로 저장(6-3).
+    static func setResting(_ resting: Bool, petId: UUID, now: Date = .now, in context: ModelContext) throws {
+        let rests = try open(for: petId, in: context)
+        apply(resting, open: rests, petId: petId, now: now, in: context)
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
     /// 그 아이의 열린 휴양 기간(`endedAt` 없음). 하나라도 있으면 휴양 중.
     static func open(for petId: UUID, in context: ModelContext) throws -> [RestPeriod] {
         try context.fetch(FetchDescriptor<RestPeriod>(predicate: #Predicate {

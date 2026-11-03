@@ -5,6 +5,7 @@ import app.okche.store.InsulinPlan
 import app.okche.store.InsulinSlot
 import app.okche.store.OkcheDao
 import app.okche.store.Pet
+import app.okche.store.newId
 import app.okche.store.Record
 import app.okche.store.RecordKind
 import app.okche.store.Sex
@@ -116,6 +117,8 @@ suspend fun registerPet(
     form: PetForm,
     now: Long = System.currentTimeMillis(),
     today: LocalDate = LocalDate.now(),
+    /** 새 아이 ID — 부르는 쪽이 저장 뒤 지금 보는 아이로 쓸 수 있게(6-3). */
+    petId: String = newId(),
 ): Map<String, String> {
     val errors = linkedMapOf<String, String>()
     val name = form.name.trim()
@@ -149,7 +152,7 @@ suspend fun registerPet(
     if (errors.isNotEmpty()) return errors
 
     val pet = Pet(
-        createdAt = now, name = name, species = form.species, breed = form.breed, furColor = form.furColor,
+        id = petId, createdAt = now, name = name, species = form.species, breed = form.breed, furColor = form.furColor,
         sex = form.sex, neutered = form.neutered, birthDate = birth?.toString(), birthEstimated = form.birthUnknown && birth != null,
         diagnosis = form.diagnosis.trim().ifEmpty { null }, hasDiabetes = form.hasDiabetes,
     )

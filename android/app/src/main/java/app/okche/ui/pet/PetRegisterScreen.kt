@@ -30,6 +30,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.okche.store.OkcheDatabase
+import app.okche.store.newId
+import app.okche.store.setLastPetId
 import app.okche.store.Sex
 import app.okche.store.Species
 import app.okche.store.Syringe
@@ -142,7 +144,11 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                 }
             }
             errors["save"]?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = { saver.save { registerPet(OkcheDatabase.get(context).dao(), form) } })
+            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = {
+                    // 새로 모신 아이는 바로 지금 보는 아이(6-3).
+                    val id = newId()
+                    saver.save { registerPet(OkcheDatabase.get(context).dao(), form, petId = id).also { if (it.isEmpty()) runCatching { context.setLastPetId(id) } } }
+                })
         }
     }
 }

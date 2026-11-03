@@ -286,8 +286,8 @@ class PetEditFlowTest {
         val tabMore = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText("더보기"))
         waitFor(tabMore)
         rule.onNode(tabMore).performClick()
-        waitFor(hasText("콩이 · 아이 정보"))
-        rule.onNodeWithText("콩이 · 아이 정보").performClick()
+        waitFor(hasText("콩이 아기씨"))
+        rule.onNodeWithText("콩이 아기씨").performClick()
         waitFor(hasSetTextAction().and(hasText("이름")))
         // performTextInput은 커서(처음엔 맨 앞) 자리에 넣어서 바꾸기로.
         rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextReplacement("콩이이")
@@ -311,7 +311,7 @@ class PetEditFlowTest {
         waitFor(hasText("콩이이"))
         rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요")).assertCountEquals(0)
         rule.onNodeWithText("저장하기").performScrollTo().performClick()
-        waitFor(hasText("콩이이 · 아이 정보"))
+        waitFor(hasText("콩이이 아기씨"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }
         assertEquals(listOf("콩이이", "true"), listOf(pet.name, pet.hasDiabetes.toString()))
         assertEquals(30, runBlocking { OkcheDatabase.get(context).dao().openInsulinPlans(pet.id) }.single().leadMinutes)
@@ -332,13 +332,13 @@ class PetEditFlowTest {
         val tabMore = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText("더보기"))
         waitFor(tabMore)
         rule.onNode(tabMore).performClick()
-        waitFor(hasText("콩이 · 아이 정보"))
-        rule.onNodeWithText("콩이 · 아이 정보").performClick()
+        waitFor(hasText("콩이 아기씨"))
+        rule.onNodeWithText("콩이 아기씨").performClick()
         waitFor(hasSetTextAction().and(hasText("콩이")))
         rule.onNode(hasSetTextAction().and(hasText("콩이"))).assertIsDisplayed()
 
         Espresso.pressBack()
-        waitFor(hasText("콩이 · 아이 정보"))
+        waitFor(hasText("콩이 아기씨"))
         rule.onNode(tabMore).assertIsDisplayed()
     }
 }

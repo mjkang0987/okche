@@ -108,7 +108,7 @@ class FormSaveModel : ViewModel() {
 
 /**
  * 아이 정보 고치기 → 인슐린 설정 두 화면. 인슐린 설정을 다녀와도 고치던 아이 정보 입력이 남게 저장 상태를 둘로 나눠 둔다.
- * 들어가는 길은 지금 더보기의 임시 줄(6-3 전).
+ * 들어가는 길은 더보기 아이 관리·아이 바꾸기 시트(6-3).
  */
 @Composable
 fun PetEditFlow(petId: String, onClose: () -> Unit) {
@@ -188,7 +188,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     BackHandler(onBack = close)
 
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
-        FormHeader(saved?.name.orEmpty(), "아이 정보", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
+        FormHeader(saved?.let { petTitle(it) }.orEmpty(), "아이 정보", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
         val f = form ?: return@Column
         fun edit(key: String? = null, change: PetEditForm.() -> PetEditForm) {
             form = f.change()
@@ -203,7 +203,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
             saved?.let { pet ->
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
                     val title = OkcheType.Title.toTextStyle()
-                    Text(pet.name, color = OkcheColor.Ink, style = title)
+                    Text(petTitle(pet), color = OkcheColor.Ink, style = title)
                     val days = companionDays(pet.familyDate)?.let { "동행 %,d일".format(it) }
                     Text(
                         listOfNotNull(if (pet.species == Species.cat) "고양이" else "강아지", pet.breed, days).joinToString(" · "),

@@ -114,4 +114,99 @@ final class OnboardingUITests: XCTestCase {
         app.switches["생일을 몰라요 (나이를 어림잡아 넣을게요)"].firstMatch.tap()
         XCTAssertTrue(app.textFields["나이 (대략)"].waitForExistence(timeout: 3))
     }
+
+    /// 더보기 임시 줄 → 아이 정보 고치기 → 인슐린 설정 → 저장 (6-2).
+    func testEditPetFromMore() {
+        let app = launch()
+        app.buttons["아이 등록하고 시작하기"].tap()
+        let name = app.textFields["이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("콩이")
+        app.buttons["모시기"].firstMatch.tap()
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+
+        app.buttons["콩이 · 아이 정보"].tap()
+        let editName = app.textFields["이름"]
+        XCTAssertTrue(editName.waitForExistence(timeout: 5))
+        editName.tap()
+        editName.typeText("이")
+        app.buttons["완료"].firstMatch.tap()
+
+        // 당뇨를 켜고 인슐린 없이 저장하면 오류
+        let diabetes = app.switches["당뇨가 있어요"].firstMatch
+        while !diabetes.isHittable { app.swipeUp() }
+        diabetes.tap()
+        let save = app.buttons["저장하기"].firstMatch
+        while !save.isHittable { app.swipeUp() }
+        save.tap()
+        XCTAssertTrue(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].waitForExistence(timeout: 3))
+
+        let setupLink = app.buttons["인슐린 이름·양·시간 설정"]
+        while !setupLink.isHittable { app.swipeDown() }
+        setupLink.tap()
+        for nth in ["첫 번째", "두 번째"] {
+            let units = app.textFields["\(nth) 양 (단위)"]
+            XCTAssertTrue(units.waitForExistence(timeout: 3))
+            units.tap()
+            units.typeText("2")
+        }
+        app.buttons["완료"].firstMatch.tap()
+        let setupSave = app.buttons["저장하기"].firstMatch
+        while !setupSave.isHittable { app.swipeUp() }
+        setupSave.tap()
+
+        // 아이 정보로 돌아오면 설정 오류는 사라지고, 저장하면 더보기 줄 이름이 바뀐다.
+        XCTAssertTrue(save.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].exists)
+        while !save.isHittable { app.swipeUp() }
+        save.tap()
+        XCTAssertTrue(app.buttons["콩이이 · 아이 정보"].waitForExistence(timeout: 5))
+    }
+    /// 가장 큰 글자에서 아이 정보·인슐린 설정 화면 접근성 검사(잘림·이름 없는 버튼·작은 터치 영역 등, 6-2).
+    func testPetEditAccessibilityAtLargestText() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-testing", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        reveal(app.buttons["아이 등록하고 시작하기"], in: app).tap()
+        let name = app.textFields["이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("콩이")
+        app.buttons["완료"].firstMatch.tap()
+        reveal(app.buttons["모시기"].firstMatch, in: app).tap()
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        app.buttons["콩이 · 아이 정보"].tap()
+        XCTAssertTrue(app.textFields["이름"].waitForExistence(timeout: 5))
+        try audit(app)
+        reveal(app.switches["당뇨가 있어요"].firstMatch, in: app).tap()
+        try audit(app)
+        reveal(app.buttons["저장하기"].firstMatch, in: app)
+        try audit(app)
+
+        app.buttons["인슐린 이름·양·시간 설정"].tap() // 안 보이면 알아서 밀어 옴
+        XCTAssertTrue(app.textFields["첫 번째 양 (단위)"].waitForExistence(timeout: 3))
+        try audit(app)
+        reveal(app.buttons["저장하기"].firstMatch, in: app)
+        try audit(app)
+    }
+
+    /// 접근성 검사. 한 줄 입력 칸의 '잘릴 수 있음'은 뺀다(넣은 글은 칸 안에서 옆으로 밀리고, 긴 보기 글만 걸림).
+    private func audit(_ app: XCUIApplication) throws {
+        try app.performAccessibilityAudit { issue in
+            issue.auditType == .textClipped && issue.element?.elementType == .textField
+        }
+    }
+
+    /// 보일 때까지 밀어 올림(내림). 20번 밀어도 안 보이면 실패.
+    @discardableResult
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, up: Bool = true) -> XCUIElement {
+        for _ in 0..<20 where !(element.exists && element.isHittable) {
+            if up { app.swipeUp() } else { app.swipeDown() }
+        }
+        XCTAssertTrue(element.isHittable, element.debugDescription)
+        return element
+    }
 }

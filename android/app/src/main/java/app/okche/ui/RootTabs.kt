@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.okche.R
+import app.okche.ui.pet.PetEditFlow
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheType
@@ -54,6 +56,12 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
 @Composable
 fun RootTabs() {
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    // 탭 아래 화면(하단 탭 없음 — 디자인 '화면 짜임새'). 지금은 더보기 → 아이 정보 하나(6-2).
+    var editPetId by rememberSaveable { mutableStateOf<String?>(null) }
+    editPetId?.let { id ->
+        PetEditFlow(id, onClose = { editPetId = null })
+        return
+    }
     Scaffold(
         containerColor = OkcheColor.Hanji,
         bottomBar = {
@@ -115,7 +123,7 @@ fun RootTabs() {
             Tab.Main -> MainTab(modifier)
             Tab.Sillok -> SillokTab(modifier)
             Tab.Album -> AlbumTab(modifier)
-            Tab.More -> MoreTab(modifier)
+            Tab.More -> MoreTab(modifier, onEditPet = { editPetId = it })
         }
     }
 }

@@ -142,6 +142,7 @@ final class PetRegistrationTests: XCTestCase {
         XCTAssertEqual(plan.syringe, .u40)
         XCTAssertEqual(plan.slots, [InsulinSlot(time: "08:00", units: 2), InsulinSlot(time: "20:00", units: 1.5)])
         XCTAssertEqual(plan.activeFrom, now)
+        XCTAssertTrue(plan.ringDuringQuiet) // 인슐린 알림은 밤에도 울림(기획 문서, 6-2)
     }
 
     func testInsulinErrors() throws {

@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,20 +38,15 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
@@ -92,6 +88,7 @@ data class DetailTarget(val kind: RecordKind, val editing: Record? = null, val p
  * 구토·매화·소피 자세히 시트(보드 Vomit·Stool·Urine): 시간, 칸들, 의서 안내, '기록하기'. 고치기도 같은 시트(값이 채워진 채).
  * [onSaved]는 저장한 기록과 새 기록인지.
  */
+// shortcut: 시트 상태는 화면 회전·테마 전환(액티비티 다시 만듦) 때 시트와 함께 사라짐(아직 안 저장한 고르기만), 회전을 지원할 때 DetailTarget을 저장한다.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, Boolean) -> Unit, onClose: () -> Unit) {
@@ -103,11 +100,11 @@ fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, B
     val editing = target.editing
     val petId = editing?.petId ?: target.petId
     var values by remember { mutableStateOf(editing?.let(::detailValues) ?: emptyMap()) }
-    var occurredAt by rememberSaveable { mutableLongStateOf(editing?.occurredAt ?: System.currentTimeMillis()) }
-    var timeChanged by rememberSaveable { mutableStateOf(false) }
-    var alerting by rememberSaveable { mutableStateOf(false) }
+    var occurredAt by remember { mutableLongStateOf(editing?.occurredAt ?: System.currentTimeMillis()) }
+    var timeChanged by remember { mutableStateOf(false) }
+    var alerting by remember { mutableStateOf(false) }
     // 이 시트에서 레이어가 저절로 떴는지(시트 한 번에 한 번 — 2026-11-03 사용자).
-    var alerted by rememberSaveable { mutableStateOf(false) }
+    var alerted by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
@@ -215,7 +212,9 @@ private fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) {
     DatePickerDialog(context, { _, y, m, d ->
         TimePickerDialog(context, { _, h, min ->
             val picked = LocalDateTime.of(y, m + 1, d, h, min).atZone(zone).toInstant().toEpochMilli()
-            onPicked(minOf(picked, System.currentTimeMillis()))
+            val now = System.currentTimeMillis()
+            if (picked > now) Toast.makeText(context, "지금보다 뒤로는 바꿀 수 없어서 지금으로 했어요.", Toast.LENGTH_SHORT).show()
+            onPicked(minOf(picked, now))
         }, current.hour, current.minute, false).show()
     }, current.year, current.monthValue - 1, current.dayOfMonth).apply {
         datePicker.maxDate = System.currentTimeMillis()
@@ -282,7 +281,6 @@ private fun Warning(kind: RecordKind, onOpen: () -> Unit) {
 fun GuideLayer(kind: RecordKind, onClose: () -> Unit) {
     val context = LocalContext.current
     Dialog(onDismissRequest = onClose) {
-        val focus = remember { FocusRequester() }
         Column(
             Modifier
                 .fillMaxWidth()
@@ -292,7 +290,7 @@ fun GuideLayer(kind: RecordKind, onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f).focusRequester(focus).focusable().semantics(mergeDescendants = true) { heading() }) {
+                Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
                     Text("의서", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
                     Text("병원에 바로 연락하길 권해요", color = OkcheColor.Yeonji, style = OkcheType.Heading.toTextStyle())
                 }
@@ -312,8 +310,6 @@ fun GuideLayer(kind: RecordKind, onClose: () -> Unit) {
             OkchePrimaryButton("기록 이어 하기", onClose, look = ButtonLook.Outlined)
             Text(GUIDE_SOURCE, color = OkcheColor.InkMuted, style = OkcheType.Caption.toTextStyle())
         }
-        // 창이 뜨면 TalkBack 초점을 제목으로.
-        LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     }
 }
 

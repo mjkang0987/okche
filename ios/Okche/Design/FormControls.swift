@@ -90,17 +90,24 @@ struct OkcheChoiceChips<Value: Hashable>: View {
     let options: [(value: Value, title: String)]
     private let isOn: (Value) -> Bool
     private let onTap: (Value) -> Void
+    /// 여러 개 고르기면 화면 읽기에 '여러 개 고를 수 있어요', 아니고 풀 수 있으면 고른 칩에 '선택 해제' 동작.
+    private let multiple: Bool
+    private let deselectable: Bool
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 40
 
     init(options: [(value: Value, title: String)], selection: Binding<Value?>, allowsNone: Bool = true) {
         self.options = options
+        multiple = false
+        deselectable = allowsNone
         isOn = { $0 == selection.wrappedValue }
         onTap = { value in selection.wrappedValue = value == selection.wrappedValue && allowsNone ? nil : value }
     }
 
-    /// 여러 개 고르기처럼 고름·누름을 부르는 쪽이 정할 때.
-    init(options: [(value: Value, title: String)], isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
+    /// 여러 개 고르기처럼 고름·누름을 부르는 쪽이 정할 때(고른 칩을 다시 누르면 푸는 것으로 본다).
+    init(options: [(value: Value, title: String)], multiple: Bool = false, isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
         self.options = options
+        self.multiple = multiple
+        deselectable = true
         self.isOn = isOn
         self.onTap = onTap
     }
@@ -123,6 +130,10 @@ struct OkcheChoiceChips<Value: Hashable>: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityHint(multiple ? "여러 개 고를 수 있어요" : "")
+                .accessibilityActions {
+                    if on && deselectable && !multiple { Button("선택 해제") { onTap(option.value) } }
+                }
             }
         }
     }

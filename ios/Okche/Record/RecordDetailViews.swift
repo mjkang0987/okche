@@ -25,6 +25,15 @@ struct RecordDetailSheet: View {
     /// 이 시트에서 레이어가 저절로 떴는지(시트 한 번에 한 번 — 2026-11-03 사용자).
     @State private var alerted = false
     @State private var failed = false
+    @State private var saving = false
+
+    init(target: DetailTarget, onSaved: @escaping (Record, Bool) -> Void) {
+        self.target = target
+        self.onSaved = onSaved
+        // 고칠 값은 처음 한 번만 채운다(레이어가 닫히며 onAppear가 다시 불려도 고르던 값을 덮지 않게).
+        _values = State(initialValue: target.editing.map(RecordDetail.values) ?? [:])
+        _occurredAt = State(initialValue: target.editing?.occurredAt ?? .now)
+    }
 
     private var kind: RecordKind { target.kind }
     private var petId: UUID? { target.editing?.petId ?? target.petId }
@@ -55,11 +64,6 @@ struct RecordDetailSheet: View {
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .onAppear {
-            guard let editing = target.editing else { return }
-            values = RecordDetail.values(editing)
-            occurredAt = editing.occurredAt
-        }
         .sheet(isPresented: $pickingTime) {
             TimeSheet(time: Binding(get: { occurredAt }, set: { occurredAt = $0; timeChanged = true }),
                       components: [.date, .hourAndMinute], notAfterNow: true)
@@ -111,7 +115,7 @@ struct RecordDetailSheet: View {
                 if field.key == "color" {
                     Button { alerting = true } label: {
                         Image(systemName: "questionmark.circle").font(.body).foregroundStyle(OkcheColor.namsaek)
-                            .frame(minWidth: 44, minHeight: 32).contentShape(Rectangle())
+                            .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                     }
                     .accessibilityLabel(kind == .urine ? "어떨 때 병원에 가야 하나요" : "어떤 빛깔이면 병원에 가야 하나요")
                 }
@@ -121,7 +125,7 @@ struct RecordDetailSheet: View {
             if kind == .stool && field.key == "shape" {
                 OkcheChoiceCards(options: options, icons: Self.shapeIcons, isOn: isOn) { pick(field, $0) }
             } else {
-                OkcheChoiceChips(options: options, isOn: isOn) { pick(field, $0) }
+                OkcheChoiceChips(options: options, multiple: field.multi, isOn: isOn) { pick(field, $0) }
             }
         }
     }
@@ -158,6 +162,9 @@ struct RecordDetailSheet: View {
     }
 
     private func save() {
+        guard !saving else { return } // 두 번 눌러 기록이 둘 생기지 않게
+        saving = true
+        defer { saving = false }
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         let at = target.editing == nil && !timeChanged ? Date.now : occurredAt
         do {

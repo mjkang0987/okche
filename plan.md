@@ -21,6 +21,7 @@
 - **디자인 (먼저) — 2026-11-01 캔버스 버전 111, 가이드 검사 0**: 새 보드 '탭 머리 · 아이가 없을 때'(`TabHeaderNoPet` — 낙관 자리에 40 알약 '+ 새 아기씨 모시기', 일기 머리 기준), '더보기 · 아이가 없을 때'(`MoreNoPet` — '아직 모신 아이가 없어요.' + 52 점선 '+ 새 아기씨 모시기', 아이 바꾸기 시트 버튼과 같은 모양).
 - **영향받는 파일(예상)**: iOS `Okche/Design/TabScreen.swift`(머리 오른쪽 자리), `Okche/Tabs/Tabs.swift`, 새 `Okche/Pet/PetSeal.swift`(낙관·시트·호칭/나이), `Okche/Pet/PetEditing.swift`(휴양 저장 함께 쓰기), `OkcheApp.swift`/`RootView.swift`(지금 보는 아이). 안드로이드 `ui/TabScreen.kt`·`Tabs.kt`·`RootTabs.kt`, 새 `ui/pet/PetSeal.kt`, `ui/pet/PetEditSaver.kt`(휴양 저장 함께 쓰기), `store/DeviceSettings.kt`(`lastPetId`). 두 플랫폼 테스트, `docs/data-model.md`(호칭·나이·`lastPetId` 규칙), `index.md`·`plan.md`.
 - **예상 결과·테스트**: 호칭(1살 생일 전날·당일, 2/29생, 생일 없음 → 아기씨), 나이 표기(0개월·11개월·1살), 지금 보는 아이(없음·지운 아이·새로 모심), 휴양 스위치 바로 저장, 화면 테스트(낙관 → 시트 → 다른 아이 → 머리 바뀜, 아이 없을 때 모시기 버튼).
+- **진행 (2026-11-03)**: 두 플랫폼 코드·테스트 작성 — 규칙(iOS `Okche/Pet/PetSeal.swift`의 `PetTitle`, 안드로이드 `ui/pet/PetSeal.kt`), 휴양 저장은 6-2 규칙을 함께 쓰는 함수로 뺌(iOS `RestPeriod.apply`·`setResting`, 안드로이드 `restChanges`·`setResting`), `lastPetId`(iOS `@AppStorage`, 안드로이드 DataStore), 새로 모신 아이는 저장 뒤 바로 `lastPetId`. 화면: 탭 머리 오른쪽 자리(`TabScreen` trailing), 낙관·시트·아이 관리, 큰 버튼 모양 4가지, 온보딩 금테를 낙관 금테에도 씀(iOS `GoldFrame` 매듭 배율, 안드로이드 `Modifier.goldFrame`), 아이 정보 머리에 호칭. 안드로이드는 아이·휴양을 Room Flow로 따라감. 테스트 iOS 단위 5·화면 2, 안드로이드 5·화면 2 추가(두 플랫폼 모두 통과). 디자인 대조: 시트가 반만 열려 버튼이 가리던 것·점선 테두리가 안 보이던 것·버튼 글이 두 줄로 꺾이던 것(안드로이드) 고침. 남은 차이: 좁은 폰(360dp)에서 '· 휴양 중'이 붙은 줄은 스위치가 아랫줄로 내려감.
 
 **6-4 지우기·추억으로 간직** (계획·디자인 먼저 — 2026-11-01 사용자 결정. 코드는 6-3 뒤)
 

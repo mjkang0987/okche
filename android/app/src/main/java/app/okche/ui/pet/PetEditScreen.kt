@@ -266,7 +266,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
             saved?.let { pet ->
                 LifecycleLinks(
                     pet,
-                    enabled = !saver.saving, // 저장과 겹치면 저장이 간직 표시를 덮을 수 있어서
+                    enabled = !saver.saving && !lifecycleBusy, // 저장과 겹치면 저장이 간직 표시를 덮을 수 있어서
                     onBusy = { lifecycleBusy = it },
                     onDone = { done ->
                         when (done) {

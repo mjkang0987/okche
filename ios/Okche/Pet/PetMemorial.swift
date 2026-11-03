@@ -110,9 +110,9 @@ enum PetLifecycle {
 
     /// 추억 화면 숫자: 함께한 날(가족 된 날부터 오늘까지, 없으면 첫 기록 날부터, 둘 다 없으면 nil)·처음/마지막 기록 날짜(없으면 nil).
     struct MemorialStats: Equatable {
-        var days: Int?
-        var first: String?
-        var last: String?
+        var days: Int? = nil
+        var first: String? = nil
+        var last: String? = nil
     }
 
     static func stats(_ pet: Pet, today: Date = .now, calendar: Calendar = .okcheDevice, in context: ModelContext) throws -> MemorialStats {
@@ -130,5 +130,65 @@ enum PetLifecycle {
                                      timeZone: calendar.timeZone)
         return MemorialStats(days: PetEditing.companionDays(start, today: today, calendar: calendar),
                              first: first.map { $0.formatted(style) }, last: last.map { $0.formatted(style) })
+    }
+}
+
+/// 추억 화면(보드 `Memorial`, 문안 탭 자리): 머리 '콩이 · 추억으로 간직 중' + 낙관, 잠든 모습 자리, 함께한 날·처음/마지막 기록.
+/// 컨디션 좋았던 날들·앨범·내보내기(11·13단계)와 편지·도움받을 곳(보류)은 아직 없음.
+struct MemorialView: View {
+    let pet: Pet
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        let stats = (try? PetLifecycle.stats(pet, in: context)) ?? .init()
+        TabScreen(title: pet.name, subtitle: "추억으로 간직 중", trailing: { PetSeal() }) {
+            sleepingBand
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 8) { cards(stats) }
+                VStack(spacing: 8) { cards(stats) }
+            }
+        }
+    }
+
+    /// 잠든 모습 그림 자리(그림은 캐릭터 단계). 남색 띠에 별 몇 개.
+    private var sleepingBand: some View {
+        ZStack(alignment: .bottom) {
+            OkcheColor.namsaekDeep
+            Canvas { context, size in
+                for (x, y, r) in [(0.11, 0.23, 1.6), (0.26, 0.15, 1.2), (0.84, 0.25, 1.6), (0.70, 0.13, 1.1),
+                                  (0.92, 0.58, 1.2), (0.07, 0.67, 1.1), (0.50, 0.12, 1.4)] {
+                    let rect = CGRect(x: x * size.width - r, y: y * size.height - r, width: r * 2, height: r * 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(OkcheColor.geumLight))
+                }
+            }
+            Text("잠든 모습").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.onDeepMuted)
+                .frame(width: 120, height: 56)
+                .overlay(UnevenRoundedRectangle(topLeadingRadius: 60, bottomLeadingRadius: 20, bottomTrailingRadius: 20,
+                                                topTrailingRadius: 60)
+                    .stroke(OkcheColor.onDeepMuted, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                .padding(.bottom, 18)
+        }
+        .frame(height: 120)
+        .accessibilityElement()
+        .accessibilityLabel("별 아래 잠든 \(pet.name) 그림 자리")
+        .accessibilityAddTraits(.isImage)
+    }
+
+    @ViewBuilder private func cards(_ stats: PetLifecycle.MemorialStats) -> some View {
+        if let days = stats.days { card("함께한 날", "\(days.formatted())일", big: true) }
+        card("처음 기록", stats.first ?? "없어요")
+        card("마지막 기록", stats.last ?? "없어요")
+    }
+
+    private func card(_ label: String, _ value: String, big: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).okcheText(big ? OkcheType.heading : OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
+            Text(label).okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(value)")
     }
 }

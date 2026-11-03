@@ -9,9 +9,17 @@ struct RecordTab: View {
 }
 
 struct MainTab: View {
+    @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
+    @AppStorage("lastPetId") private var lastPetId = ""
+
     // shortcut: 켜 둔 채 날이 바뀌어도 그대로고 하루 기준(새벽 6시)도 아직 안 따름, 6단계 문안 내용에서 고친다.
+    // 지금 보는 아이가 추억이면 문안 자리에 추억 화면(6-4).
     var body: some View {
-        TabScreen(title: "문안", subtitle: Date.now.formatted(.dateTime.month().day().weekday(.wide)), trailing: { PetSeal() })
+        if let pet = PetTitle.current(pets, lastPetId: lastPetId), pet.memorializedAt != nil {
+            MemorialView(pet: pet)
+        } else {
+            TabScreen(title: "문안", subtitle: Date.now.formatted(.dateTime.month().day().weekday(.wide)), trailing: { PetSeal() })
+        }
     }
 }
 

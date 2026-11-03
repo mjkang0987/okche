@@ -205,6 +205,45 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["콩이 아기씨"].waitForExistence(timeout: 5))
     }
 
+    /// 아이 정보 → 추억으로 간직(문안에 추억 화면) → 추억에서 되돌리기 → 지우기(더보기로) (6-4).
+    func testKeepRestoreAndDelete() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        app.buttons["콩이 아기씨"].tap()
+
+        tapBelow(app.buttons["추억으로 간직하기"], in: app)
+        XCTAssertTrue(app.staticTexts["콩이의 기록을 추억으로 간직할게요"].waitForExistence(timeout: 3))
+        app.buttons["간직하기"].tap()
+        let memorial = app.staticTexts.containing(NSPredicate(format: "label CONTAINS '추억으로 간직 중'")).firstMatch
+        XCTAssertTrue(memorial.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["문안"].isSelected)
+        XCTAssertTrue(app.staticTexts["함께한 날"].exists || app.otherElements.containing(NSPredicate(format: "label BEGINSWITH '처음 기록'")).firstMatch.exists)
+
+        app.tabBars.buttons["더보기"].tap()
+        let keptRow = app.buttons["콩이 · 추억으로 간직 중"]
+        XCTAssertTrue(keptRow.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.switches["콩이 휴양 중 · 관리 쉬기"].exists) // 추억 아이는 휴양 스위치 없음
+        keptRow.tap()
+        tapBelow(app.buttons["추억에서 되돌리기"], in: app)
+        XCTAssertTrue(app.staticTexts["콩이를 다시 모실까요?"].waitForExistence(timeout: 3))
+        app.buttons["다시 모시기"].tap()
+        XCTAssertTrue(app.buttons["추억으로 간직하기"].waitForExistence(timeout: 3))
+
+        app.buttons["이 아이 기록 지우기"].tap()
+        XCTAssertTrue(app.staticTexts["콩이의 기록을 지울까요?"].waitForExistence(timeout: 3))
+        app.buttons["지우기"].tap()
+        XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 5))
+    }
+
+    /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
+    private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
+        for _ in 0..<15 where !element.isHittable { app.swipeUp() }
+        element.tap()
+    }
+
     /// 아이 등록 화면을 열어 이름만 넣고 모신다.
     private func register(_ name: String, in app: XCUIApplication, from button: XCUIElement) {
         XCTAssertTrue(button.waitForExistence(timeout: 5))

@@ -2,10 +2,19 @@ import SwiftData
 import SwiftUI
 
 /// 아이 정보 고치기 (디자인 보드 `PetEdit`). 들어가는 길은 더보기 아이 관리·아이 바꾸기 시트.
-/// 사진 칸은 11단계, 호칭('마마')은 6-3, 사료·체중·추억·지우기 줄은 그 화면을 만드는 단계에서 눌리게 한다.
+/// 사진 칸은 11단계, 사료·체중 줄은 그 화면을 만드는 단계에서 눌리게 한다. 추억·지우기는 6-4(추억 아이는 보드 `PetEditMemorial`).
 struct PetEditView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.openTab) private var openTab
+    @AppStorage("lastPetId") private var lastPetId = ""
+    /// 마지막 아이를 지워도 시작하기 화면으로 돌아가지 않고 더보기로(6-4 — 이미 앱을 쓴 사람).
+    @AppStorage("onboardingDone") private var onboardingDone = false
+    /// 띄운 확인 창(간직·지우기·되돌리기).
+    @State private var dialog: LifecycleDialog?
+    @State private var lifecycleFailed = false
+
+    enum LifecycleDialog { case keep, delete, restore }
     @State private var form: PetEditing
     @State private var errors: [PetRegistration.Field: String] = [:]
     @State private var saved = false
@@ -60,16 +69,19 @@ struct PetEditView: View {
                         }
                         .id(PetRegistration.Field.insulinPlan)
                         laterRows
-                        OkcheSwitchRow(title: "휴양 중 · 관리 쉬기",
-                                       detail: "알림을 멈추고, 이 기간은 약·끼니 챙긴 횟수에서 빼요. 휴양 중에도 기록할 수 있어요.",
-                                       isOn: $form.resting)
+                        // 추억으로 간직한 아이는 휴양 스위치 없음(6-4).
+                        if pet.memorializedAt == nil {
+                            OkcheSwitchRow(title: "휴양 중 · 관리 쉬기",
+                                           detail: "알림을 멈추고, 이 기간은 약·끼니 챙긴 횟수에서 빼요. 휴양 중에도 기록할 수 있어요.",
+                                           isOn: $form.resting)
+                        }
                         VStack(alignment: .leading, spacing: 8) {
                             OkcheFieldError(message: errors[.save])
                             Button("저장하기") { save(scroller) }
                                 .buttonStyle(.okchePrimary)
                                 .disabled(saved)
                         }
-                        laterLinks
+                        lifecycleLinks
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
                     .padding(.top, 4)
@@ -79,6 +91,7 @@ struct PetEditView: View {
             }
         }
         .background(OkcheColor.hanji)
+        .overlay { dialogView }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar) // 탭 아래 화면은 하단 탭 없음(디자인 화면 짜임새)
         .toolbar {
@@ -105,7 +118,8 @@ struct PetEditView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(PetTitle.name(pet)).okcheText(OkcheType.title).foregroundStyle(OkcheColor.ink)
             Text(([pet.species == .cat ? "고양이" : "강아지", pet.breed]
-                  + [PetEditing.companionDays(pet.familyDate).map { "동행 \($0.formatted())일" }].compactMap { $0 })
+                  + [pet.memorializedAt != nil ? "추억으로 간직 중"
+                     : PetEditing.companionDays(pet.familyDate).map { "동행 \($0.formatted())일" }].compactMap { $0 })
                 .joined(separator: " · "))
                 .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
         }
@@ -142,18 +156,75 @@ struct PetEditView: View {
         return "\(kg)kg · \(record.occurredAt.formatted(.dateTime.month().day()))"
     }
 
-    /// 추억으로 간직하기 | 이 아이 기록 지우기 — 6-4에서 눌리게.
-    private var laterLinks: some View {
-        HStack(spacing: 4) {
-            Button("추억으로 간직하기") {}
-                .foregroundStyle(OkcheColor.inkMuted)
-            Text("|").foregroundStyle(OkcheColor.line).accessibilityHidden(true)
-            Button("이 아이 기록 지우기") {}
-                .foregroundStyle(OkcheColor.yeonji)
+    /// '추억으로 간직하기 | 이 아이 기록 지우기', 추억 아이는 '추억에서 되돌리기 | 이 아이 기록 지우기'(6-4). 누르면 확인 창.
+    private var lifecycleLinks: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                if pet.memorializedAt == nil {
+                    Button("추억으로 간직하기") { dialog = .keep }
+                        .foregroundStyle(OkcheColor.inkMuted)
+                } else {
+                    Button("추억에서 되돌리기") { dialog = .restore }
+                        .foregroundStyle(OkcheColor.namsaek)
+                }
+                Text("|").foregroundStyle(OkcheColor.line).accessibilityHidden(true)
+                Button("이 아이 기록 지우기") { dialog = .delete }
+                    .foregroundStyle(OkcheColor.yeonji)
+            }
+            .okcheText(OkcheType.label, weight: .regular)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            OkcheFieldError(message: lifecycleFailed ? "저장하지 못했어요. 다시 해 주세요." : nil)
         }
-        .okcheText(OkcheType.label, weight: .regular)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .disabled(true)
+    }
+
+    @ViewBuilder private var dialogView: some View {
+        switch dialog {
+        case .keep:
+            OkcheConfirmDialog(title: "\(pet.name)의 기록을 추억으로 간직할게요",
+                               bullets: ["약·기록·사진 알림은 모두 멈춰요", "기록과 사진은 그대로 남아요",
+                                         "생일 같은 축하 화면은 이제 뜨지 않아요", "아이 정보에서 언제든 되돌릴 수 있어요"],
+                               confirm: "간직하기", onCancel: { dialog = nil }) { run(PetLifecycle.memorialize, then: .main) }
+        case .delete:
+            OkcheConfirmDialog(title: "\(pet.name)의 기록을 지울까요?", destructive: true,
+                               message: "기록·사진·실록이 모두 사라지고, 되돌릴 수 없어요.", confirm: "지우기", confirmLook: .danger,
+                               onCancel: { dialog = nil }, onConfirm: { run(PetLifecycle.delete, then: .more) }) {
+                // 추억 아이에게는 간직 권유를 보이지 않는다(이미 간직 중).
+                if pet.memorializedAt == nil {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("지우는 대신 **추억으로 간직**할 수도 있어요. 기록과 사진은 그대로 두고, 알림만 모두 멈춰요.")
+                            .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.ink)
+                        Button("추억으로 간직하기") { dialog = .keep }.buttonStyle(.okchePrimary(.outlined))
+                    }
+                    .padding(14)
+                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                }
+            }
+        case .restore:
+            OkcheConfirmDialog(title: "\(PetTitle.withObjectParticle(pet.name)) 다시 모실까요?",
+                               bullets: ["간직할 때 멈춘 약·인슐린·끼니 알림이 다시 시작돼요", "생일 같은 축하 화면이 다시 떠요",
+                                         "휴양 중이었다면 다시 켜 주세요"],
+                               confirm: "다시 모시기", onCancel: { dialog = nil }) { run(PetLifecycle.restore, then: nil) }
+        case nil:
+            EmptyView()
+        }
+    }
+
+    /// 간직(→ 문안의 추억 화면, 지금 보는 아이로)·지우기(→ 더보기)·되돌리기(이 화면 그대로).
+    private func run(_ action: (Pet, Date, ModelContext) throws -> Void, then tab: AppTab?) {
+        do {
+            try action(pet, .now, context)
+            lifecycleFailed = false
+            dialog = nil
+            guard let tab else { return }
+            if tab == .main { lastPetId = pet.id.uuidString }
+            if tab == .more { onboardingDone = true }
+            openTab(tab)
+            dismiss()
+        } catch {
+            dialog = nil
+            lifecycleFailed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+        }
     }
 
     private func save(_ scroller: ScrollViewProxy) {

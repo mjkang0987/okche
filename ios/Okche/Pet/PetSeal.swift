@@ -20,9 +20,20 @@ enum PetTitle {
         return fullYears(from: birth, to: calendar.startOfDay(for: today), calendar) >= 1 ? "마마" : "아기씨"
     }
 
-    /// '콩이 마마'
+    /// '콩이 마마'. 추억으로 간직한 아이는 호칭 없이 이름만(6-4).
     static func name(_ pet: Pet, today: Date = .now, calendar: Calendar = .okcheDevice) -> String {
-        "\(pet.name) \(honorific(pet.birthDate, today: today, calendar: calendar))"
+        pet.memorializedAt != nil ? pet.name : "\(pet.name) \(honorific(pet.birthDate, today: today, calendar: calendar))"
+    }
+
+    /// 이름 + 을/를(받침이 있으면 '을'). 한글로 끝나지 않으면 '을(를)'.
+    static func withObjectParticle(_ name: String) -> String {
+        guard let last = name.unicodeScalars.last, (0xAC00...0xD7A3).contains(last.value) else { return name + "을(를)" }
+        return name + ((last.value - 0xAC00) % 28 == 0 ? "를" : "을")
+    }
+
+    /// 목록 순서: 모신 순, 추억으로 간직한 아이는 맨 뒤(추억끼리도 모신 순, 6-4).
+    static func ordered(_ pets: [Pet]) -> [Pet] {
+        pets.filter { $0.memorializedAt == nil } + pets.filter { $0.memorializedAt != nil }
     }
 
     /// 만 나이 '7살', 1살 미만은 만 개월 '3개월'(1개월 미만 '0개월'). 생일이 없으면 nil.
@@ -125,7 +136,7 @@ struct PetSwitchSheet: View {
                     .accessibilityLabel("닫기")
                 }
                 VStack(spacing: 8) {
-                    ForEach(pets) { pet in row(pet) }
+                    ForEach(PetTitle.ordered(pets)) { pet in row(pet) }
                 }
                 Text("고른 아이가 모든 화면 오른쪽 위에 계속 보여요.")
                     .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
@@ -151,8 +162,10 @@ struct PetSwitchSheet: View {
 
     private func row(_ pet: Pet) -> some View {
         let selected = pet.id == PetTitle.current(pets, lastPetId: lastPetId)?.id
-        let detail = [pet.species == .cat ? "고양이" : "강아지", PetTitle.age(pet.birthDate),
-                      rests.contains { $0.petId == pet.id } ? "휴양 중" : nil].compactMap { $0 }.joined(separator: " · ")
+        let detail = pet.memorializedAt != nil
+            ? [pet.species == .cat ? "고양이" : "강아지", "추억으로 간직 중"].joined(separator: " · ")
+            : [pet.species == .cat ? "고양이" : "강아지", PetTitle.age(pet.birthDate),
+               rests.contains { $0.petId == pet.id } ? "휴양 중" : nil].compactMap { $0 }.joined(separator: " · ")
         return Button {
             lastPetId = pet.id.uuidString
             dismiss()
@@ -201,7 +214,7 @@ struct PetManageSection: View {
                     .buttonStyle(.okchePrimary(.dashed))
                     .padding(.top, 12).padding(.bottom, 10)
             } else {
-                ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
+                ForEach(Array(PetTitle.ordered(pets).enumerated()), id: \.element.id) { index, pet in
                     row(pet)
                         .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
                 }
@@ -217,15 +230,20 @@ struct PetManageSection: View {
 
     private func row(_ pet: Pet) -> some View {
         let resting = rests.contains { $0.petId == pet.id }
+        let note = pet.memorializedAt != nil ? "· 추억으로 간직 중" : resting ? "· 휴양 중" : nil
         let link = NavigationLink { PetEditScreen(pet: pet) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(PetTitle.name(pet)).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
-                if resting { Text("· 휴양 중").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
+                if let note { Text(note).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
             }
             .multilineTextAlignment(.leading)
             .frame(minHeight: 44)
         }
-        .accessibilityLabel(PetTitle.name(pet) + (resting ? " · 휴양 중" : ""))
+        .accessibilityLabel(PetTitle.name(pet) + (note.map { " \($0)" } ?? ""))
+        // 추억으로 간직한 아이는 휴양 스위치 없음(6-4).
+        if pet.memorializedAt != nil {
+            return AnyView(HStack { link; Spacer(minLength: 0) }.frame(minHeight: 56))
+        }
         let toggle = Toggle(isOn: Binding(get: { resting }, set: { on in
             do {
                 try RestPeriod.setResting(on, petId: pet.id, in: context)
@@ -240,10 +258,10 @@ struct PetManageSection: View {
         .tint(OkcheColor.namsaek)
         .accessibilityLabel("\(PetTitle.name(pet)) 휴양 중 · 관리 쉬기")
         // 한 줄에 안 들어가면 스위치를 아래 줄로(큰 글자에서 스위치 이름도 줄바꿈).
-        return ViewThatFits(in: .horizontal) {
+        return AnyView(ViewThatFits(in: .horizontal) {
             HStack { link; Spacer(minLength: 8); toggle.fixedSize() }
             VStack(alignment: .leading, spacing: 4) { link; toggle }
         }
-        .frame(minHeight: 56)
+        .frame(minHeight: 56))
     }
 }

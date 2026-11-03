@@ -42,7 +42,7 @@ data class PetEditForm(
     val loadedAge: String,
 ) : Serializable {
     /** 종을 바꾸면 품종·털색을 그 종의 첫째로 되돌린다(아이 등록과 같음). */
-    fun withSpecies(species: Species) =
+    fun withSpecies(species: Species) = if (species == this.species) this else
         copy(species = species, breed = breeds.getValue(species).first(), furColor = furColors.getValue(species).first().name)
 
     companion object {

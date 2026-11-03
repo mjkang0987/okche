@@ -64,6 +64,16 @@ final class RecordDetailTests: XCTestCase {
         XCTAssertEqual(later.occurredAt, at(2026, 10, 25, 10))
     }
 
+    /// 시간을 안 바꾼 고치기는 `day`를 그대로 둔다(다른 시간대에서 고쳐도).
+    func testEditWithoutTimeChangeKeepsDay() throws {
+        let record = try QuickRecord.save(QuickRecord.rows[0], value: "kibble", petId: nil, now: at(2026, 10, 25, 7), timeZone: seoul, in: context)
+        try RecordDetail.save(.vomit, values: ["color": ["yellow"]], occurredAt: record.occurredAt, editing: record, petId: nil,
+                              now: at(2026, 10, 25, 9), timeZone: TimeZone(identifier: "America/Los_Angeles")!, in: context)
+        XCTAssertEqual(record.day, "2026-10-25")
+        XCTAssertEqual(record.updatedAt, at(2026, 10, 25, 9))
+        XCTAssertEqual(QuickRecord.value(record), "노란색")
+    }
+
     func testToggle() {
         let contents = field(.vomit, "contents")
         var values = RecordDetail.toggle([:], field: contents, value: "kibble")

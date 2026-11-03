@@ -171,7 +171,12 @@ enum RecordDetail {
         let record: Record
         if let editing {
             editing.data = data(kind, values)
-            editing.setOccurredAt(at, timeZone: timeZone, now: now)
+            // 시간을 바꿨을 때만 `day`를 다시 정한다(다른 시간대에서 남긴 기록이 칸만 고쳐 다른 날로 옮겨지지 않게).
+            if at != editing.occurredAt {
+                editing.setOccurredAt(at, timeZone: timeZone, now: now)
+            } else {
+                editing.updatedAt = now
+            }
             record = editing
         } else {
             record = Record(now: now, petId: petId, kind: kind, occurredAt: at, timeZone: timeZone, data: data(kind, values))

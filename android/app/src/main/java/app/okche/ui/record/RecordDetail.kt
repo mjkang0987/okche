@@ -138,7 +138,9 @@ suspend fun saveDetail(
     val at = minOf(occurredAt, now) // 지금보다 뒤는 안 됨
     val data = detailData(kind, values)
     return if (editing != null) {
-        editing.copy(data = data).withOccurredAt(at, zone, now).also { dao.update(it) }
+        // 시간을 바꿨을 때만 `day`를 다시 정한다(다른 시간대에서 남긴 기록이 칸만 고쳐 다른 날로 옮겨지지 않게).
+        val changed = if (at != editing.occurredAt) editing.withOccurredAt(at, zone, now) else editing.copy(updatedAt = now)
+        changed.copy(data = data).also { dao.update(it) }
     } else {
         Record(createdAt = now, petId = petId, kind = kind, occurredAt = at, day = app.okche.store.OkcheDay.of(at, zone), data = data).also { dao.insert(it) }
     }

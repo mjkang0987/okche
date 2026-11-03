@@ -145,8 +145,8 @@ fun RecordTab(
                         .onFailure { failed = true }
                 }
             }
+            Text("누르면 바로 기록돼요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
-        Text("누르면 바로 기록돼요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
         RecentRecord(dao, pets.orEmpty(), justSaved, onOpenLog)
     }
@@ -159,7 +159,11 @@ fun RecordTab(
 class QuickRecordState(val unknownPicked: MutableState<Boolean>, val justSaved: MutableState<String?>)
 
 @Composable
-fun rememberQuickRecordState() = QuickRecordState(rememberSaveable { mutableStateOf(false) }, rememberSaveable { mutableStateOf<String?>(null) })
+fun rememberQuickRecordState(): QuickRecordState {
+    val unknownPicked = rememberSaveable { mutableStateOf(false) }
+    val justSaved = rememberSaveable { mutableStateOf<String?>(null) }
+    return remember(unknownPicked, justSaved) { QuickRecordState(unknownPicked, justSaved) }
+}
 
 /** 디자인 아이콘(물방울·알약·물방울 둘·그릇)에 가까운 머티리얼 아이콘. */
 private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {

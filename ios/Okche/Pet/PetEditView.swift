@@ -92,8 +92,12 @@ struct PetEditView: View {
         .onChange(of: form.birthDate) { errors[.birth] = nil }
         .onChange(of: form.familyDate) { errors[.family] = nil }
         .onChange(of: form.hasDiabetes) { errors[.insulinPlan] = nil }
-        // 인슐린 설정을 다녀오면 '먼저 설정해 주세요' 오류는 지운다(아직 없으면 다시 저장할 때 또 뜸).
-        .onAppear { errors[.insulinPlan] = nil }
+        // 인슐린 설정을 다녀와 계획이 생겼으면 '먼저 설정해 주세요' 오류를 지운다.
+        .onAppear {
+            if errors[.insulinPlan] != nil, !((try? InsulinPlan.open(for: pet.id, in: context)) ?? []).isEmpty {
+                errors[.insulinPlan] = nil
+            }
+        }
     }
 
     /// 이름 + '고양이 · 코리안숏헤어 · 동행 1,248일' (저장된 값).

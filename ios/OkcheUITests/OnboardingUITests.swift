@@ -157,8 +157,9 @@ final class OnboardingUITests: XCTestCase {
         while !setupSave.isHittable { app.swipeUp() }
         setupSave.tap()
 
-        // 아이 정보로 돌아와 저장하면 더보기 줄 이름이 바뀐다.
+        // 아이 정보로 돌아오면 설정 오류는 사라지고, 저장하면 더보기 줄 이름이 바뀐다.
         XCTAssertTrue(save.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].exists)
         while !save.isHittable { app.swipeUp() }
         save.tap()
         XCTAssertTrue(app.buttons["콩이이 · 아이 정보"].waitForExistence(timeout: 5))

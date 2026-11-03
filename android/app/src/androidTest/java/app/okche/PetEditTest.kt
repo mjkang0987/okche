@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.test.espresso.Espresso
@@ -304,6 +305,7 @@ class PetEditFlowTest {
 
         // 아이 정보로 돌아오면 고치던 이름이 남아 있고, 저장하면 더보기 줄 이름이 바뀐다.
         waitFor(hasText("콩이이"))
+        rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요")).assertCountEquals(0)
         rule.onNodeWithText("저장하기").performScrollTo().performClick()
         waitFor(hasText("콩이이 · 아이 정보"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }

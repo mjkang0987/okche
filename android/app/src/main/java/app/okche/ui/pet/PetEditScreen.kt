@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -155,8 +157,8 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     LaunchedEffect(petId) {
         saved = dao.pet(petId)
         weight = latestWeightText(dao, petId)
-        // 인슐린 설정을 다녀오면 '먼저 설정해 주세요' 오류는 지운다(아직 없으면 다시 저장할 때 또 뜸).
-        errors = errors - "insulinPlan"
+        // 인슐린 설정을 다녀와 계획이 생겼으면 '먼저 설정해 주세요' 오류를 지운다.
+        if ("insulinPlan" in errors && dao.openInsulinPlans(petId).isNotEmpty()) errors = errors - "insulinPlan"
         // 처음 열 때만 저장된 값으로 채운다(화면을 다시 만들면 고치던 값이 남음). 그새 지운 아이면 닫는다.
         if (form == null) {
             val loaded = PetEditForm.load(dao, petId)
@@ -391,7 +393,8 @@ private fun LeadPicker(minutes: Int, onSelect: (Int) -> Unit) {
     ) {
         // 고르기 칸이 같은 이름을 읽으므로 보이는 글은 화면 읽기에서 뺀다(iOS와 같음).
         Text("알림 보낼 때", Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
-        Box(Modifier.widthIn(min = 150.dp)) {
+        // 내용 너비(최소 150) — 보드처럼 이름 오른쪽에, 큰 글자에선 다음 줄로.
+        Box(Modifier.widthIn(min = 150.dp).width(IntrinsicSize.Max)) {
             OkchePickerField(title, "알림 보낼 때", { open = true }, showLabel = false, icon = Icons.Outlined.KeyboardArrowDown, role = Role.DropdownList)
             DropdownMenu(open, { open = false }, containerColor = OkcheColor.Paper) {
                 for ((value, name) in insulinLeadChoices) {

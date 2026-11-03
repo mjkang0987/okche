@@ -1,5 +1,18 @@
 package app.okche
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ActivityScenario
+import app.okche.ui.pet.PetForm
+import app.okche.ui.pet.registerPet
+import org.junit.Rule
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.store.OkcheDatabase
@@ -99,5 +112,48 @@ class RecordDetailTest {
         assertFalse(picksAlert(RecordKind.stool, none, mapOf("color" to listOf("pale"), "signs" to listOf("blood")))) // 회백색·피는 안 띄움
         assertTrue(picksAlert(RecordKind.urine, none, mapOf("signs" to listOf("straining"))))
         assertFalse(picksAlert(RecordKind.urine, none, mapOf("color" to listOf("pinkRed"), "signs" to listOf("pain"))))
+    }
+}
+
+/** ⋯ → 구토 시트 → 붉은색(의서 레이어, 시트 한 번에 한 번) → 이어 하기 → 기록하기 → 연필로 고치기 (7-2). iOS testDetailSheetAlertAndEdit와 같은 흐름. */
+class RecordDetailFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun closeScenario() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    private val layer = hasText("의서의 '지금 바로 병원에' 목록이에요.")
+
+    @Test fun detailSheetAlertAndEdit() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasContentDescription("구토 자세히 남기기"))
+        rule.onNode(hasContentDescription("구토 자세히 남기기")).performClick()
+        waitFor(hasText("콩이 · 구토"))
+        rule.onNode(hasText("사료 알갱이")).performClick()
+        rule.onNode(hasText("헤어볼")).performClick()
+        rule.onNode(hasText("붉은색 (피)")).performScrollTo().performClick()
+        waitFor(layer)
+        rule.onNode(hasText("기록 이어 하기")).performClick()
+        rule.onNode(hasText("3번 이상")).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onAllNodes(layer).assertCountEquals(0) // 한 번만
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        waitFor(hasText("사료 · 헤어볼 · 붉은색 · 3번 이상", substring = true))
+        rule.onNode(hasText("아뢰었사옵니다")).assertExists()
+
+        rule.onNode(hasContentDescription("콩이 구토 기록 고치기", substring = true)).performScrollTo().performClick()
+        waitFor(hasText("콩이 · 구토"))
+        rule.onNode(hasText("헤어볼")).assertIsOn() // 값이 채워진 채
+        rule.onNode(hasText("헤어볼")).performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        waitFor(hasText("사료 · 붉은색 · 3번 이상", substring = true))
     }
 }

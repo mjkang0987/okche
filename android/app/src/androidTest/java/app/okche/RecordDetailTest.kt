@@ -87,6 +87,15 @@ class RecordDetailTest {
         assertEquals(at(2026, 10, 25, 10), later.occurredAt)
     }
 
+    /** 시간을 안 바꾼 고치기는 `day`를 그대로 둔다(다른 시간대에서 고쳐도). */
+    @Test fun editWithoutTimeChangeKeepsDay() = runBlocking {
+        val record = saveQuickRecord(dao, quickRows[0], "kibble", null, at(2026, 10, 25, 7), seoul)
+        val edited = saveDetail(dao, RecordKind.vomit, mapOf("color" to listOf("yellow")), record.occurredAt, record, null, at(2026, 10, 25, 9), ZoneId.of("America/Los_Angeles"))
+        assertEquals("2026-10-25", edited.day)
+        assertEquals(at(2026, 10, 25, 9), edited.updatedAt)
+        assertEquals("노란색", recordValue(edited))
+    }
+
     @Test fun toggle() {
         val contents = field(RecordKind.vomit, "contents")
         var values = toggleDetail(toggleDetail(emptyMap(), contents, "kibble"), contents, "plant")
@@ -153,7 +162,11 @@ class RecordDetailFlowTest {
         waitFor(hasText("콩이 · 구토"))
         rule.onNode(hasText("헤어볼")).assertIsOn() // 값이 채워진 채
         rule.onNode(hasText("헤어볼")).performClick()
+        rule.onNode(hasText("이물질 (끈·비닐 등)")).performClick() // 고치기 시트에서도 처음 한 번 레이어
+        waitFor(layer)
+        rule.onNode(hasText("기록 이어 하기")).performClick()
+        rule.onNode(hasText("이물질 (끈·비닐 등)")).assertIsOn() // 레이어를 닫아도 고른 값 그대로
         rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
-        waitFor(hasText("사료 · 붉은색 · 3번 이상", substring = true))
+        waitFor(hasText("사료 · 이물질 · 붉은색 · 3번 이상", substring = true))
     }
 }

@@ -291,8 +291,13 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["콩이 · 구토"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["헤어볼"].isSelected) // 값이 채워진 채
         app.buttons["헤어볼"].tap()
+        app.buttons["이물질 (끈·비닐 등)"].tap() // 고치기 시트에서도 처음 한 번 레이어
+        XCTAssertTrue(app.buttons["기록 이어 하기"].waitForExistence(timeout: 3))
+        app.buttons["기록 이어 하기"].tap()
+        XCTAssertTrue(app.buttons["이물질 (끈·비닐 등)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["이물질 (끈·비닐 등)"].isSelected) // 레이어를 닫아도 고른 값 그대로
         tapBelow(app.buttons["기록하기"], in: app)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '사료 · 붉은색 · 3번 이상'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '사료 · 이물질 · 붉은색 · 3번 이상'")).firstMatch.waitForExistence(timeout: 5))
     }
 
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).

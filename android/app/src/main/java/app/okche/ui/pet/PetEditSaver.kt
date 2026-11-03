@@ -102,12 +102,12 @@ suspend fun savePetEdit(
             birthDate = birth, birthEstimated = form.birthUnknown && birth != null,
             familyDate = form.familyDate?.toString(), diagnosis = form.diagnosis.trim().ifEmpty { null }, hasDiabetes = form.hasDiabetes,
         )
-        val rests = dao.openRestPeriods(pet.id)
+        val (newRest, closeRests) = restChanges(form.resting, dao.openRestPeriods(pet.id), pet.id, now)
         dao.savePetEdit(
             pet = edited.takeIf { it != pet }?.copy(updatedAt = now),
             closePlans = if (form.hasDiabetes) emptyList() else plans.map { it.copy(activeUntil = now, updatedAt = now) },
-            newRest = if (form.resting && rests.isEmpty()) RestPeriod(createdAt = now, petId = pet.id, startedAt = now) else null,
-            closeRests = if (form.resting) emptyList() else rests.map { it.copy(endedAt = now, updatedAt = now) },
+            newRest = newRest,
+            closeRests = closeRests,
         )
         return emptyMap()
     } catch (e: CancellationException) {
@@ -117,6 +117,17 @@ suspend fun savePetEdit(
         Log.e("Okche", "아이 정보 저장 실패", e)
         return mapOf("save" to SAVE_ERROR)
     }
+}
+
+/** 휴양: 켤 때는 열린 기간이 없을 때만 새로, 끌 때는 열린 기간을 모두 닫는다(데이터 2-1). */
+private fun restChanges(resting: Boolean, rests: List<RestPeriod>, petId: String, now: Long) =
+    (if (resting && rests.isEmpty()) RestPeriod(createdAt = now, petId = petId, startedAt = now) else null) to
+        (if (resting) emptyList() else rests.map { it.copy(endedAt = now, updatedAt = now) })
+
+/** 더보기 '휴양 중 · 관리 쉬기' 스위치: 바로 저장(6-3). */
+suspend fun setResting(dao: OkcheDao, petId: String, resting: Boolean, now: Long = System.currentTimeMillis()) {
+    val (newRest, closeRests) = restChanges(resting, dao.openRestPeriods(petId), petId, now)
+    dao.savePetEdit(pet = null, closePlans = emptyList(), newRest = newRest, closeRests = closeRests)
 }
 
 /**

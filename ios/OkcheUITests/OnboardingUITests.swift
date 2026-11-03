@@ -237,6 +237,36 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 5))
     }
 
+    /// 누군지 몰라요로 바로 기록 → 방금 남긴 기록 → 기록 목록에서 누구였는지 정하기 → 지우기 (7-1).
+    func testQuickRecordAssignAndDelete() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let unknown = app.buttons["누군지 몰라요"]
+        XCTAssertTrue(unknown.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["콩이"].isSelected) // 지금 보는 아이가 먼저 골라져 있다
+        unknown.tap()
+        app.buttons["구토 사료 · 바로 기록"].tap()
+        XCTAssertTrue(app.staticTexts["아뢰었사옵니다"].waitForExistence(timeout: 3))
+
+        tapBelow(app.buttons["오늘 일기 전체"], in: app)
+        XCTAssertTrue(app.staticTexts["누군지 모름 · 구토"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["구토 1번"].exists)
+        app.buttons["누구였는지 정하기"].tap()
+        XCTAssertTrue(app.staticTexts["누구였나요?"].waitForExistence(timeout: 3))
+        app.buttons["콩이"].firstMatch.tap()
+        app.buttons["정하기"].tap()
+        XCTAssertTrue(app.staticTexts["콩이 · 구토"].waitForExistence(timeout: 3))
+
+        app.buttons.matching(NSPredicate(format: "label ENDSWITH '콩이 구토 기록 지우기'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["이 기록을 지울까요?"].waitForExistence(timeout: 3))
+        app.buttons["지우기"].tap()
+        XCTAssertTrue(app.staticTexts["이날 남긴 기록이 없어요."].waitForExistence(timeout: 3))
+        app.buttons["뒤로"].tap()
+        XCTAssertTrue(unknown.waitForExistence(timeout: 3))
+        XCTAssertTrue(unknown.isSelected) // 목록을 다녀와도 '누군지 몰라요' 그대로
+        XCTAssertFalse(app.staticTexts["방금 남긴 기록"].exists) // 오늘 기록이 없으면 숨김
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

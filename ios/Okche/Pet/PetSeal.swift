@@ -166,19 +166,34 @@ struct PetSwitchSheet: View {
             ? [pet.species == .cat ? "고양이" : "강아지", "추억으로 간직 중"].joined(separator: " · ")
             : [pet.species == .cat ? "고양이" : "강아지", PetTitle.age(pet.birthDate),
                rests.contains { $0.petId == pet.id } ? "휴양 중" : nil].compactMap { $0 }.joined(separator: " · ")
-        return Button {
+        return RadioRow(title: PetTitle.name(pet), detail: detail, selected: selected, showsSeal: true) {
             lastPetId = pet.id.uuidString
             dismiss()
-        } label: {
+        }
+    }
+}
+
+/// 라디오 줄(아이 바꾸기 시트·누구였는지 정하기 시트): 동그라미 + (금테 네모) + 이름·설명. 고른 줄은 남색 연한 바탕·테두리.
+struct RadioRow: View {
+    let title: String
+    var detail: String?
+    let selected: Bool
+    var showsSeal = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.title3).foregroundStyle(selected ? OkcheColor.namsaek : OkcheColor.lineStrong)
                     .accessibilityHidden(true)
-                SealSquare()
+                if showsSeal { SealSquare() }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(PetTitle.name(pet)).okcheText(OkcheType.body, weight: selected ? .bold : nil)
+                    Text(title).okcheText(OkcheType.body, weight: selected ? .bold : nil)
                         .foregroundStyle(selected ? OkcheColor.namsaekDeep : OkcheColor.ink)
-                    Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    if let detail {
+                        Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    }
                 }
                 Spacer(minLength: 0)
             }

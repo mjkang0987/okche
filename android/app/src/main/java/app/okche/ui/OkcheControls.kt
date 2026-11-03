@@ -245,10 +245,12 @@ fun <T> OkcheChoiceChips(
     hint: String? = null,
     /** 있으면 고른 칩을 다시 눌러 안 고름으로 되돌린다(선택 칸). 필수 칸은 비워 둔다. */
     onDeselect: (() -> Unit)? = null,
+    /** 묶음 이름을 화면에선 숨기고 TalkBack만 읽게(디자인 legend sr-only — 기록 목록 '누구 기록'). */
+    hideLabel: Boolean = false,
 ) {
     Column(modifier) {
         // 묶음 이름(legend)은 화면 글자 그대로 읽힌다 — 바로 뒤가 그 묶음의 칩들.
-        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp), hint = hint)
+        OkcheFieldLabel(label, if (hideLabel) Modifier.visuallyHidden() else Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp), hint = hint)
         FlowRow(
             Modifier.selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),

@@ -27,11 +27,13 @@
 		7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AB360783EF98AB5867AB5C /* PetRegistration.swift */; };
 		84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */; };
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
+		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
 		A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC98478DFCF8B973F662089 /* FixedID.swift */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
 		B674AAAE81492DE86413BCA5 /* PetEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98CDAB465E2B94F5B559EA92 /* PetEditView.swift */; };
 		B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 657947957AE14624C6573439 /* RootView.swift */; };
+		B8EE434637CD34B5F452CC4F /* QuickRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A207A9255AA19D05F7D40457 /* QuickRecord.swift */; };
 		B98102180DE4DD53B6377DCA /* OkcheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */; };
 		C9380FEA3E64CDA7BE873E2D /* FormControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057BAF60E852CAEEBD99A1FC /* FormControls.swift */; };
 		CA74315C30A861DA14F460D5 /* PetEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EADEDDED180083767C7591 /* PetEditing.swift */; };
@@ -43,6 +45,7 @@
 		EA602DD64B1EFC19974AB3AD /* InsulinSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD19586ECCA53AEA01EFA244 /* InsulinSetupView.swift */; };
 		F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5119E23AD833065A0FAF7789 /* Record.swift */; };
 		F06FE9717024B04E23FC62F7 /* PetFormParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3243EEDC54CED5C2596666C2 /* PetFormParts.swift */; };
+		F2FE4E2DD21AF0DCBAD2495F /* QuickRecordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992566B40FF6E32589431918 /* QuickRecordTests.swift */; };
 		FDA88CE821754E5BB61A4FF3 /* Pet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7D6C2E378358E8E76912918 /* Pet.swift */; };
 		FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACD8ED29171327F04FE543E9 /* RootTabView.swift */; };
 /* End PBXBuildFile section */
@@ -66,6 +69,7 @@
 
 /* Begin PBXFileReference section */
 		013FAFDB9E2C5AF3310E9A2B /* OkcheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheStore.swift; sourceTree = "<group>"; };
+		026A0B16D0F9C96FEAC020DC /* RecordViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordViews.swift; sourceTree = "<group>"; };
 		057BAF60E852CAEEBD99A1FC /* FormControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormControls.swift; sourceTree = "<group>"; };
 		062F522F90EA709F319790DF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		13CBF10BF9810FF2FF06E5CF /* Food.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Food.swift; sourceTree = "<group>"; };
@@ -85,6 +89,8 @@
 		891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreTests.swift; sourceTree = "<group>"; };
 		9179F1B84DD420CB6775A1FC /* OFL-GowunBatang.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "OFL-GowunBatang.txt"; path = "../../../design/fonts/OFL-GowunBatang.txt"; sourceTree = "<group>"; };
 		98CDAB465E2B94F5B559EA92 /* PetEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditView.swift; sourceTree = "<group>"; };
+		992566B40FF6E32589431918 /* QuickRecordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRecordTests.swift; sourceTree = "<group>"; };
+		A207A9255AA19D05F7D40457 /* QuickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRecord.swift; sourceTree = "<group>"; };
 		ACD8ED29171327F04FE543E9 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		AE8A7F0A002CF27603AFB3AD /* Photo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Photo.swift; sourceTree = "<group>"; };
 		B09057EC665CB2A87457B924 /* PetSeal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetSeal.swift; sourceTree = "<group>"; };
@@ -136,6 +142,7 @@
 				657947957AE14624C6573439 /* RootView.swift */,
 				92A3D766F6450A40DE97DCF9 /* Design */,
 				668FCDBAAA3D289747A49494 /* Pet */,
+				EE34943794570AE9DF0CF728 /* Record */,
 				145D616F467EADC0B735C0ED /* Store */,
 				CC6296CEC67F4E91A4464E36 /* Tabs */,
 			);
@@ -185,6 +192,7 @@
 				D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */,
 				465382965673124E58129062 /* PetRegistrationTests.swift */,
 				8649B59BC02635CA73BE002E /* PetTitleTests.swift */,
+				992566B40FF6E32589431918 /* QuickRecordTests.swift */,
 				891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */,
 			);
 			path = OkcheTests;
@@ -220,6 +228,15 @@
 				F659238365F43F72FF6074CF /* Tabs.swift */,
 			);
 			path = Tabs;
+			sourceTree = "<group>";
+		};
+		EE34943794570AE9DF0CF728 /* Record */ = {
+			isa = PBXGroup;
+			children = (
+				A207A9255AA19D05F7D40457 /* QuickRecord.swift */,
+				026A0B16D0F9C96FEAC020DC /* RecordViews.swift */,
+			);
+			path = Record;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -337,6 +354,7 @@
 				4C11B7EF101CB5D66F5AC7B2 /* PetMemorialTests.swift in Sources */,
 				986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */,
 				CC249A1EEE997BB6078FFB4B /* PetTitleTests.swift in Sources */,
+				F2FE4E2DD21AF0DCBAD2495F /* QuickRecordTests.swift in Sources */,
 				516AA3AFF1691A66D7DB2AC0 /* StoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -375,7 +393,9 @@
 				7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */,
 				1B3C5F0BD0535907A19FD5D4 /* PetSeal.swift in Sources */,
 				0558E3345936022F6BAF06D5 /* Photo.swift in Sources */,
+				B8EE434637CD34B5F452CC4F /* QuickRecord.swift in Sources */,
 				F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */,
+				8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */,
 				FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */,
 				B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */,
 				0A5E36DE8810DCDF3082C112 /* Setting.swift in Sources */,

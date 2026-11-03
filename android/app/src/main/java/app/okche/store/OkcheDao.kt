@@ -32,6 +32,7 @@ abstract class OkcheDao {
     @Update abstract suspend fun update(restPeriod: RestPeriod)
     @Update abstract suspend fun update(plan: InsulinPlan)
     @Update abstract suspend fun update(setting: Setting)
+    @Update abstract suspend fun update(record: Record)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE) protected abstract suspend fun insertIfAbsent(setting: Setting)
 
@@ -185,6 +186,14 @@ abstract class OkcheDao {
         deletePhotosOnlyOf(petId, now)
         deletePhotoLinks(petId, now)
     }
+
+    /** 그날(6시 기준) 지우지 않은 기록, 늦은 것 위 — 기록 목록(7-1). */
+    @Query("SELECT * FROM record WHERE day = :day AND deleted_at IS NULL ORDER BY occurred_at DESC")
+    abstract fun dayRecordsFlow(day: String): Flow<List<Record>>
+
+    /** 방금 남긴 기록: 그날 이 기기에서 가장 늦게 남긴 지우지 않은 기록(7-1). */
+    @Query("SELECT * FROM record WHERE day = :day AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1")
+    abstract fun latestRecordFlow(day: String): Flow<Record?>
 
     @Query("SELECT MIN(occurred_at) FROM record WHERE pet_id = :petId AND deleted_at IS NULL")
     abstract suspend fun firstRecordAt(petId: String): Long?

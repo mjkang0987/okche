@@ -125,8 +125,7 @@ fun RecordTab(
     var detail by remember { mutableStateOf<DetailTarget?>(null) }
     // 지금 보는 아이가 칩에 없으면(추억·아이 없음) '누군지 몰라요'(2026-11-03 사용자).
     val who = current?.takeIf { !unknownPicked && it.memorializedAt == null }?.id
-    // 위 20은 디자인 일기 화면 값(토큰에 20이 없음).
-    TabScreen(stringResource(R.string.record_title), modifier, stringResource(R.string.record_subtitle), topPadding = 20.dp, trailing = seal) {
+    TabScreen(stringResource(R.string.record_title), modifier, stringResource(R.string.record_subtitle), trailing = seal) {
         if (pets != null) {
             OkcheChoiceChips(
                 "누구 기록인가요?",

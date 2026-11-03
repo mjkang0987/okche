@@ -181,30 +181,7 @@ fun PetSwitchSheet(
             }
             Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
                 for (pet in orderedPets(pets)) {
-                    val selected = pet.id == current?.id
-                    val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 52.dp)
-                            .background(if (selected) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
-                            .border(1.5.dp, if (selected) OkcheColor.Namsaek else OkcheColor.Line, shape)
-                            .clip(shape)
-                            .selectable(selected, role = Role.RadioButton) { onPick(pet.id) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected, null, colors = RadioButtonDefaults.colors(OkcheColor.Namsaek, OkcheColor.LineStrong))
-                        SealSquare()
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                petTitle(pet), color = if (selected) OkcheColor.NamsaekDeep else OkcheColor.Ink,
-                                style = OkcheType.Body.toTextStyle(if (selected) FontWeight.Bold else FontWeight.Normal),
-                            )
-                            Text(petDetail(pet, pet.id in restingIds), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-                        }
-                    }
+                    RadioRow(petTitle(pet), pet.id == current?.id, { onPick(pet.id) }, petDetail(pet, pet.id in restingIds), showsSeal = true)
                 }
             }
             Text("고른 아이가 모든 화면 오른쪽 위에 계속 보여요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
@@ -220,6 +197,34 @@ fun PetSwitchSheet(
                     OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, Modifier.weight(1f), look = ButtonLook.Dashed)
                 }
             }
+        }
+    }
+}
+
+/** 라디오 줄(아이 바꾸기 시트·누구였는지 정하기): 고르면 남색 연한 바탕·테두리, 낙관 네모는 골라서. */
+@Composable
+fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit, detail: String? = null, showsSeal: Boolean = false) {
+    val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .background(if (selected) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
+            .border(1.5.dp, if (selected) OkcheColor.Namsaek else OkcheColor.Line, shape)
+            .clip(shape)
+            .selectable(selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected, null, colors = RadioButtonDefaults.colors(OkcheColor.Namsaek, OkcheColor.LineStrong))
+        if (showsSeal) SealSquare()
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title, color = if (selected) OkcheColor.NamsaekDeep else OkcheColor.Ink,
+                style = OkcheType.Body.toTextStyle(if (selected) FontWeight.Bold else FontWeight.Normal),
+            )
+            if (detail != null) Text(detail, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
     }
 }

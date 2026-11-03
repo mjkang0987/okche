@@ -197,7 +197,7 @@ fun PetSwitchSheet(
             }
             Text("고른 아이가 모든 화면 오른쪽 위에 계속 보여요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             // 큰 글자에서는 두 버튼을 세로로 쌓는다(반쪽 폭에서 여러 줄로 꺾이지 않게).
-            if (LocalDensity.current.fontScale > 1.3f) {
+            if (LocalDensity.current.fontScale >= 1.15f) {
                 Column(verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
                     OkchePrimaryButton("아이 정보 고치기", onEdit, look = ButtonLook.Outlined)
                     OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, look = ButtonLook.Dashed)
@@ -218,7 +218,7 @@ fun PetManageSection(pets: List<Pet>, restingIds: Set<String>, onEditPet: (Strin
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var failed by remember { mutableStateOf(false) }
-    // 저장이 끝나 흐름이 새 값을 내보내기 전에 또 눌러 열린 기간이 둘 생기지 않게.
+    // 저장 둘이 함께 돌지 않게(저장 중엔 스위치를 막음). 같은 값으로 또 저장해도 setResting이 다시 읽어 그대로 둔다.
     var saving by remember { mutableStateOf(false) }
     Column(
         Modifier

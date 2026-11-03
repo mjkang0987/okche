@@ -247,10 +247,12 @@ fun <T> OkcheChoiceChips(
     onDeselect: (() -> Unit)? = null,
     /** 묶음 이름을 화면에선 숨기고 TalkBack만 읽게(디자인 legend sr-only — 기록 목록 '누구 기록'). */
     hideLabel: Boolean = false,
+    /** 묶음 이름 옆 작은 버튼(자세히 시트 빛깔 옆 '?'). */
+    labelTrailing: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier) {
         // 묶음 이름(legend)은 화면 글자 그대로 읽힌다 — 바로 뒤가 그 묶음의 칩들.
-        OkcheFieldLabel(label, if (hideLabel) Modifier.visuallyHidden() else Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp), hint = hint)
+        ChipsLabel(label, hint, hideLabel, labelTrailing)
         FlowRow(
             Modifier.selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
@@ -276,59 +278,123 @@ fun <T> OkcheChoiceChips(
                         )
                         .padding(vertical = 2.dp),
                 ) {
-                    val shape = RoundedCornerShape(OkcheRadius.RadiusPill)
-                    Box(
-                        Modifier
-                            .heightIn(min = 40.dp)
-                            .then(
-                                if (isSelected) Modifier.background(OkcheColor.Namsaek, shape)
-                                else Modifier.background(OkcheColor.Paper, shape).border(1.5.dp, OkcheColor.LineStrong, shape),
-                            )
-                            .padding(horizontal = FieldPadding),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text,
-                            color = if (isSelected) OkcheColor.Paper else OkcheColor.Ink,
-                            style = OkcheType.Body.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
-                        )
-                    }
+                    ChipFace(text, isSelected)
                 }
             }
         }
     }
 }
 
-/** 고르기 칸: 52 높이 카드 여러 칸을 나란히(종 고양이·강아지). 고른 것 namsaekSoft 바탕·남색 테두리·namsaekDeep 굵은 글자. */
+/** 여러 개 고르기 칩(7-2 자세히 시트): 고르기 칩과 같은 모양, 칩마다 체크 상자처럼 넣고 뺀다. */
+@Composable
+fun <T> OkcheMultiChips(
+    label: String,
+    options: List<Pair<T, String>>,
+    selected: List<T>,
+    onToggle: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    hint: String? = null,
+) {
+    Column(modifier) {
+        ChipsLabel(label, hint, hideLabel = false, trailing = null)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
+            for ((value, text) in options) {
+                val isSelected = value in selected
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(OkcheRadius.RadiusPill))
+                        .toggleable(isSelected, role = Role.Checkbox, onValueChange = { onToggle(value) })
+                        .padding(vertical = 2.dp),
+                ) { ChipFace(text, isSelected) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChipsLabel(label: String, hint: String?, hideLabel: Boolean, trailing: (@Composable () -> Unit)?) {
+    val modifier = if (hideLabel) Modifier.visuallyHidden() else Modifier.padding(bottom = OkcheSpacing.Space2 - 2.dp)
+    if (trailing == null) {
+        OkcheFieldLabel(label, modifier, hint = hint)
+    } else {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+            OkcheFieldLabel(label, hint = hint)
+            trailing()
+        }
+    }
+}
+
+/** 칩 겉모습: 40 높이 알약, 고르면 남색 바탕·흰 굵은 글자. */
+@Composable
+private fun ChipFace(text: String, isSelected: Boolean) {
+    val shape = RoundedCornerShape(OkcheRadius.RadiusPill)
+    Box(
+        Modifier
+            .heightIn(min = 40.dp)
+            .then(
+                if (isSelected) Modifier.background(OkcheColor.Namsaek, shape)
+                else Modifier.background(OkcheColor.Paper, shape).border(1.5.dp, OkcheColor.LineStrong, shape),
+            )
+            .padding(horizontal = FieldPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = if (isSelected) OkcheColor.Paper else OkcheColor.Ink,
+            style = OkcheType.Body.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
+        )
+    }
+}
+
+/**
+ * 고르기 칸: 52 높이 카드 여러 칸을 나란히(종 고양이·강아지). 고른 것 namsaekSoft 바탕·남색 테두리·namsaekDeep 굵은 글자.
+ * [icons]를 주면 아이콘 위·글자 아래 96 높이(7-2 매화 모양), [onDeselect]가 있으면 고른 카드를 다시 눌러 푼다.
+ */
 @Composable
 fun <T> OkcheChoiceCards(
     label: String,
     options: List<Pair<T, String>>,
-    selected: T,
+    selected: T?,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    hint: String? = null,
+    icons: Map<T, ImageVector> = emptyMap(),
+    onDeselect: (() -> Unit)? = null,
 ) {
     Column(modifier) {
-        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2))
-        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2), hint = hint)
+        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(if (icons.isEmpty()) OkcheSpacing.Space2 else 6.dp)) {
             for ((value, text) in options) {
                 val isSelected = value == selected
                 val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
-                Box(
+                val icon = icons[value]
+                Column(
                     Modifier
                         .weight(1f)
-                        .heightIn(min = FieldHeight)
+                        .heightIn(min = if (icon == null) FieldHeight else 96.dp)
                         .background(if (isSelected) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
                         .border(1.5.dp, if (isSelected) OkcheColor.Namsaek else OkcheColor.Line, shape)
                         .clip(shape)
-                        .selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(value) })
-                        .padding(horizontal = OkcheSpacing.Space2),
-                    contentAlignment = Alignment.Center,
+                        .selectable(isSelected, role = Role.RadioButton, onClick = {
+                            if (isSelected && onDeselect != null) onDeselect() else onSelect(value)
+                        })
+                        .then(
+                            if (isSelected && onDeselect != null) {
+                                Modifier.semantics { customActions = listOf(CustomAccessibilityAction("선택 해제") { onDeselect(); true }) }
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(horizontal = if (icon == null) OkcheSpacing.Space2 else 2.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    if (icon != null) Icon(icon, null, Modifier.size(32.dp), tint = OkcheColor.NamsaekDeep)
                     Text(
                         text,
                         color = if (isSelected) OkcheColor.NamsaekDeep else OkcheColor.Ink,
-                        style = OkcheType.Body.toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
+                        style = (if (icon == null) OkcheType.Body else OkcheType.Label).toTextStyle(if (isSelected) FontWeight.Bold else FontWeight.Normal),
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

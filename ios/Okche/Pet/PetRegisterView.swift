@@ -10,6 +10,7 @@ struct PetRegisterView: View {
     /// 저장한 뒤 닫히는 동안 한 번 더 눌러 두 번 저장되지 않게.
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
+    @AppStorage("lastPetId") private var lastPetId = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -78,7 +79,8 @@ struct PetRegisterView: View {
     private func save(_ scroller: ScrollViewProxy) {
         guard !saved else { return }
         do {
-            try form.save(in: context)
+            // 새로 모신 아이는 바로 지금 보는 아이(6-3).
+            lastPetId = try form.save(in: context).id.uuidString
             errors = [:]
             saved = true
             dismiss()

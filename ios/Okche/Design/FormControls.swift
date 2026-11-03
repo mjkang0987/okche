@@ -175,22 +175,47 @@ struct OkcheSwitchRow: View {
     }
 }
 
-/// ⑤ 큰 버튼: 52 높이 남색, 흰 18 굵은 글자.
+/// ⑤ 큰 버튼: 52 높이 남색, 흰 18 굵은 글자. 모양 옵션(6-3): 흰 바탕 테두리(`outlined`)·점선(`dashed`) 52, 남색 알약 40(`pill`).
 struct OkchePrimaryButtonStyle: ButtonStyle {
+    enum Look { case filled, outlined, dashed, pill }
+    var look: Look = .filled
     @ScaledMetric(relativeTo: .title3) private var height: CGFloat = 52
+    @ScaledMetric(relativeTo: .subheadline) private var pillHeight: CGFloat = 40
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .okcheText(OkcheType.heading)
-            .foregroundStyle(OkcheColor.paper)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, OkcheSpacing.space4)
-            .frame(maxWidth: .infinity, minHeight: height)
-            .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-            .opacity(configuration.isPressed ? 0.85 : 1)
+        Group {
+            switch look {
+            case .filled:
+                configuration.label
+                    .okcheText(OkcheType.heading)
+                    .foregroundStyle(OkcheColor.paper)
+                    .padding(.horizontal, OkcheSpacing.space4)
+                    .frame(maxWidth: .infinity, minHeight: height)
+                    .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+            case .outlined, .dashed:
+                configuration.label
+                    .okcheText(OkcheType.body)
+                    .foregroundStyle(OkcheColor.ink)
+                    .padding(.horizontal, OkcheSpacing.space3)
+                    .frame(maxWidth: .infinity, minHeight: height)
+                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                    .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
+                        .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: look == .dashed ? [6, 4] : [])))
+            case .pill:
+                configuration.label
+                    .okcheText(OkcheType.label, weight: .bold)
+                    .foregroundStyle(OkcheColor.paper)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: pillHeight)
+                    .background(OkcheColor.namsaek, in: Capsule())
+            }
+        }
+        .multilineTextAlignment(.center)
+        .opacity(configuration.isPressed ? 0.85 : 1)
     }
 }
 
 extension ButtonStyle where Self == OkchePrimaryButtonStyle {
     static var okchePrimary: OkchePrimaryButtonStyle { .init() }
+    static func okchePrimary(_ look: OkchePrimaryButtonStyle.Look) -> OkchePrimaryButtonStyle { .init(look: look) }
 }

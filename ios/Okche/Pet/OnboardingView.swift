@@ -102,24 +102,25 @@ struct OnboardingView: View {
     }
 }
 
-/// 금테: 안쪽으로 `inset`만큼 들어간 네 변과 모서리 亞자 매듭(디자인 보드의 SVG와 같은 모양).
-private struct GoldFrame: Shape {
+/// 금테: 안쪽으로 `inset`만큼 들어간 네 변과 모서리 亞자 매듭(디자인 보드의 SVG와 같은 모양). 작은 금테(낙관 44)는 매듭을 `knot`배로.
+struct GoldFrame: Shape {
     let inset: CGFloat
+    var knot: CGFloat = 1
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let l = inset, t = inset, r = rect.width - inset, b = rect.height - inset
-        path.move(to: CGPoint(x: l + 9, y: t)); path.addLine(to: CGPoint(x: r - 9, y: t))
-        path.move(to: CGPoint(x: l + 9, y: b)); path.addLine(to: CGPoint(x: r - 9, y: b))
-        path.move(to: CGPoint(x: l, y: t + 9)); path.addLine(to: CGPoint(x: l, y: b - 9))
-        path.move(to: CGPoint(x: r, y: t + 9)); path.addLine(to: CGPoint(x: r, y: b - 9))
+        let l = inset, t = inset, r = rect.width - inset, b = rect.height - inset, k = knot
+        path.move(to: CGPoint(x: l + 9 * k, y: t)); path.addLine(to: CGPoint(x: r - 9 * k, y: t))
+        path.move(to: CGPoint(x: l + 9 * k, y: b)); path.addLine(to: CGPoint(x: r - 9 * k, y: b))
+        path.move(to: CGPoint(x: l, y: t + 9 * k)); path.addLine(to: CGPoint(x: l, y: b - 9 * k))
+        path.move(to: CGPoint(x: r, y: t + 9 * k)); path.addLine(to: CGPoint(x: r, y: b - 9 * k))
         for corner in [CGPoint(x: l, y: t), CGPoint(x: r, y: t), CGPoint(x: l, y: b), CGPoint(x: r, y: b)] {
             // 亞자: 십자 바깥선 + 가운데 네모
             let cross: [(CGFloat, CGFloat)] = [(-3, -9), (3, -9), (3, -3), (9, -3), (9, 3), (3, 3), (3, 9), (-3, 9),
                                                (-3, 3), (-9, 3), (-9, -3), (-3, -3)]
-            path.addLines(cross.map { CGPoint(x: corner.x + $0.0, y: corner.y + $0.1) })
+            path.addLines(cross.map { CGPoint(x: corner.x + $0.0 * k, y: corner.y + $0.1 * k) })
             path.closeSubpath()
-            path.addRect(CGRect(x: corner.x - 3, y: corner.y - 3, width: 6, height: 6))
+            path.addRect(CGRect(x: corner.x - 3 * k, y: corner.y - 3 * k, width: 6 * k, height: 6 * k))
         }
         return path
     }

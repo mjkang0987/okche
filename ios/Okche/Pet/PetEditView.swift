@@ -26,7 +26,7 @@ struct PetEditView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            FormHeader(title: pet.name, note: "아이 정보", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
+            FormHeader(title: PetTitle.name(pet), note: "아이 정보", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
             ScrollViewReader { scroller in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -103,7 +103,7 @@ struct PetEditView: View {
     /// 이름 + '고양이 · 코리안숏헤어 · 동행 1,248일' (저장된 값).
     private var summary: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(pet.name).okcheText(OkcheType.title).foregroundStyle(OkcheColor.ink)
+            Text(PetTitle.name(pet)).okcheText(OkcheType.title).foregroundStyle(OkcheColor.ink)
             Text(([pet.species == .cat ? "고양이" : "강아지", pet.breed]
                   + [PetEditing.companionDays(pet.familyDate).map { "동행 \($0.formatted())일" }].compactMap { $0 })
                 .joined(separator: " · "))

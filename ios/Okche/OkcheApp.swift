@@ -15,6 +15,7 @@ struct OkcheApp: App {
             // `-keep-settings`면 기기 설정은 남겨 다시 실행했을 때를 본다.
             if uiTesting, !ProcessInfo.processInfo.arguments.contains("-keep-settings") {
                 UserDefaults.standard.removeObject(forKey: "onboardingDone")
+                UserDefaults.standard.removeObject(forKey: "lastPetId")
             }
             let container = try OkcheStore.container(inMemory: uiTesting)
             _ = try Setting.loadOrCreate(in: container.mainContext)

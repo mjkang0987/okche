@@ -115,7 +115,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.textFields["나이 (대략)"].waitForExistence(timeout: 3))
     }
 
-    /// 더보기 임시 줄 → 아이 정보 고치기 → 인슐린 설정 → 저장 (6-2).
+    /// 더보기 아이 관리 → 아이 정보 고치기 → 인슐린 설정 → 저장 (6-2).
     func testEditPetFromMore() {
         let app = launch()
         app.buttons["아이 등록하고 시작하기"].tap()
@@ -127,7 +127,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
         app.tabBars.buttons["더보기"].tap()
 
-        app.buttons["콩이 · 아이 정보"].tap()
+        app.buttons["콩이 아기씨"].tap()
         let editName = app.textFields["이름"]
         XCTAssertTrue(editName.waitForExistence(timeout: 5))
         editName.tap()
@@ -162,6 +162,57 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].exists)
         while !save.isHittable { app.swipeUp() }
         save.tap()
-        XCTAssertTrue(app.buttons["콩이이 · 아이 정보"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["콩이이 아기씨"].waitForExistence(timeout: 5))
+    }
+
+    /// 낙관 → 아이 바꾸기 시트 → 새로 모심(바로 지금 보는 아이) → 다른 아이 고르기, 실록 제목, 더보기 휴양 스위치 (6-3).
+    func testSwitchPets() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let seal = app.buttons["지금 보는 아이 콩이 아기씨 · 아이 바꾸기"]
+        XCTAssertTrue(seal.waitForExistence(timeout: 5))
+
+        seal.tap()
+        XCTAssertTrue(app.staticTexts["어느 아이를 볼까요?"].waitForExistence(timeout: 3))
+        register("보리", in: app, from: app.buttons["+ 새 아기씨 모시기"])
+        XCTAssertTrue(app.buttons["지금 보는 아이 보리 아기씨 · 아이 바꾸기"].waitForExistence(timeout: 5))
+
+        app.buttons["지금 보는 아이 보리 아기씨 · 아이 바꾸기"].tap()
+        let kong = app.buttons["콩이 아기씨, 고양이"]
+        XCTAssertTrue(kong.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["보리 아기씨, 고양이"].isSelected)
+        kong.tap()
+        XCTAssertTrue(seal.waitForExistence(timeout: 3))
+
+        app.tabBars.buttons["실록"].tap()
+        XCTAssertTrue(app.staticTexts["콩이실록"].waitForExistence(timeout: 3))
+
+        app.tabBars.buttons["더보기"].tap()
+        let rest = app.switches["콩이 아기씨 휴양 중 · 관리 쉬기"]
+        XCTAssertTrue(rest.waitForExistence(timeout: 3))
+        rest.switches.firstMatch.tap()
+        XCTAssertTrue(app.buttons["콩이 아기씨 · 휴양 중"].waitForExistence(timeout: 3))
+    }
+
+    /// 먼저 둘러보기(아이 없음): 낙관 자리와 더보기에 '+ 새 아기씨 모시기' (6-3).
+    func testNoPetShowsRegisterButtons() {
+        let app = launch()
+        app.buttons["먼저 둘러볼게요"].tap()
+        XCTAssertTrue(app.buttons["+ 새 아기씨 모시기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 3))
+        register("콩이", in: app, from: app.buttons["+ 새 아기씨 모시기"])
+        XCTAssertTrue(app.buttons["콩이 아기씨"].waitForExistence(timeout: 5))
+    }
+
+    /// 아이 등록 화면을 열어 이름만 넣고 모신다.
+    private func register(_ name: String, in app: XCUIApplication, from button: XCUIElement) {
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
+        let field = app.textFields["이름"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(name)
+        app.buttons["모시기"].firstMatch.tap()
     }
 }

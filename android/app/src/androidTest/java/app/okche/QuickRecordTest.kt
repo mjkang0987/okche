@@ -69,8 +69,9 @@ class QuickRecordTest {
         val first = saveQuickRecord(dao, row(RecordKind.stool), "hard", null, at(2026, 10, 25, 7), seoul)
         val second = saveQuickRecord(dao, row(RecordKind.vomit), "digested", null, at(2026, 10, 25, 9), seoul)
         assertEquals(second.id, dao.latestRecordFlow("2026-10-25").first()?.id)
-        deleteRecord(dao, second, at(2026, 10, 25, 9, 5))
-        assertEquals("{}", db.query("SELECT data FROM record WHERE id = '${second.id}'", null).use { c -> c.moveToFirst(); c.getString(0) })
+        deleteRecord(dao, second.copy(slotKey = "slot"), at(2026, 10, 25, 9, 5))
+        // 지우면 선택 칸 비움
+        assertEquals(listOf<String?>("{}", null), db.query("SELECT data, slot_key FROM record WHERE id = '${second.id}'", null).use { c -> c.moveToFirst(); listOf(c.getString(0), c.getString(1)) })
         assertEquals(first.id, dao.latestRecordFlow("2026-10-25").first()?.id)
         assertNull(dao.latestRecordFlow("2026-10-26").first()) // 날 바뀜
     }
@@ -139,6 +140,7 @@ class QuickRecordFlowTest {
         waitFor(hasText("이날 남긴 기록이 없어요."))
         rule.onNode(hasContentDescription("뒤로")).performClick()
         waitFor(unknown)
+        rule.onNode(unknown).assertIsSelected() // 목록을 다녀와도 '누군지 몰라요' 그대로
         rule.onAllNodes(hasText("방금 남긴 기록")).assertCountEquals(0) // 오늘 기록이 없으면 숨김
     }
 }

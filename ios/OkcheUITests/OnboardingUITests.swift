@@ -263,6 +263,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["이날 남긴 기록이 없어요."].waitForExistence(timeout: 3))
         app.buttons["뒤로"].tap()
         XCTAssertTrue(unknown.waitForExistence(timeout: 3))
+        XCTAssertTrue(unknown.isSelected) // 목록을 다녀와도 '누군지 몰라요' 그대로
         XCTAssertFalse(app.staticTexts["방금 남긴 기록"].exists) // 오늘 기록이 없으면 숨김
     }
 

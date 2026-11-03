@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -19,7 +21,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
@@ -30,30 +31,30 @@ fun TabScreen(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    // 화면 위 여백. 디자인은 탭 첫 화면 24, 일기만 20.
-    topPadding: Dp = OkcheSpacing.Space6,
     trailing: @Composable () -> Unit = {},
     content: @Composable () -> Unit = {},
 ) {
+    // 위 여백은 다섯 탭 모두 24(일기 보드 20 대신 — 2026-11-04 사용자).
     Column(
         modifier
             .fillMaxSize()
             .background(OkcheColor.Hanji)
             .verticalScroll(rememberScrollState())
-            .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = topPadding, bottom = OkcheSpacing.Space4),
+            .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space6, bottom = OkcheSpacing.Space4),
         verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
     ) {
         // 머리 오른쪽 자리가 한 줄에 안 들어가면 제목 아래로 내려간다.
+        // 제목 첫 줄은 언제나 위에서 4(낙관 44 가운데) — 낙관이 없거나 쉬운 말이 아래 줄로 내려가도 탭을 오갈 때 제목이 튀지 않게(2026-11-04 사용자).
         FlowRow(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().heightIn(min = 44.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
-            itemVerticalAlignment = Alignment.CenterVertically,
+            itemVerticalAlignment = Alignment.Top,
         ) {
             // 큰 글자에서 한 줄에 안 들어가면 쉬운 말이 아래 줄로 내려간다. TalkBack은 한 머리말로 읽는다.
             // 낙관 옆 남는 폭만 쓰게 해서 쉬운 말이 먼저 내려가고, 제목도 안 들어갈 때만 낙관이 아래 줄로.
             FlowRow(
-                Modifier.weight(1f, fill = false).padding(end = OkcheSpacing.Space3).semantics(mergeDescendants = true) { heading() },
+                Modifier.weight(1f, fill = false).padding(top = 4.dp, end = OkcheSpacing.Space3).semantics(mergeDescendants = true) { heading() },
                 horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
                 verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
             ) {

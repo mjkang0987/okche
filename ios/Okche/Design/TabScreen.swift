@@ -4,8 +4,6 @@ import SwiftUI
 struct TabScreen<Trailing: View, Content: View>: View {
     let title: String
     var subtitle: String? = nil
-    /// 화면 위 여백. 디자인은 탭 첫 화면 24, 일기만 20.
-    var topPadding: CGFloat = OkcheSpacing.space6
     @ViewBuilder var trailing: Trailing
     @ViewBuilder var content: Content
 
@@ -33,27 +31,29 @@ struct TabScreen<Trailing: View, Content: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OkcheSpacing.space4) {
                 // 한 줄에 안 들어가면 쉬운 말을 먼저 제목 아래로, 그래도 안 되면 오른쪽 자리를 제목 아래로 내린다.
+                // 제목 첫 줄은 언제나 위에서 4(낙관 44 가운데) — 낙관이 없거나 쉬운 말이 아래로 내려가도 탭을 오갈 때 제목이 튀지 않게(2026-11-04 사용자).
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: OkcheSpacing.space3) {
-                        titleBlock(HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header })
+                    HStack(alignment: .top, spacing: OkcheSpacing.space3) {
+                        titleBlock(HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header }).padding(.top, 4)
                         Spacer(minLength: 0)
                         trailing
                     }
-                    HStack(spacing: OkcheSpacing.space3) {
-                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header })
+                    HStack(alignment: .top, spacing: OkcheSpacing.space3) {
+                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header }).padding(.top, 4)
                         Spacer(minLength: 0)
                         trailing
                     }
                     VStack(alignment: .leading, spacing: OkcheSpacing.space2) {
-                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header })
+                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header }).padding(.top, 4)
                         trailing
                     }
                 }
+                .frame(minHeight: 44, alignment: .top)
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, topPadding)
+            .padding(.top, OkcheSpacing.space6) // 다섯 탭 모두 24(일기 보드 20 대신 — 2026-11-04 사용자)
             .padding(.bottom, OkcheSpacing.space4)
         }
         .background(OkcheColor.hanji)
@@ -61,19 +61,19 @@ struct TabScreen<Trailing: View, Content: View>: View {
 }
 
 extension TabScreen where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, topPadding: CGFloat = OkcheSpacing.space6, @ViewBuilder content: () -> Content) {
-        self.init(title: title, subtitle: subtitle, topPadding: topPadding, trailing: { EmptyView() }, content: content)
+    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() }, content: content)
     }
 }
 
 extension TabScreen where Content == EmptyView {
-    init(title: String, subtitle: String? = nil, topPadding: CGFloat = OkcheSpacing.space6, @ViewBuilder trailing: () -> Trailing) {
-        self.init(title: title, subtitle: subtitle, topPadding: topPadding, trailing: trailing, content: { EmptyView() })
+    init(title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(title: title, subtitle: subtitle, trailing: trailing, content: { EmptyView() })
     }
 }
 
 extension TabScreen where Trailing == EmptyView, Content == EmptyView {
-    init(title: String, subtitle: String? = nil, topPadding: CGFloat = OkcheSpacing.space6) {
-        self.init(title: title, subtitle: subtitle, topPadding: topPadding, trailing: { EmptyView() }, content: { EmptyView() })
+    init(title: String, subtitle: String? = nil) {
+        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() }, content: { EmptyView() })
     }
 }

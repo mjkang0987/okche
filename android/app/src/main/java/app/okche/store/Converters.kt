@@ -22,9 +22,9 @@ class Converters {
     }
 
     @TypeConverter fun fromMealSlots(value: List<MealSlot>): String =
-        JSONArray(value.map { JSONObject().put("name", it.name).put("time", it.time) }).toString()
+        JSONArray(value.map { JSONObject().put("name", it.name).put("time", it.time).apply { it.grams?.let { g -> put("grams", g) } } }).toString()
 
     @TypeConverter fun toMealSlots(json: String): List<MealSlot> = JSONArray(json).let { a ->
-        List(a.length()) { a.getJSONObject(it).run { MealSlot(getString("name"), getString("time")) } }
+        List(a.length()) { a.getJSONObject(it).run { MealSlot(getString("name"), getString("time"), if (has("grams")) getInt("grams") else null) } }
     }
 }

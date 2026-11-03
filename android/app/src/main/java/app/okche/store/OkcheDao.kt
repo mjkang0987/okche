@@ -228,6 +228,36 @@ abstract class OkcheDao {
     @Query("SELECT * FROM meal_plan WHERE deleted_at IS NULL") abstract suspend fun mealPlans(): List<MealPlan>
     @Query("SELECT * FROM photo WHERE deleted_at IS NULL") abstract suspend fun photos(): List<Photo>
 
+    // 끼니(7-3)
+    /** 그 아이의 지우지 않은 끼니 계획(열린 것 고르기는 `openMealPlan`). */
+    @Query("SELECT * FROM meal_plan WHERE pet_id = :petId AND deleted_at IS NULL") abstract suspend fun mealPlans(petId: String): List<MealPlan>
+
+    @Query("SELECT * FROM meal_plan WHERE pet_id = :petId AND deleted_at IS NULL") abstract fun mealPlansFlow(petId: String): Flow<List<MealPlan>>
+
+    /** 그 아이·그날의 지우지 않은 수라 기록, 이른 것 위. */
+    @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = 'meal' AND day = :day AND deleted_at IS NULL ORDER BY occurred_at")
+    abstract fun dayMealsFlow(petId: String, day: String): Flow<List<Record>>
+
+    /** 그 차례의 지우지 않은 기록. */
+    @Query("SELECT * FROM record WHERE slot_key = :key AND deleted_at IS NULL LIMIT 1") abstract suspend fun recordBySlot(key: String): Record?
+
+    /** 수라 기록 ID 전부(지운 줄 포함 — 급식기 자동 기록을 되살리지 않게 1-5). */
+    @Query("SELECT id FROM record WHERE kind = 'meal'") abstract suspend fun mealRecordIds(): List<String>
+
+    @Query("SELECT slot_key FROM record WHERE kind = 'meal' AND deleted_at IS NULL AND slot_key IS NOT NULL") abstract suspend fun mealSlotKeys(): List<String>
+
+    /** 끼니 시간 저장·방식 바꾸기: 열린 계획을 닫고 새 줄(끼니가 없으면 닫기만) — 한 번에. */
+    @Transaction
+    open suspend fun replaceMealPlan(petId: String, plan: MealPlan?, now: Long) {
+        closeMealPlans(petId, now)
+        plan?.let { insert(it) }
+    }
+
+    @Transaction
+    open suspend fun insertAll(records: List<Record>) {
+        for (r in records) insert(r)
+    }
+
     /** 실록 집계의 기본 검색: 한 아이·한 종류·한 날의 지우지 않은 기록. */
     @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = :kind AND day = :day AND deleted_at IS NULL ORDER BY occurred_at")
     abstract suspend fun records(petId: String, kind: RecordKind, day: String): List<Record>

@@ -110,4 +110,9 @@ final class MealRulesTests: XCTestCase {
         try MealRules.savePlan(petId: pet, mode: .direct, slots: [], now: at(2026, 10, 26, 10), in: context)
         XCTAssertEqual(try MealRules.fillFeeder(now: at(2026, 10, 27, 20), timeZone: seoul, in: context), 0)
     }
+
+    /// 고정 ID는 안드로이드와 같은 값(1-5) — 안드로이드 MealRulesTest와 같은 글자.
+    func testFeederIdMatchesAndroid() {
+        XCTAssertEqual(UUID.feederRecord(slotKey: "p|2026-10-25|07:00").uuidString.lowercased(), "759216b2-dbd6-38f6-80c0-02009c1eba67")
+    }
 }

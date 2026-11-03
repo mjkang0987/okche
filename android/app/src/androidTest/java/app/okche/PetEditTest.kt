@@ -1,5 +1,7 @@
 package app.okche
 
+import android.view.KeyEvent
+import android.os.SystemClock
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -16,8 +18,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
-import androidx.test.espresso.Espresso
 import app.okche.store.setOnboardingDone
+import androidx.lifecycle.Lifecycle
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -337,8 +339,14 @@ class PetEditFlowTest {
         waitFor(hasSetTextAction().and(hasText("콩이")))
         rule.onNode(hasSetTextAction().and(hasText("콩이"))).assertIsDisplayed()
 
-        Espresso.pressBack()
-        waitFor(hasText("콩이 아기씨"))
+        // 뒤로 → 앱이 닫히지 않고 더보기로(아이 정보 머리 '아이 정보'가 사라지고 탭이 보임).
+        // 하드웨어 뒤로 키처럼 한 번(DOWN+UP)만 넣는다 — Espresso pressBack으로는 가끔 뒤로가 두 번 처리돼 앱까지 닫혔음(2026-11-03, 한 번만 넣으면 15번 모두 정상).
+        val t = SystemClock.uptimeMillis()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.injectInputEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0), true)
+        automation.injectInputEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0), true)
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("아이 정보")).fetchSemanticsNodes().isEmpty() }
         rule.onNode(tabMore).assertIsDisplayed()
+        assertEquals(Lifecycle.State.RESUMED, scenario!!.state)
     }
 }

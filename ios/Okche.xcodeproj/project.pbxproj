@@ -27,6 +27,7 @@
 		7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AB360783EF98AB5867AB5C /* PetRegistration.swift */; };
 		84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */; };
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
+		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
 		A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC98478DFCF8B973F662089 /* FixedID.swift */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
@@ -68,6 +69,7 @@
 
 /* Begin PBXFileReference section */
 		013FAFDB9E2C5AF3310E9A2B /* OkcheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheStore.swift; sourceTree = "<group>"; };
+		026A0B16D0F9C96FEAC020DC /* RecordViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordViews.swift; sourceTree = "<group>"; };
 		057BAF60E852CAEEBD99A1FC /* FormControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormControls.swift; sourceTree = "<group>"; };
 		062F522F90EA709F319790DF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		13CBF10BF9810FF2FF06E5CF /* Food.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Food.swift; sourceTree = "<group>"; };
@@ -232,6 +234,7 @@
 			isa = PBXGroup;
 			children = (
 				A207A9255AA19D05F7D40457 /* QuickRecord.swift */,
+				026A0B16D0F9C96FEAC020DC /* RecordViews.swift */,
 			);
 			path = Record;
 			sourceTree = "<group>";
@@ -392,6 +395,7 @@
 				0558E3345936022F6BAF06D5 /* Photo.swift in Sources */,
 				B8EE434637CD34B5F452CC4F /* QuickRecord.swift in Sources */,
 				F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */,
+				8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */,
 				FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */,
 				B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */,
 				0A5E36DE8810DCDF3082C112 /* Setting.swift in Sources */,

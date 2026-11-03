@@ -148,7 +148,8 @@ fun RecordTab(
             Text("누르면 바로 기록돼요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
         if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-        RecentRecord(dao, pets.orEmpty(), justSaved, onOpenLog)
+        // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
+        if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog)
     }
 }
 

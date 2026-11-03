@@ -54,6 +54,7 @@ import app.okche.ui.pet.PetSeal
 import app.okche.ui.pet.PetSwitchSheet
 import app.okche.ui.record.RecordLogScreen
 import app.okche.ui.record.RecordTab
+import app.okche.ui.record.rememberQuickRecordState
 import app.okche.ui.pet.currentPet
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -88,6 +89,7 @@ fun RootTabs() {
     var registering by rememberSaveable { mutableStateOf(false) }
     var switching by rememberSaveable { mutableStateOf(false) }
     var logOpen by rememberSaveable { mutableStateOf(false) }
+    val quickState = rememberQuickRecordState()
     editPetId?.let { id ->
         PetEditFlow(
             id,
@@ -199,6 +201,7 @@ fun RootTabs() {
                 modifier, seal, pets, current,
                 onPickPet = { id -> scope.launch { context.setLastPetId(id) } },
                 onOpenLog = { logOpen = true },
+                state = quickState,
             )
             Tab.Main -> if (current?.memorializedAt != null) MemorialScreen(current, modifier, seal) else MainTab(modifier, seal)
             Tab.Sillok -> SillokTab(modifier, current?.name, seal)

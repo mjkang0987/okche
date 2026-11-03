@@ -40,6 +40,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,15 +107,14 @@ fun RecordTab(
     current: Pet?,
     onPickPet: (String) -> Unit,
     onOpenLog: () -> Unit,
+    state: QuickRecordState,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val scope = rememberCoroutineScope()
-    // '누군지 몰라요'를 골랐는지(이 화면에서만 — 지금 보는 아이는 그대로).
-    var unknownPicked by rememberSaveable { mutableStateOf(false) }
-    // 방금 누른 기록 — 그 기록일 때만 '아뢰었사옵니다'.
-    var justSaved by rememberSaveable { mutableStateOf<String?>(null) }
+    var unknownPicked by state.unknownPicked
+    var justSaved by state.justSaved
     var failed by remember { mutableStateOf(false) }
     // 지금 보는 아이가 칩에 없으면(추억·아이 없음) '누군지 몰라요'(2026-11-03 사용자).
     val who = current?.takeIf { !unknownPicked && it.memorializedAt == null }?.id
@@ -132,15 +132,18 @@ fun RecordTab(
                 },
             )
         }
-        QuickRecordCard { row, value ->
-            scope.launch {
-                runCatching { saveQuickRecord(dao, row, value, who) }
-                    .onSuccess {
-                        justSaved = it.id
-                        failed = false
-                        @Suppress("DEPRECATION") view.announceForAccessibility("아뢰었사옵니다")
-                    }
-                    .onFailure { failed = true }
+        // 아이를 읽기 전에 누르면 '누군지 모름'으로 저장되니 읽은 뒤에 그린다.
+        if (pets != null) {
+            QuickRecordCard { row, value ->
+                scope.launch {
+                    runCatching { saveQuickRecord(dao, row, value, who) }
+                        .onSuccess {
+                            justSaved = it.id
+                            failed = false
+                            @Suppress("DEPRECATION") view.announceForAccessibility("아뢰었사옵니다")
+                        }
+                        .onFailure { failed = true }
+                }
             }
         }
         Text("누르면 바로 기록돼요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
@@ -148,6 +151,15 @@ fun RecordTab(
         RecentRecord(dao, pets.orEmpty(), justSaved, onOpenLog)
     }
 }
+
+/**
+ * 일기 탭 상태: '누군지 몰라요'를 골랐는지(이 화면에서만 — 지금 보는 아이는 그대로), 방금 누른 기록 id('아뢰었사옵니다').
+ * 탭을 바꾸거나 기록 목록을 다녀와도 남게 RootTabs가 쥔다(iOS는 탭·push라 그대로 남음).
+ */
+class QuickRecordState(val unknownPicked: MutableState<Boolean>, val justSaved: MutableState<String?>)
+
+@Composable
+fun rememberQuickRecordState() = QuickRecordState(rememberSaveable { mutableStateOf(false) }, rememberSaveable { mutableStateOf<String?>(null) })
 
 /** 디자인 아이콘(물방울·알약·물방울 둘·그릇)에 가까운 머티리얼 아이콘. */
 private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
@@ -160,6 +172,7 @@ private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
 /** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋, 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
 @Composable
 private fun QuickRecordCard(onTap: (QuickRow, String) -> Unit) {
+    // 큰 글자에선 이름 아래로 버튼. 그보다 작아도 폭이 모자라면 버튼이 다음 줄로(FlowRow).
     val large = LocalDensity.current.fontScale >= 1.3f
     Column(
         Modifier
@@ -171,7 +184,7 @@ private fun QuickRecordCard(onTap: (QuickRow, String) -> Unit) {
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
             val label = @Composable {
                 Row(
-                    Modifier.then(if (large) Modifier else Modifier.width(62.dp)).semantics { heading() },
+                    Modifier.then(if (large) Modifier else Modifier.width(62.dp)).semantics(mergeDescendants = true) { heading() },
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -190,7 +203,7 @@ private fun QuickRecordCard(onTap: (QuickRow, String) -> Unit) {
             } else {
                 Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     label()
-                    buttons()
+                    FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { buttons() }
                 }
             }
         }
@@ -232,10 +245,12 @@ private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onO
     val today = remember { OkcheDay.of(System.currentTimeMillis()) }
     val latest by remember(today) { dao.latestRecordFlow(today) }.collectAsState(null)
     var deleting by remember { mutableStateOf<Record?>(null) }
+    // 창은 기록이 사라져도(지운 뒤 Flow가 먼저 비어도) 닫히게 먼저 둔다.
+    deleting?.let { DeleteRecordDialog(dao, it, pets) { deleting = null } }
     val record = latest ?: return
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, itemVerticalAlignment = Alignment.CenterVertically) {
-            Text("방금 남긴 기록", Modifier.semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
+            Text("방금 남긴 기록", Modifier.padding(end = OkcheSpacing.Space2).semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
             Text(
                 "오늘 일기 전체",
                 Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onOpenLog).wrapContentHeight(Alignment.CenterVertically),
@@ -264,7 +279,6 @@ private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onO
             DeleteIcon("${recordTime(record)} ${recordSpeech(record, pets)} 기록 지우기", OkcheColor.InkMuted) { deleting = record }
         }
     }
-    deleting?.let { DeleteRecordDialog(dao, it, pets) { deleting = null } }
 }
 
 @Composable
@@ -277,6 +291,7 @@ private fun DeleteIcon(label: String, tint: androidx.compose.ui.graphics.Color, 
 private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     OkcheConfirmDialog(
         "이 기록을 지울까요?", "지우기",
         onCancel = onClose,
@@ -285,7 +300,9 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
             busy = true
             scope.launch {
                 runCatching { deleteRecord(dao, record) }
-                onClose()
+                    .onSuccess { onClose() }
+                    .onFailure { failed = true }
+                busy = false
             }
         },
         destructive = true, confirmLook = ButtonLook.Danger,
@@ -296,6 +313,7 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
         Text("지운 기록은 되돌릴 수 없고, 실록 통계에서도 빠져요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+        if (failed) OkcheErrorText("지우지 못했어요. 다시 해 주세요.")
     }
 }
 

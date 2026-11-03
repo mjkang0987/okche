@@ -177,10 +177,11 @@ fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, B
                             onClose()
                         }
                         .onFailure {
+                            // 실패할 때만 다시 풂(닫히는 동안 한 번 더 눌러 기록이 둘 생기지 않게 — iOS와 같음).
+                            busy = false
                             failed = true
                             @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
                         }
-                    busy = false
                 }
             })
         }

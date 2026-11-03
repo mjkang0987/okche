@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.test.platform.app.InstrumentationRegistry
+import app.okche.store.OkcheDatabase
 import app.okche.store.setOnboardingDone
 import app.okche.ui.theme.OkcheColor
 import kotlinx.coroutines.runBlocking
@@ -32,9 +33,13 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 
 class RootTabsTest {
-    // 아이가 없어도 시작하기 대신 탭이 뜨게 '먼저 둘러볼게요'를 누른 상태로 연다.
+    // 아이 없이(다른 테스트가 남긴 아이도 지움) 시작하기 대신 탭이 뜨게 '먼저 둘러볼게요'를 누른 상태로 연다.
     @get:Rule(order = 0) val browsed = object : ExternalResource() {
-        override fun before() = runBlocking { InstrumentationRegistry.getInstrumentation().targetContext.setOnboardingDone(true) }
+        override fun before() = runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            OkcheDatabase.get(context).clearAllTables()
+            context.setOnboardingDone(true)
+        }
     }
 
     @get:Rule(order = 1) val rule = createAndroidComposeRule<MainActivity>()

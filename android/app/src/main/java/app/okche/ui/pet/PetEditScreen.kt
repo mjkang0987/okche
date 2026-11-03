@@ -188,7 +188,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     BackHandler(onBack = close)
 
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
-        FormHeader(saved?.name.orEmpty(), "아이 정보", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
+        FormHeader(saved?.let { petTitle(it) }.orEmpty(), "아이 정보", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
         val f = form ?: return@Column
         fun edit(key: String? = null, change: PetEditForm.() -> PetEditForm) {
             form = f.change()
@@ -203,7 +203,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
             saved?.let { pet ->
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
                     val title = OkcheType.Title.toTextStyle()
-                    Text(pet.name, color = OkcheColor.Ink, style = title)
+                    Text(petTitle(pet), color = OkcheColor.Ink, style = title)
                     val days = companionDays(pet.familyDate)?.let { "동행 %,d일".format(it) }
                     Text(
                         listOfNotNull(if (pet.species == Species.cat) "고양이" else "강아지", pet.breed, days).joinToString(" · "),

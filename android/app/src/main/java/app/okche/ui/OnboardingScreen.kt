@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
@@ -100,8 +102,36 @@ fun OnboardingScreen(onRegister: () -> Unit, onBrowse: () -> Unit) {
     }
 }
 
-// 금테 모서리 꽃살(보드 SVG 그대로, 12·12 기준 dp 좌표).
+// 금테 모서리 꽃살(보드 SVG 그대로, dp 좌표).
 private val cornerPath = PathParser().parsePathString("M-3 -9H3V-3H9V3H3V9H-3V3H-9V-3H-3Z M-3 -3H3V3H-3Z").toPath()
+
+/**
+ * 금테: 안쪽으로 [inset]dp 들어간 네 변과 모서리 꽃살(디자인 보드 SVG와 같은 모양). 작은 금테(낙관 44)는 꽃살을 [knot]배로.
+ * 선 굵기 [stroke]도 dp.
+ */
+internal fun Modifier.goldFrame(inset: Float, stroke: Float, knot: Float = 1f, brush: (Size) -> Brush) = drawWithCache {
+    val w = size.width / density
+    val h = size.height / density
+    val e = inset + 9 * knot
+    val corner = Path().apply {
+        addPath(cornerPath)
+        transform(Matrix().apply { scale(knot, knot) })
+    }
+    val frame = Path().apply {
+        moveTo(e, inset); lineTo(w - e, inset)
+        moveTo(e, h - inset); lineTo(w - e, h - inset)
+        moveTo(inset, e); lineTo(inset, h - e)
+        moveTo(w - inset, e); lineTo(w - inset, h - e)
+        for ((x, y) in listOf(inset to inset, w - inset to inset, inset to h - inset, w - inset to h - inset)) {
+            addPath(corner, Offset(x, y))
+        }
+    }
+    val paint = brush(size)
+    onDrawBehind {
+        // dp 좌표로 그리려고 density만큼 키운다. 선 굵기도 같이 커진다.
+        scale(density, pivot = Offset.Zero) { drawPath(frame, paint, style = Stroke(stroke)) }
+    }
+}
 
 /** 금테 남색 현판: '옥체'(고운바탕 56 — 이 화면만의 예외) + 한 줄 소개. */
 @Composable
@@ -111,26 +141,11 @@ private fun BrandPlaque() {
             .fillMaxWidth()
             .heightIn(min = 180.dp)
             .background(OkcheColor.NamsaekDeep)
-            .drawWithCache {
-                val brush = Brush.linearGradient(
+            .goldFrame(inset = 12f, stroke = 1.1f) { size ->
+                Brush.linearGradient(
                     0f to OkcheColor.GeumLight, 0.5f to OkcheColor.Geum, 1f to OkcheColor.GeumShade,
                     start = Offset.Zero, end = Offset(size.width, size.height),
                 )
-                val w = size.width / density
-                val h = size.height / density
-                val frame = Path().apply {
-                    moveTo(21f, 12f); lineTo(w - 21, 12f)
-                    moveTo(21f, h - 12); lineTo(w - 21, h - 12)
-                    moveTo(12f, 21f); lineTo(12f, h - 21)
-                    moveTo(w - 12, 21f); lineTo(w - 12, h - 21)
-                    for ((x, y) in listOf(12f to 12f, w - 12 to 12f, 12f to h - 12, w - 12 to h - 12)) {
-                        addPath(cornerPath, Offset(x, y))
-                    }
-                }
-                onDrawBehind {
-                    // dp 좌표로 그리려고 density만큼 키운다. 선 굵기도 같이 커지므로 1.1dp.
-                    scale(density, pivot = Offset.Zero) { drawPath(frame, brush, style = Stroke(1.1f)) }
-                }
             },
         verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,

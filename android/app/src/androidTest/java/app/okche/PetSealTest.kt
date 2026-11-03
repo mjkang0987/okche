@@ -1,5 +1,23 @@
 package app.okche
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.test.core.app.ActivityScenario
+import app.okche.store.setOnboardingDone
+import app.okche.ui.pet.PetForm
+import app.okche.ui.pet.registerPet
+import org.junit.Rule
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.store.OkcheDatabase
@@ -68,5 +86,73 @@ class PetSealTest {
         assertEquals(emptyList<Long>(), dao.openRestPeriods("pet").map { it.startedAt })
         val ended = db.query("SELECT ended_at FROM rest_period", null).use { c -> c.moveToFirst(); c.getLong(0) }
         assertEquals(300L, ended)
+    }
+}
+
+/** 낙관 → 아이 바꾸기 시트 → 새로 모심(바로 지금 보는 아이) → 다른 아이 고르기, 실록 제목, 더보기 휴양 스위치 (6-3). */
+class PetSwitchFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun close() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    private fun tab(name: String) = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText(name))
+
+    private fun register(name: String) {
+        waitFor(hasSetTextAction().and(hasText("이름")))
+        rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput(name)
+        rule.onNode(hasText("모시기").and(hasClickAction())).performScrollTo().performClick()
+    }
+
+    @Test fun switchPets() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+            context.setOnboardingDone(false)
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        val kongSeal = hasContentDescription("지금 보는 아이 콩이 아기씨 · 아이 바꾸기")
+        waitFor(kongSeal)
+
+        rule.onNode(kongSeal).performClick()
+        waitFor(hasText("어느 아이를 볼까요?"))
+        rule.onNode(hasText("+ 새 아기씨 모시기").and(hasClickAction())).performClick()
+        register("보리")
+        val boriSeal = hasContentDescription("지금 보는 아이 보리 아기씨 · 아이 바꾸기")
+        waitFor(boriSeal)
+
+        rule.onNode(boriSeal).performClick()
+        waitFor(hasText("콩이 아기씨"))
+        rule.onNode(hasText("보리 아기씨").and(isSelectable())).assertIsSelected()
+        rule.onNode(hasText("콩이 아기씨").and(isSelectable())).performClick()
+        waitFor(kongSeal)
+
+        rule.onNode(tab("실록")).performClick()
+        waitFor(hasText("콩이실록"))
+
+        rule.onNode(tab("더보기")).performClick()
+        val rest = hasContentDescription("콩이 아기씨 휴양 중 · 관리 쉬기")
+        waitFor(rest)
+        rule.onNode(rest).performClick()
+        waitFor(hasText("콩이 아기씨 · 휴양 중"))
+    }
+
+    /** 먼저 둘러보기(아이 없음): 낙관 자리와 더보기에 '+ 새 아기씨 모시기'. */
+    @Test fun noPetShowsRegisterButtons() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            context.setOnboardingDone(true)
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasText("+ 새 아기씨 모시기"))
+        rule.onNode(tab("더보기")).performClick()
+        waitFor(hasText("아직 모신 아이가 없어요."))
+        rule.onNode(hasText("+ 새 아기씨 모시기").and(hasClickAction())).performClick()
+        register("콩이")
+        waitFor(hasText("콩이 아기씨"))
     }
 }

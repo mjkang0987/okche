@@ -21,6 +21,8 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,13 +35,23 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.okche.R
+import app.okche.store.OkcheDatabase
+import app.okche.store.lastPetId
+import app.okche.store.setLastPetId
 import app.okche.ui.pet.PetEditFlow
+import app.okche.ui.pet.PetManageSection
+import app.okche.ui.pet.PetRegisterScreen
+import app.okche.ui.pet.PetSeal
+import app.okche.ui.pet.PetSwitchSheet
+import app.okche.ui.pet.currentPet
+import kotlinx.coroutines.launch
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheType
@@ -56,11 +68,47 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
 @Composable
 fun RootTabs() {
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    // 탭 아래 화면(하단 탭 없음 — 디자인 '화면 짜임새'). 지금은 더보기 → 아이 정보 하나(6-2).
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val dao = remember { OkcheDatabase.get(context).dao() }
+    // 아이·휴양·지금 보는 아이는 바뀌는 대로 따라간다(6-3). 처음 읽기 전(null)에는 낙관 자리를 비워 둔다.
+    val pets by remember { dao.petsFlow() }.collectAsState(null)
+    val rests by remember { dao.openRestPeriodsFlow() }.collectAsState(emptyList())
+    val lastPetId by remember { context.lastPetId }.collectAsState(null)
+    val restingIds = rests.mapTo(mutableSetOf()) { it.petId }
+    val current = pets?.let { currentPet(it, lastPetId) }
+    // 탭 아래 화면(하단 탭 없음 — 디자인 '화면 짜임새'): 아이 정보(6-2), 아이 등록(6-3).
     var editPetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var registering by rememberSaveable { mutableStateOf(false) }
+    var switching by rememberSaveable { mutableStateOf(false) }
     editPetId?.let { id ->
         PetEditFlow(id, onClose = { editPetId = null })
         return
+    }
+    if (registering) {
+        PetRegisterScreen(onClose = { registering = false }, onSaved = { registering = false })
+        return
+    }
+    if (switching && pets != null) {
+        PetSwitchSheet(
+            pets!!, current, restingIds,
+            onPick = { id ->
+                switching = false
+                scope.launch { context.setLastPetId(id) }
+            },
+            onEdit = {
+                switching = false
+                editPetId = current?.id
+            },
+            onRegister = {
+                switching = false
+                registering = true
+            },
+            onDismiss = { switching = false },
+        )
+    }
+    val seal: @Composable () -> Unit = {
+        if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true })
     }
     Scaffold(
         containerColor = OkcheColor.Hanji,
@@ -119,11 +167,13 @@ fun RootTabs() {
     ) { padding ->
         val modifier = Modifier.padding(padding)
         when (Tab.entries[selected]) {
-            Tab.Record -> RecordTab(modifier)
-            Tab.Main -> MainTab(modifier)
-            Tab.Sillok -> SillokTab(modifier)
-            Tab.Album -> AlbumTab(modifier)
-            Tab.More -> MoreTab(modifier, onEditPet = { editPetId = it })
+            Tab.Record -> RecordTab(modifier, seal)
+            Tab.Main -> MainTab(modifier, seal)
+            Tab.Sillok -> SillokTab(modifier, current?.name, seal)
+            Tab.Album -> AlbumTab(modifier, seal)
+            Tab.More -> MoreTab(modifier) {
+                PetManageSection(pets.orEmpty(), restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
+            }
         }
     }
 }

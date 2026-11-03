@@ -69,9 +69,9 @@ suspend fun assignRecord(dao: OkcheDao, record: Record, petId: String?, now: Lon
     if (record.petId != petId) dao.update(record.copy(petId = petId, updatedAt = now))
 }
 
-/** 기록 지우기: `deletedAt`·`updatedAt`, '되돌릴 수 없어요'라서 `data` = `{}`(데이터 1-4). */
+/** 기록 지우기: `deletedAt`·`updatedAt`, '되돌릴 수 없어요'라서 선택 칸을 비움 — `data` = `{}`, `slotKey`(데이터 1-4). */
 suspend fun deleteRecord(dao: OkcheDao, record: Record, now: Long = System.currentTimeMillis()) {
-    dao.update(record.copy(deletedAt = now, updatedAt = now, data = "{}"))
+    dao.update(record.copy(deletedAt = now, updatedAt = now, data = "{}", slotKey = null))
 }
 
 /** `YYYY-MM-DD`를 하루 옮긴 날. */

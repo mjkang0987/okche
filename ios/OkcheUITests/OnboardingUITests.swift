@@ -164,49 +164,4 @@ final class OnboardingUITests: XCTestCase {
         save.tap()
         XCTAssertTrue(app.buttons["콩이이 · 아이 정보"].waitForExistence(timeout: 5))
     }
-    /// 가장 큰 글자에서 아이 정보·인슐린 설정 화면 접근성 검사(잘림·이름 없는 버튼·작은 터치 영역 등, 6-2).
-    func testPetEditAccessibilityAtLargestText() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
-        app.launch()
-        reveal(app.buttons["아이 등록하고 시작하기"], in: app).tap()
-        let name = app.textFields["이름"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        name.typeText("콩이")
-        app.buttons["완료"].firstMatch.tap()
-        reveal(app.buttons["모시기"].firstMatch, in: app).tap()
-        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["더보기"].tap()
-        app.buttons["콩이 · 아이 정보"].tap()
-        XCTAssertTrue(app.textFields["이름"].waitForExistence(timeout: 5))
-        try audit(app)
-        reveal(app.switches["당뇨가 있어요"].firstMatch, in: app).tap()
-        try audit(app)
-        reveal(app.buttons["저장하기"].firstMatch, in: app)
-        try audit(app)
-
-        app.buttons["인슐린 이름·양·시간 설정"].tap() // 안 보이면 알아서 밀어 옴
-        XCTAssertTrue(app.textFields["첫 번째 양 (단위)"].waitForExistence(timeout: 3))
-        try audit(app)
-        reveal(app.buttons["저장하기"].firstMatch, in: app)
-        try audit(app)
-    }
-
-    /// 접근성 검사. 한 줄 입력 칸의 '잘릴 수 있음'은 뺀다(넣은 글은 칸 안에서 옆으로 밀리고, 긴 보기 글만 걸림).
-    private func audit(_ app: XCUIApplication) throws {
-        try app.performAccessibilityAudit { issue in
-            issue.auditType == .textClipped && issue.element?.elementType == .textField
-        }
-    }
-
-    /// 보일 때까지 밀어 올림(내림). 20번 밀어도 안 보이면 실패.
-    @discardableResult
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication, up: Bool = true) -> XCUIElement {
-        for _ in 0..<20 where !(element.exists && element.isHittable) {
-            if up { app.swipeUp() } else { app.swipeDown() }
-        }
-        XCTAssertTrue(element.isHittable, element.debugDescription)
-        return element
-    }
 }

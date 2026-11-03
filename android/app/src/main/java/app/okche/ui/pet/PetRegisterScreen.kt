@@ -10,29 +10,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import android.util.Log
-import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.LaunchedEffect
-import app.okche.store.OkcheDao
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -54,42 +45,6 @@ import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
-import kotlinx.coroutines.launch
-
-/**
- * '모시기' 저장을 화면 밖(화면 활동의 ViewModel)에서 한다: 저장 중 화면이 다시 만들어져도 저장이 끊기지 않고,
- * 결과는 새 화면이 받아 처리한다. 저장 중 다시 누르면 무시한다.
- */
-class PetRegisterSaver : ViewModel() {
-    var saving by mutableStateOf(false)
-        private set
-
-    /** 처리 안 한 저장 결과(빈 맵 = 저장됨, 아니면 오류). 화면이 받으면 [consume]. */
-    var result by mutableStateOf<Map<String, String>?>(null)
-        private set
-
-    fun save(dao: OkcheDao, form: PetForm) {
-        if (saving) return
-        saving = true
-        viewModelScope.launch {
-            try {
-                result = registerPet(dao, form)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // registerPet이 저장소 오류를 잡지만, 그 밖의 예외로도 앱이 죽지 않고 같은 문구를 보이게.
-                Log.e("Okche", "아이 등록 실패", e)
-                result = mapOf("save" to "저장하지 못했어요. 다시 해 주세요.")
-            } finally {
-                saving = false
-            }
-        }
-    }
-
-    fun consume() {
-        result = null
-    }
-}
 
 /**
  * 아이 등록(디자인 보드 Profile·ProfileDog). 프로필 사진 칸은 11단계(사진 저장)에서.
@@ -98,14 +53,10 @@ class PetRegisterSaver : ViewModel() {
 @Composable
 fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val context = LocalContext.current
-    val saver: PetRegisterSaver = viewModel()
+    val saver: FormSaveModel = viewModel(key = "petRegister")
     var form by rememberSaveable { mutableStateOf(PetForm()) }
     var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
-    // 오류가 난 첫 칸으로 옮겨 가려고 칸마다 단다.
-    val bring = remember { mutableMapOf<String, BringIntoViewRequester>() }
-    val focus = remember { mutableMapOf<String, FocusRequester>() }
-    fun Modifier.anchor(key: String) =
-        bringIntoViewRequester(bring.getOrPut(key) { BringIntoViewRequester() }).focusRequester(focus.getOrPut(key) { FocusRequester() })
+    val anchors = remember { Anchors() }
     // 고친 칸의 오류는 바로 지운다. 인슐린 줄 수가 바뀌면 줄 번호가 밀리므로 줄 오류를 모두 지운다.
     fun edit(key: String? = null, change: PetForm.() -> PetForm) {
         val rows = form.insulinRows.size
@@ -125,8 +76,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             return@LaunchedEffect
         }
         // consume은 맨 뒤에: result가 바뀌면 이 효과가 취소돼 스크롤(bringIntoView)이 중간에 끊긴다.
-        bring[first]?.bringIntoView()
-        focus[first]?.requestFocus()
+        anchors.goTo(first, focusable = true)
         saver.consume()
     }
 
@@ -148,7 +98,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp), // 보드 칸 사이 20(토큰에 없음)
         ) {
             OkcheTextField(
-                form.name, { edit("name") { copy(name = it) } }, "이름", Modifier.anchor("name"),
+                form.name, { edit("name") { copy(name = it) } }, "이름", anchors.of("name"),
                 error = errors["name"],
             )
             OkcheChoiceCards(
@@ -173,10 +123,10 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                     edit { copy(birthUnknown = it) }
                     errors = errors - "age" - "birthDate"
                 },
-                anchor = { Modifier.anchor(it) },
+                anchor = { anchors.of(it) },
             )
             OkcheTextField(
-                form.weight, { edit("weight") { copy(weight = it) } }, "체중", Modifier.anchor("weight"), hint = "(kg)",
+                form.weight, { edit("weight") { copy(weight = it) } }, "체중", anchors.of("weight"), hint = "(kg)",
                 error = errors["weight"], keyboardOptions = decimalKeys,
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -188,11 +138,11 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", form.hasDiabetes, { edit { copy(hasDiabetes = it) } })
                 if (form.hasDiabetes) InsulinBox(form, errors, ::edit, { errors = errors.filterKeys { !it.startsWith("time") } }) { key ->
-                    Modifier.anchor(key)
+                    anchors.of(key)
                 }
             }
             errors["save"]?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = { saver.save(OkcheDatabase.get(context).dao(), form) })
+            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = { saver.save { registerPet(OkcheDatabase.get(context).dao(), form) } })
         }
     }
 }

@@ -11,7 +11,7 @@ import app.okche.store.Species
 import app.okche.store.Syringe
 import app.okche.ui.pet.InsulinRow
 import app.okche.ui.pet.PetForm
-import app.okche.ui.pet.PetRegisterSaver
+import app.okche.ui.pet.FormSaveModel
 import app.okche.ui.pet.registerPet
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -134,10 +134,10 @@ class PetRegisterTest {
 
     /** 저장 중 '모시기'를 또 눌러도 한 번만 저장한다. */
     @Test fun saverIgnoresSecondTapWhileSaving() {
-        val saver = PetRegisterSaver()
+        val saver = FormSaveModel()
         val form = PetForm(name = "콩이")
-        saver.save(db.dao(), form)
-        saver.save(db.dao(), form)
+        saver.save { registerPet(db.dao(), form) }
+        saver.save { registerPet(db.dao(), form) }
         val deadline = System.currentTimeMillis() + 5_000
         while (saver.result == null && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals(emptyMap<String, String>(), saver.result)
@@ -146,9 +146,9 @@ class PetRegisterTest {
 
     /** 저장 중 저장소가 오류를 내도 앱이 죽지 않고 '모시기' 위 문구로 끝난다. */
     @Test fun saverReportsStoreFailure() {
-        val saver = PetRegisterSaver()
+        val saver = FormSaveModel()
         db.close()
-        saver.save(db.dao(), PetForm(name = "콩이"))
+        saver.save { registerPet(db.dao(), PetForm(name = "콩이")) }
         val deadline = System.currentTimeMillis() + 5_000
         while (saver.result == null && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals(mapOf("save" to "저장하지 못했어요. 다시 해 주세요."), saver.result)

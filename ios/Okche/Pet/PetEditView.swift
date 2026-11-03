@@ -45,9 +45,10 @@ struct PetEditView: View {
                             OkcheSwitchRow(title: "당뇨가 있어요", detail: "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", isOn: $form.hasDiabetes)
                             if form.hasDiabetes {
                                 NavigationLink {
-                                    InsulinSetupView(form: InsulinSetup(pet: pet, context: context))
+                                    InsulinSetupScreen(pet: pet)
                                 } label: {
                                     Text("인슐린 이름·양·시간 설정 ›")
+                                        .accessibilityLabel("인슐린 이름·양·시간 설정") // 화면 읽기는 '›' 없이
                                         .okcheText(OkcheType.body, weight: .medium)
                                         .foregroundStyle(OkcheColor.namsaek)
                                         .padding(.horizontal, 16)
@@ -91,6 +92,8 @@ struct PetEditView: View {
         .onChange(of: form.birthDate) { errors[.birth] = nil }
         .onChange(of: form.familyDate) { errors[.family] = nil }
         .onChange(of: form.hasDiabetes) { errors[.insulinPlan] = nil }
+        // 인슐린 설정을 다녀오면 '먼저 설정해 주세요' 오류는 지운다(아직 없으면 다시 저장할 때 또 뜸).
+        .onAppear { errors[.insulinPlan] = nil }
     }
 
     /// 이름 + '고양이 · 코리안숏헤어 · 동행 1,248일' (저장된 값).
@@ -179,5 +182,15 @@ struct PetEditScreen: View {
 
     var body: some View {
         PetEditView(form: PetEditing(pet: pet, context: context))
+    }
+}
+
+/// 아이 정보의 인슐린 설정 줄에서 여는 화면. 감싸 두어 아이 정보를 다시 그릴 때마다 저장소를 읽지 않게.
+struct InsulinSetupScreen: View {
+    let pet: Pet
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        InsulinSetupView(form: InsulinSetup(pet: pet, context: context))
     }
 }

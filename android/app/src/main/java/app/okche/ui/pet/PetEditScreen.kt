@@ -42,6 +42,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
@@ -71,7 +72,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * 저장을 화면 밖(ViewModel)에서 한다 — 저장 중 화면이 다시 만들어져도 끊기지 않고 결과는 새 화면이 받는다(PetRegisterSaver와 같음).
+ * 저장을 화면 밖(ViewModel)에서 한다 — 저장 중 화면이 다시 만들어져도 끊기지 않고 결과는 새 화면이 받는다. 저장 중 다시 누르면 무시한다(아이 등록·고치기·인슐린 설정).
  */
 class FormSaveModel : ViewModel() {
     var saving by mutableStateOf(false)
@@ -124,8 +125,8 @@ fun PetEditFlow(petId: String, onClose: () -> Unit) {
     }
 }
 
-/** 오류가 난 첫 칸으로 옮겨 가려고 칸마다 다는 표시. */
-private class Anchors {
+/** 오류가 난 첫 칸으로 옮겨 가려고 칸마다 다는 표시(아이 등록·고치기·인슐린 설정). */
+internal class Anchors {
     val bring = mutableMapOf<String, BringIntoViewRequester>()
     val focus = mutableMapOf<String, FocusRequester>()
     fun of(key: String) =
@@ -154,6 +155,8 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     LaunchedEffect(petId) {
         saved = dao.pet(petId)
         weight = latestWeightText(dao, petId)
+        // 인슐린 설정을 다녀오면 '먼저 설정해 주세요' 오류는 지운다(아직 없으면 다시 저장할 때 또 뜸).
+        errors = errors - "insulinPlan"
         // 처음 열 때만 저장된 값으로 채운다(화면을 다시 만들면 고치던 값이 남음). 그새 지운 아이면 닫는다.
         if (form == null) {
             val loaded = PetEditForm.load(dao, petId)
@@ -235,7 +238,8 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", f.hasDiabetes, { edit("insulinPlan") { copy(hasDiabetes = it) } })
                 if (f.hasDiabetes) {
                     TextButton(onInsulin, Modifier.heightIn(min = 44.dp)) {
-                        Text("인슐린 이름·양·시간 설정 ›", color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium))
+                        // 화면 읽기는 '›' 없이 읽게
+                        Text("인슐린 이름·양·시간 설정 ›", Modifier.semantics { contentDescription = "인슐린 이름·양·시간 설정" }, color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium))
                     }
                     errors["insulinPlan"]?.let { OkcheErrorText(it, Modifier.padding(horizontal = OkcheSpacing.Space4)) }
                 }
@@ -385,7 +389,8 @@ private fun LeadPicker(minutes: Int, onSelect: (Int) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("알림 보낼 때", color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
+        // 고르기 칸이 같은 이름을 읽으므로 보이는 글은 화면 읽기에서 뺀다(iOS와 같음).
+        Text("알림 보낼 때", Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
         Box(Modifier.widthIn(min = 150.dp)) {
             OkchePickerField(title, "알림 보낼 때", { open = true }, showLabel = false, icon = Icons.Outlined.KeyboardArrowDown, role = Role.DropdownList)
             DropdownMenu(open, { open = false }, containerColor = OkcheColor.Paper) {

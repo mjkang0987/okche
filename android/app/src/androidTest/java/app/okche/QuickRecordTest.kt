@@ -1,5 +1,20 @@
 package app.okche
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ActivityScenario
+import app.okche.ui.pet.PetForm
+import app.okche.ui.pet.registerPet
+import org.junit.Rule
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.store.OkcheDatabase
@@ -81,5 +96,49 @@ class QuickRecordTest {
         assertEquals("2027-01-01", shiftDay("2026-12-31", 1))
         assertEquals("오늘 · 10월 25일 (일)", dayTitle("2026-10-25", "2026-10-25"))
         assertEquals("10월 24일 (토)", dayTitle("2026-10-24", "2026-10-25"))
+    }
+}
+
+/** 누군지 몰라요로 바로 기록 → 방금 남긴 기록 → 기록 목록에서 누구였는지 정하기 → 지우기 (7-1). iOS testQuickRecordAssignAndDelete와 같은 흐름. */
+class QuickRecordFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun closeScenario() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test fun quickRecordAssignAndDelete() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        val unknown = hasText("누군지 몰라요").and(isSelectable())
+        waitFor(unknown)
+        rule.onNode(hasText("콩이").and(isSelectable())).assertIsSelected() // 지금 보는 아이가 먼저 골라져 있다
+        rule.onNode(unknown).performClick()
+        rule.onNode(hasContentDescription("구토 사료 · 바로 기록")).performClick()
+        waitFor(hasText("아뢰었사옵니다"))
+
+        rule.onNode(hasText("오늘 일기 전체")).performScrollTo().performClick()
+        waitFor(hasText("누군지 모름 · 구토"))
+        rule.onNode(hasText("구토 1번")).assertExists()
+        rule.onNode(hasText("누구였는지 정하기")).performClick()
+        waitFor(hasText("누구였나요?"))
+        rule.onNode(hasText("콩이").and(isSelectable()).and(hasAnyAncestor(hasContentDescription("이 기록의 아이")))).assertIsSelected() // 지금 보는 아이가 먼저
+        rule.onNode(hasText("정하기").and(hasClickAction())).performClick()
+        waitFor(hasText("콩이 · 구토"))
+
+        rule.onNode(hasContentDescription("콩이 구토 기록 지우기", substring = true)).performClick()
+        waitFor(hasText("이 기록을 지울까요?"))
+        rule.onNode(hasText("지우기").and(hasClickAction())).performClick()
+        waitFor(hasText("이날 남긴 기록이 없어요."))
+        rule.onNode(hasContentDescription("뒤로")).performClick()
+        waitFor(unknown)
+        rule.onAllNodes(hasText("방금 남긴 기록")).assertCountEquals(0) // 오늘 기록이 없으면 숨김
     }
 }

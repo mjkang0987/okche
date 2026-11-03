@@ -99,8 +99,19 @@ enum PetLifecycle {
         pet.familyDate = nil
         pet.diagnosis = nil
         pet.profilePhotoId = nil
-        for record in records { record.data = "{}" }
+        for record in records {
+            record.data = "{}"
+            record.slotKey = nil
+        }
         for plan in insulin { plan.name = nil }
+        for med in meds { med.howTo = nil }
+        for food in foods { food.finishedOn = nil }
+        for photo in orphanPhotos {
+            photo.caption = nil
+            photo.bodyView = nil
+            photo.bodyScore = nil
+            photo.recordId = nil
+        }
         mark(records, \.deletedAt, \.updatedAt)
         mark(meds, \.deletedAt, \.updatedAt)
         mark(insulin, \.deletedAt, \.updatedAt)

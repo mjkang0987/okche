@@ -142,16 +142,16 @@ abstract class OkcheDao {
     )
     protected abstract suspend fun deletePetRow(petId: String, now: Long)
 
-    @Query("UPDATE record SET deleted_at = :now, updated_at = :now, data = '{}' WHERE pet_id = :petId AND deleted_at IS NULL")
+    @Query("UPDATE record SET deleted_at = :now, updated_at = :now, data = '{}', slot_key = NULL WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteRecords(petId: String, now: Long)
 
-    @Query("UPDATE med_schedule SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
+    @Query("UPDATE med_schedule SET deleted_at = :now, updated_at = :now, how_to = NULL WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteMedSchedules(petId: String, now: Long)
 
     @Query("UPDATE insulin_plan SET deleted_at = :now, updated_at = :now, name = NULL WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteInsulinPlans(petId: String, now: Long)
 
-    @Query("UPDATE food_change SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
+    @Query("UPDATE food_change SET deleted_at = :now, updated_at = :now, finished_on = NULL WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteFoodChanges(petId: String, now: Long)
 
     @Query("UPDATE meal_plan SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
@@ -162,7 +162,8 @@ abstract class OkcheDao {
 
     /** 이 아이와만 이어진 사진(다른 아이 연결이 남지 않는 사진)을 지운다. 연결을 지우기 전에 부른다. */
     @Query(
-        "UPDATE photo SET deleted_at = :now, updated_at = :now WHERE deleted_at IS NULL " +
+        "UPDATE photo SET deleted_at = :now, updated_at = :now, caption = NULL, body_view = NULL, body_score = NULL, record_id = NULL " +
+            "WHERE deleted_at IS NULL " +
             "AND id IN (SELECT photo_id FROM photo_pet WHERE pet_id = :petId AND deleted_at IS NULL) " +
             "AND NOT EXISTS (SELECT 1 FROM photo_pet o WHERE o.photo_id = photo.id AND o.pet_id != :petId AND o.deleted_at IS NULL)",
     )

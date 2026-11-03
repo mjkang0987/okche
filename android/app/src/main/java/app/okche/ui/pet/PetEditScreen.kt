@@ -156,6 +156,8 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     val dao = remember { OkcheDatabase.get(context).dao() }
     val saver: FormSaveModel = viewModel(key = "petEdit")
     val scope = rememberCoroutineScope()
+    // 간직·되돌리기·지우기를 저장하는 동안엔 '저장하기'를 막는다(간직 전 입력이 추억 아이에 덮이지 않게).
+    var lifecycleBusy by remember { mutableStateOf(false) }
     var form by rememberSaveable { mutableStateOf<PetEditForm?>(null) }
     var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
     // 위 요약(저장된 값)과 체중 줄. 인슐린 설정에서 돌아오면 다시 읽는다.
@@ -260,11 +262,12 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                 f.resting, { edit { copy(resting = it) } },
             )
             errors["save"]?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("저장하기", enabled = !saver.saving, onClick = { saver.save { savePetEdit(dao, f) } })
+            OkchePrimaryButton("저장하기", enabled = !saver.saving && !lifecycleBusy, onClick = { saver.save { savePetEdit(dao, f) } })
             saved?.let { pet ->
                 LifecycleLinks(
                     pet,
                     enabled = !saver.saving, // 저장과 겹치면 저장이 간직 표시를 덮을 수 있어서
+                    onBusy = { lifecycleBusy = it },
                     onDone = { done ->
                         when (done) {
                             Lifecycle.Kept -> onKept()
@@ -311,7 +314,7 @@ private enum class Lifecycle { Kept, Restored, Deleted }
  * 저장은 한 트랜잭션(OkcheDao), 실패하면 아래에 문구.
  */
 @Composable
-private fun LifecycleLinks(pet: Pet, enabled: Boolean, onDone: (Lifecycle) -> Unit) {
+private fun LifecycleLinks(pet: Pet, enabled: Boolean, onBusy: (Boolean) -> Unit, onDone: (Lifecycle) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var dialog by rememberSaveable { mutableStateOf<Lifecycle?>(null) }
@@ -319,6 +322,7 @@ private fun LifecycleLinks(pet: Pet, enabled: Boolean, onDone: (Lifecycle) -> Un
     val memorial = pet.memorializedAt != null
     fun run(what: Lifecycle) {
         dialog = null
+        onBusy(true)
         scope.launch {
             val dao = OkcheDatabase.get(context).dao()
             val now = System.currentTimeMillis()
@@ -329,19 +333,22 @@ private fun LifecycleLinks(pet: Pet, enabled: Boolean, onDone: (Lifecycle) -> Un
                     Lifecycle.Deleted -> dao.deletePet(pet.id, now)
                 }
             }.isFailure
+            // 간직·지우기는 화면을 닫으니 막은 채로 둔다.
+            if (failed || what == Lifecycle.Restored) onBusy(false)
             if (!failed) onDone(what)
         }
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
             val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
+            val alpha = if (enabled) 1f else 0.4f // 막혀 있을 땐 흐리게
             if (memorial) {
-                TextButton({ dialog = Lifecycle.Restored }, enabled = enabled) { Text("추억에서 되돌리기", color = OkcheColor.Namsaek, style = style) }
+                TextButton({ dialog = Lifecycle.Restored }, enabled = enabled) { Text("추억에서 되돌리기", color = OkcheColor.Namsaek.copy(alpha = alpha), style = style) }
             } else {
-                TextButton({ dialog = Lifecycle.Kept }, enabled = enabled) { Text("추억으로 간직하기", color = OkcheColor.InkMuted, style = style) }
+                TextButton({ dialog = Lifecycle.Kept }, enabled = enabled) { Text("추억으로 간직하기", color = OkcheColor.InkMuted.copy(alpha = alpha), style = style) }
             }
             Text("|", Modifier.clearAndSetSemantics {}, color = OkcheColor.Line, style = style)
-            TextButton({ dialog = Lifecycle.Deleted }, enabled = enabled) { Text("이 아이 기록 지우기", color = OkcheColor.Yeonji, style = style) }
+            TextButton({ dialog = Lifecycle.Deleted }, enabled = enabled) { Text("이 아이 기록 지우기", color = OkcheColor.Yeonji.copy(alpha = alpha), style = style) }
         }
         if (failed) OkcheErrorText(SAVE_ERROR)
     }

@@ -163,13 +163,18 @@ final class PetMemorialTests: XCTestCase {
         let kong = pet()
         kong.diagnosis = "IBD"
         kong.familyDate = "2023-05-26"
-        let record = Record(now: created, petId: kong.id, kind: .vomit, occurredAt: created, data: #"{"color":"yellow"}"#)
+        kong.sex = .female
+        context.insert(InsulinPlan(now: created, petId: kong.id, name: "란투스", slots: [InsulinSlot(time: "08:00", units: 2)], activeFrom: created))
+        let record = Record(now: created, petId: kong.id, kind: .vomit, occurredAt: created, slotKey: "slot", data: #"{"color":"yellow"}"#)
         context.insert(record)
         try context.save()
         try PetLifecycle.delete(kong, now: kept, in: context)
         XCTAssertNil(kong.diagnosis)
         XCTAssertNil(kong.familyDate)
+        XCTAssertNil(kong.sex)
         XCTAssertEqual(record.data, "{}")
+        XCTAssertNil(record.slotKey)
+        XCTAssertEqual(try all(InsulinPlan.self).map(\.name), [nil])
     }
 
     /// 당뇨 아이를 간직해도 아이 정보는 저장된다(인슐린 계획 검사 안 함).
@@ -182,5 +187,16 @@ final class PetMemorialTests: XCTestCase {
         form.name = "콩콩"
         try form.save(in: context, now: back, calendar: seoul)
         XCTAssertEqual(kong.name, "콩콩")
+    }
+
+    /// 당뇨가 없던 추억 아이가 당뇨를 새로 켜면 인슐린 계획 검사는 그대로(6-2 규칙).
+    func testMemorialPetTurningDiabetesOnStillNeedsPlan() throws {
+        let kong = pet()
+        try context.save()
+        try PetLifecycle.memorialize(kong, now: kept, in: context)
+        var form = PetEditing(pet: kong, context: context, today: back, calendar: seoul)
+        form.hasDiabetes = true
+        XCTAssertThrowsError(try form.save(in: context, now: back, calendar: seoul))
+        XCTAssertFalse(kong.hasDiabetes)
     }
 }

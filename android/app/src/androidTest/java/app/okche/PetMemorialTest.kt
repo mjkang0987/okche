@@ -162,12 +162,14 @@ class PetMemorialTest {
     /** 지우면 선택 칸을 비운다(데이터 1-4). */
     @Test fun deleteClearsOptionalFields() = runBlocking {
         val kong = pet()
-        dao.update(kong.copy(diagnosis = "IBD", familyDate = "2023-05-26"))
-        dao.insert(Record(createdAt = created, petId = kong.id, kind = RecordKind.vomit, occurredAt = created, data = """{"color":"yellow"}"""))
+        dao.update(kong.copy(diagnosis = "IBD", familyDate = "2023-05-26", sex = app.okche.store.Sex.female))
+        dao.insert(InsulinPlan(createdAt = created, petId = kong.id, name = "란투스", slots = listOf(InsulinSlot("08:00", 2.0)), activeFrom = created))
+        dao.insert(Record(createdAt = created, petId = kong.id, kind = RecordKind.vomit, occurredAt = created, slotKey = "slot", data = """{"color":"yellow"}"""))
         dao.deletePet(kong.id, kept)
-        val row = db.query("SELECT diagnosis, family_date FROM pet", null).use { c -> c.moveToFirst(); listOf(c.getString(0), c.getString(1)) }
-        assertEquals(listOf<String?>(null, null), row)
-        assertEquals("{}", db.query("SELECT data FROM record", null).use { c -> c.moveToFirst(); c.getString(0) })
+        val row = db.query("SELECT diagnosis, family_date, sex FROM pet", null).use { c -> c.moveToFirst(); listOf(c.getString(0), c.getString(1), c.getString(2)) }
+        assertEquals(listOf<String?>(null, null, null), row)
+        assertEquals(listOf<String?>("{}", null), db.query("SELECT data, slot_key FROM record", null).use { c -> c.moveToFirst(); listOf(c.getString(0), c.getString(1)) })
+        assertEquals(null, db.query("SELECT name FROM insulin_plan", null).use { c -> c.moveToFirst(); c.getString(0) })
     }
 }
 

@@ -58,7 +58,11 @@ struct OkcheConfirmDialog<Extra: View>: View {
         }
         .accessibilityAddTraits(.isModal)
         .accessibilityAction(.escape, onCancel) // 두 손가락 Z로 닫기
-        .onAppear { titleFocused = true }
+        // 바로 옮기면 화면 읽기가 아직 창을 몰라 초점이 안 옮겨질 때가 있어 잠깐 뒤에.
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            titleFocused = true
+        }
     }
 
     @ViewBuilder private var buttons: some View {

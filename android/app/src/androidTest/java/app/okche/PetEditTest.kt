@@ -301,6 +301,10 @@ class PetEditFlowTest {
         waitFor(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)")))
         rule.onNode(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)"))).performTextInput("2")
         rule.onNode(hasSetTextAction().and(hasContentDescription("두 번째 양 (단위)"))).performTextInput("2")
+        // 알림 보낼 때 고르기(펼침 메뉴)
+        rule.onNodeWithContentDescription("알림 보낼 때").performScrollTo().performClick()
+        waitFor(hasText("30분 전"))
+        rule.onNodeWithText("30분 전").performClick()
         rule.onNodeWithText("저장하기").performScrollTo().performClick()
 
         // 아이 정보로 돌아오면 고치던 이름이 남아 있고, 저장하면 더보기 줄 이름이 바뀐다.
@@ -310,6 +314,7 @@ class PetEditFlowTest {
         waitFor(hasText("콩이이 · 아이 정보"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }
         assertEquals(listOf("콩이이", "true"), listOf(pet.name, pet.hasDiabetes.toString()))
+        assertEquals(30, runBlocking { OkcheDatabase.get(context).dao().openInsulinPlans(pet.id) }.single().leadMinutes)
     }
 
     /** 처음 실행에서 등록(아래로 밀어 '모시기') → 더보기 → 아이 정보: 위에서 시작하고, 뒤로 가면 더보기로 돌아온다. */

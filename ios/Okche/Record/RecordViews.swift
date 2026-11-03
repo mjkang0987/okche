@@ -384,6 +384,7 @@ struct AssignSheet: View {
                         dismiss()
                     } catch {
                         failed = true
+                        AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
                     }
                 }
                 .buttonStyle(.okchePrimary)

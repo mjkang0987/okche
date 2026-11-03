@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -45,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
@@ -363,14 +367,14 @@ fun <T> OkcheChoiceCards(
 ) {
     Column(modifier) {
         OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2), hint = hint)
-        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(if (icons.isEmpty()) OkcheSpacing.Space2 else 6.dp)) {
-            for ((value, text) in options) {
+        // 아이콘 카드는 큰 글자에서 나란히 두면 낱말이 끊기니 세로로 쌓는다(iOS ViewThatFits와 같은 결과).
+        val stacked = icons.isNotEmpty() && LocalDensity.current.fontScale >= 1.3f
+        val card = @Composable { value: T, text: String, cardModifier: Modifier ->
                 val isSelected = value == selected
                 val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
                 val icon = icons[value]
                 Column(
-                    Modifier
-                        .weight(1f)
+                    cardModifier
                         .heightIn(min = if (icon == null) FieldHeight else 96.dp)
                         .background(if (isSelected) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
                         .border(1.5.dp, if (isSelected) OkcheColor.Namsaek else OkcheColor.Line, shape)
@@ -397,6 +401,18 @@ fun <T> OkcheChoiceCards(
                         textAlign = TextAlign.Center,
                     )
                 }
+        }
+        if (stacked) {
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for ((value, text) in options) card(value, text, Modifier.fillMaxWidth())
+            }
+        } else {
+            // 높이를 맞춘다(글자가 두 줄인 칸이 있어도 같은 높이).
+            Row(
+                Modifier.selectableGroup().height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(if (icons.isEmpty()) OkcheSpacing.Space2 else 6.dp),
+            ) {
+                for ((value, text) in options) card(value, text, Modifier.weight(1f).fillMaxHeight())
             }
         }
     }

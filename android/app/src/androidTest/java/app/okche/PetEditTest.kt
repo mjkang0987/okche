@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.test.espresso.Espresso
 import app.okche.store.setOnboardingDone
+import androidx.lifecycle.Lifecycle
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -337,8 +338,10 @@ class PetEditFlowTest {
         waitFor(hasSetTextAction().and(hasText("콩이")))
         rule.onNode(hasSetTextAction().and(hasText("콩이"))).assertIsDisplayed()
 
-        Espresso.pressBack()
-        waitFor(hasText("콩이 아기씨"))
+        // 뒤로 → 앱이 닫히지 않고 더보기로(아이 정보 머리 '아이 정보'가 사라지고 탭이 보임).
+        Espresso.pressBackUnconditionally()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("아이 정보")).fetchSemanticsNodes().isEmpty() }
         rule.onNode(tabMore).assertIsDisplayed()
+        assertEquals(Lifecycle.State.RESUMED, scenario!!.state)
     }
 }

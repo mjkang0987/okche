@@ -91,9 +91,12 @@ fun RootTabs() {
             onClose = { editPetId = null },
             // 간직하면 문안의 추억 화면(지금 보는 아이로), 지우면 더보기 — 마지막 아이를 지워도 시작하기로 돌아가지 않게(6-4).
             onKept = {
-                editPetId = null
-                selected = Tab.Main.ordinal
-                scope.launch { context.setLastPetId(id) }
+                // 지금 보는 아이를 먼저 바꾼 뒤 문안으로(다른 아이의 문안이 잠깐 보이지 않게).
+                scope.launch {
+                    context.setLastPetId(id)
+                    editPetId = null
+                    selected = Tab.Main.ordinal
+                }
             },
             onDeleted = {
                 editPetId = null

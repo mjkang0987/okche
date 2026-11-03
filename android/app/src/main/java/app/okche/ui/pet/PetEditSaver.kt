@@ -93,7 +93,8 @@ suspend fun savePetEdit(
         if (form.familyDate != null && form.familyDate > today) errors["familyDate"] = FUTURE_DAY_ERROR
 
         val plans = dao.openInsulinPlans(pet.id)
-        if (form.hasDiabetes && plans.isEmpty()) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
+        // 추억으로 간직한 아이는 인슐린 계획을 닫아 두므로 검사하지 않는다(6-4).
+        if (form.hasDiabetes && plans.isEmpty() && pet.memorializedAt == null) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
         if (errors.isNotEmpty()) return errors
 
         val edited = pet.copy(

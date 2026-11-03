@@ -179,6 +179,14 @@ class PetEditTest {
         assertNull(companionDays("2026-11-01", today))
     }
 
+    /** 당뇨 아이를 간직해도 아이 정보는 저장된다(인슐린 계획 검사 안 함, 6-4). */
+    @Test fun memorialDiabeticPetSaves() = runBlocking {
+        val id = makePet(diabetes = true)
+        dao.memorialize(id, now)
+        assertEquals(emptyMap<String, String>(), save(load(id).copy(name = "콩콩")))
+        assertEquals("콩콩", pet(id).name)
+    }
+
     // 인슐린 설정
 
     @Test fun insulinSetupLoadsOpenPlan() = runBlocking {

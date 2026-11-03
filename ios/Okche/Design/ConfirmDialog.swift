@@ -12,6 +12,8 @@ struct OkcheConfirmDialog<Extra: View>: View {
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @ViewBuilder var extra: Extra
+    /// 창이 뜨면 화면 읽기 초점을 제목으로.
+    @AccessibilityFocusState private var titleFocused: Bool
 
     var body: some View {
         ZStack {
@@ -23,6 +25,7 @@ struct OkcheConfirmDialog<Extra: View>: View {
                     Text(title).okcheText(OkcheType.heading)
                         .foregroundStyle(destructive ? OkcheColor.yeonji : OkcheColor.ink)
                         .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($titleFocused)
                     if let message {
                         Text(message).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                     }
@@ -54,10 +57,12 @@ struct OkcheConfirmDialog<Extra: View>: View {
             .defaultScrollAnchor(.center)
         }
         .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onCancel) // 두 손가락 Z로 닫기
+        .onAppear { titleFocused = true }
     }
 
     @ViewBuilder private var buttons: some View {
-        Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined))
+        Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
         Button(confirm, action: onConfirm).buttonStyle(.okchePrimary(confirmLook))
     }
 }

@@ -5,6 +5,8 @@ import SwiftUI
 enum PetLifecycle {
     /// 간직: `memorializedAt` = 지금, 열린 약 주기·인슐린·끼니 계획 `activeUntil` = 같은 시각, 열린 휴양 `endedAt` = 같은 시각.
     static func memorialize(_ pet: Pet, now: Date = .now, in context: ModelContext) throws {
+        // 이미 간직 중이면 그대로(두 번 누름 — 간직 시각이 바뀌면 되돌릴 줄을 못 찾는다).
+        guard pet.memorializedAt == nil else { return }
         let petId = pet.id
         let meds = try context.fetch(FetchDescriptor<MedSchedule>(predicate: #Predicate {
             $0.petId == petId && $0.deletedAt == nil && $0.activeUntil == nil
@@ -24,7 +26,8 @@ enum PetLifecycle {
     }
 
     /// 되돌리기: `memorializedAt` 없음 + 간직할 때 끝낸 줄(`activeUntil` = 그때 `memorializedAt`)을 같은 내용 새 줄로(`activeFrom` = 지금).
-    /// 약 주기는 `seriesId` 그대로. 휴양은 다시 열지 않는다.
+    /// 약 주기는 `seriesId` 그대로. 휴양은 다시 열지 않는다. 인슐린은 지금도 당뇨이고 열린 계획이 없을 때만(간직 중 당뇨를 껐거나
+    /// 인슐린을 새로 설정했으면 6-2 규칙대로 그대로 둔다).
     static func restore(_ pet: Pet, now: Date = .now, in context: ModelContext) throws {
         guard let kept = pet.memorializedAt else { return }
         let petId = pet.id
@@ -32,9 +35,10 @@ enum PetLifecycle {
         let meds = try context.fetch(FetchDescriptor<MedSchedule>(predicate: #Predicate {
             $0.petId == petId && $0.deletedAt == nil && $0.activeUntil == until
         }))
-        let insulin = try context.fetch(FetchDescriptor<InsulinPlan>(predicate: #Predicate {
+        let reopenInsulin = try pet.hasDiabetes && InsulinPlan.open(for: petId, in: context).isEmpty
+        let insulin = reopenInsulin ? try context.fetch(FetchDescriptor<InsulinPlan>(predicate: #Predicate {
             $0.petId == petId && $0.deletedAt == nil && $0.activeUntil == until
-        }))
+        })) : []
         let meals = try context.fetch(FetchDescriptor<MealPlan>(predicate: #Predicate {
             $0.petId == petId && $0.deletedAt == nil && $0.activeUntil == until
         }))
@@ -58,7 +62,8 @@ enum PetLifecycle {
     }
 
     /// 아이 지우기: 아이와 그 아이의 기록·약 주기·인슐린·사료 바꾸기·끼니 계획·휴양 기간에 `deletedAt`.
-    /// 사진은 그 아이 연결(`PhotoPet`)을 지우고, 남은 아이가 없는 사진도 지운다.
+    /// 사진은 그 아이 연결(`PhotoPet`)을 지우고, 남은 아이가 없는 사진도 지운다. '되돌릴 수 없어요'라서 선택 칸은 비운다(데이터 1-4 —
+    /// 기록 `data`는 `{}`, 아이의 선택 칸, 인슐린 이름).
     static func delete(_ pet: Pet, now: Date = .now, in context: ModelContext) throws {
         let petId = pet.id
         func mark<T: PersistentModel>(_ rows: [T], _ deletedAt: ReferenceWritableKeyPath<T, Date?>,
@@ -88,6 +93,14 @@ enum PetLifecycle {
         }
         pet.deletedAt = now
         pet.updatedAt = now
+        pet.sex = nil
+        pet.neutered = nil
+        pet.birthDate = nil
+        pet.familyDate = nil
+        pet.diagnosis = nil
+        pet.profilePhotoId = nil
+        for record in records { record.data = "{}" }
+        for plan in insulin { plan.name = nil }
         mark(records, \.deletedAt, \.updatedAt)
         mark(meds, \.deletedAt, \.updatedAt)
         mark(insulin, \.deletedAt, \.updatedAt)

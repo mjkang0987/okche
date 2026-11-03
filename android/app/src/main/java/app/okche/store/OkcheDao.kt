@@ -95,6 +95,8 @@ abstract class OkcheDao {
     /** 간직: `memorializedAt` = 지금, 열린 약 주기·인슐린·끼니 계획 `activeUntil`·열린 휴양 `endedAt` = 같은 시각. */
     @Transaction
     open suspend fun memorialize(petId: String, now: Long) {
+        // 이미 간직 중이면 그대로(두 번 누름 — 간직 시각이 바뀌면 되돌릴 줄을 못 찾는다).
+        if (pet(petId)?.memorializedAt != null) return
         setMemorialized(petId, now, now)
         closeMedSchedules(petId, now)
         closeInsulinPlans(petId, now)
@@ -113,15 +115,18 @@ abstract class OkcheDao {
 
     /**
      * 되돌리기: `memorializedAt` 없음 + 간직할 때 끝낸 줄(`activeUntil` = 그때 `memorializedAt`)을 같은 내용 새 줄로(`activeFrom` = 지금).
-     * 약 주기는 `seriesId` 그대로. 휴양은 다시 열지 않는다.
+     * 약 주기는 `seriesId` 그대로. 휴양은 다시 열지 않는다. 인슐린은 지금도 당뇨이고 열린 계획이 없을 때만
+     * (간직 중 당뇨를 껐거나 인슐린을 새로 설정했으면 6-2 규칙대로 그대로 둔다).
      */
     @Transaction
     open suspend fun restoreFromMemorial(petId: String, now: Long) {
-        val kept = pet(petId)?.memorializedAt ?: return
+        val pet = pet(petId) ?: return
+        val kept = pet.memorializedAt ?: return
         for (m in medSchedulesEndedAt(petId, kept)) {
             insert(m.copy(id = newId(), createdAt = now, updatedAt = now, activeFrom = now, activeUntil = null))
         }
-        for (p in insulinPlansEndedAt(petId, kept)) {
+        val reopenInsulin = pet.hasDiabetes && openInsulinPlans(petId).isEmpty()
+        if (reopenInsulin) for (p in insulinPlansEndedAt(petId, kept)) {
             insert(p.copy(id = newId(), createdAt = now, updatedAt = now, activeFrom = now, activeUntil = null))
         }
         for (m in mealPlansEndedAt(petId, kept)) {
@@ -130,16 +135,20 @@ abstract class OkcheDao {
         setMemorialized(petId, null, now)
     }
 
-    @Query("UPDATE pet SET deleted_at = :now, updated_at = :now WHERE id = :petId AND deleted_at IS NULL")
+    // '되돌릴 수 없어요'라서 선택 칸은 비운다(데이터 1-4 — 기록 data는 {}, 아이의 선택 칸, 인슐린 이름).
+    @Query(
+        "UPDATE pet SET deleted_at = :now, updated_at = :now, sex = NULL, neutered = NULL, birth_date = NULL, family_date = NULL, " +
+            "diagnosis = NULL, profile_photo_id = NULL WHERE id = :petId AND deleted_at IS NULL",
+    )
     protected abstract suspend fun deletePetRow(petId: String, now: Long)
 
-    @Query("UPDATE record SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
+    @Query("UPDATE record SET deleted_at = :now, updated_at = :now, data = '{}' WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteRecords(petId: String, now: Long)
 
     @Query("UPDATE med_schedule SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteMedSchedules(petId: String, now: Long)
 
-    @Query("UPDATE insulin_plan SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")
+    @Query("UPDATE insulin_plan SET deleted_at = :now, updated_at = :now, name = NULL WHERE pet_id = :petId AND deleted_at IS NULL")
     protected abstract suspend fun deleteInsulinPlans(petId: String, now: Long)
 
     @Query("UPDATE food_change SET deleted_at = :now, updated_at = :now WHERE pet_id = :petId AND deleted_at IS NULL")

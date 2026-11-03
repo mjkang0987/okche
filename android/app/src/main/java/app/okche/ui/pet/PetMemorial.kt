@@ -72,7 +72,7 @@ suspend fun memorialStats(dao: OkcheDao, pet: Pet, today: LocalDate = LocalDate.
 @Composable
 fun MemorialScreen(pet: Pet, modifier: Modifier = Modifier, seal: @Composable () -> Unit = {}) {
     val context = LocalContext.current
-    var stats by remember { mutableStateOf<MemorialStats?>(null) }
+    var stats by remember(pet.id) { mutableStateOf<MemorialStats?>(null) }
     LaunchedEffect(pet.id) { stats = memorialStats(OkcheDatabase.get(context).dao(), pet) }
     TabScreen(pet.name, modifier, "추억으로 간직 중", trailing = seal) {
         SleepingBand(pet.name)

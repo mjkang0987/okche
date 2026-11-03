@@ -47,8 +47,9 @@ class PetMemorialTest {
 
     @After fun close() = db.close()
 
-    private fun pet(name: String = "콩이") = runBlocking {
-        Pet(createdAt = created, name = name, species = Species.cat, breed = "코리안숏헤어", furColor = "치즈").also { dao.insert(it) }
+    private fun pet(name: String = "콩이", diabetes: Boolean = false) = runBlocking {
+        Pet(createdAt = created, name = name, species = Species.cat, breed = "코리안숏헤어", furColor = "치즈", hasDiabetes = diabetes)
+            .also { dao.insert(it) }
     }
 
     private fun med(petId: String, until: Long? = null) = runBlocking {
@@ -79,7 +80,7 @@ class PetMemorialTest {
     }
 
     @Test fun restoreReopensOnlyRowsClosedWhenKept() = runBlocking {
-        val kong = pet()
+        val kong = pet(diabetes = true)
         val open = med(kong.id)
         med(kong.id, until = at(2026, 10, 5))
         dao.insert(InsulinPlan(createdAt = created, petId = kong.id, name = "란투스", slots = listOf(InsulinSlot("08:00", 2.0)), activeFrom = created))
@@ -129,4 +130,44 @@ class PetMemorialTest {
         assertEquals(MemorialStats(235, "2026년 3월 14일", "2026년 10월 25일"), memorialStats(dao, kong, today, seoul))
         assertEquals(1258L, memorialStats(dao, kong.copy(familyDate = "2023-05-26"), today, seoul).days)
     }
+
+    /** 두 번 간직해도 처음 간직 시각 그대로 — 되돌릴 줄을 잃지 않는다. */
+    @Test fun memorializeTwiceKeepsFirstTime() = runBlocking {
+        val kong = pet()
+        val open = med(kong.id)
+        dao.memorialize(kong.id, kept)
+        dao.memorialize(kong.id, back)
+        assertEquals(kept, dao.pet(kong.id)?.memorializedAt)
+        dao.restoreFromMemorial(kong.id, back)
+        assertEquals(listOf(open.seriesId), meds().filter { it.activeUntil == null }.map { it.seriesId })
+    }
+
+    /** 간직 중 당뇨를 껐거나 인슐린을 새로 설정했으면 되돌릴 때 인슐린을 다시 열지 않는다(열린 계획 하나만). */
+    @Test fun restoreSkipsInsulinWhenNotDiabeticOrAlreadyOpen() = runBlocking {
+        val kong = pet(diabetes = true)
+        dao.insert(InsulinPlan(createdAt = created, petId = kong.id, slots = listOf(InsulinSlot("08:00", 2.0)), activeFrom = created))
+        dao.memorialize(kong.id, kept)
+        dao.insert(InsulinPlan(createdAt = kept, petId = kong.id, slots = listOf(InsulinSlot("09:00", 3.0)), activeFrom = at(2026, 10, 25)))
+        dao.restoreFromMemorial(kong.id, back)
+        assertEquals(listOf(listOf(InsulinSlot("09:00", 3.0))), dao.openInsulinPlans(kong.id).map { it.slots })
+
+        val bori = pet("보리", diabetes = true)
+        dao.insert(InsulinPlan(createdAt = created, petId = bori.id, slots = listOf(InsulinSlot("08:00", 2.0)), activeFrom = created))
+        dao.memorialize(bori.id, kept)
+        dao.update(checkNotNull(dao.pet(bori.id)).copy(hasDiabetes = false))
+        dao.restoreFromMemorial(bori.id, back)
+        assertEquals(0, dao.openInsulinPlans(bori.id).size)
+    }
+
+    /** 지우면 선택 칸을 비운다(데이터 1-4). */
+    @Test fun deleteClearsOptionalFields() = runBlocking {
+        val kong = pet()
+        dao.update(kong.copy(diagnosis = "IBD", familyDate = "2023-05-26"))
+        dao.insert(Record(createdAt = created, petId = kong.id, kind = RecordKind.vomit, occurredAt = created, data = """{"color":"yellow"}"""))
+        dao.deletePet(kong.id, kept)
+        val row = db.query("SELECT diagnosis, family_date FROM pet", null).use { c -> c.moveToFirst(); listOf(c.getString(0), c.getString(1)) }
+        assertEquals(listOf<String?>(null, null), row)
+        assertEquals("{}", db.query("SELECT data FROM record", null).use { c -> c.moveToFirst(); c.getString(0) })
+    }
 }
+

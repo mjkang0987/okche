@@ -59,6 +59,7 @@ final class PetMemorialTests: XCTestCase {
 
     func testRestoreReopensOnlyRowsClosedWhenKept() throws {
         let kong = pet()
+        kong.hasDiabetes = true
         let openMed = med(kong.id)
         _ = med(kong.id, until: at(2026, 10, 5))
         context.insert(InsulinPlan(now: created, petId: kong.id, name: "란투스", slots: [InsulinSlot(time: "08:00", units: 2)], activeFrom: created))
@@ -122,5 +123,64 @@ final class PetMemorialTests: XCTestCase {
                        .init(days: 235, first: "2026년 3월 14일", last: "2026년 10월 25일"))
         kong.familyDate = "2023-05-26"
         XCTAssertEqual(try PetLifecycle.stats(kong, today: today, calendar: seoul, in: context).days, 1258)
+    }
+
+    /// 두 번 간직해도 처음 간직 시각 그대로 — 되돌릴 줄을 잃지 않는다.
+    func testMemorializeTwiceKeepsFirstTime() throws {
+        let kong = pet()
+        let open = med(kong.id)
+        try context.save()
+        try PetLifecycle.memorialize(kong, now: kept, in: context)
+        try PetLifecycle.memorialize(kong, now: back, in: context)
+        XCTAssertEqual(kong.memorializedAt, kept)
+        try PetLifecycle.restore(kong, now: back, in: context)
+        XCTAssertEqual(try all(MedSchedule.self).filter { $0.activeUntil == nil }.map(\.seriesId), [open.seriesId])
+    }
+
+    /// 간직 중 당뇨를 껐거나 인슐린을 새로 설정했으면 되돌릴 때 인슐린을 다시 열지 않는다(열린 계획 하나만).
+    func testRestoreSkipsInsulinWhenNotDiabeticOrAlreadyOpen() throws {
+        let kong = pet()
+        kong.hasDiabetes = true
+        context.insert(InsulinPlan(now: created, petId: kong.id, slots: [InsulinSlot(time: "08:00", units: 2)], activeFrom: created))
+        try context.save()
+        try PetLifecycle.memorialize(kong, now: kept, in: context)
+        context.insert(InsulinPlan(now: kept, petId: kong.id, slots: [InsulinSlot(time: "09:00", units: 3)], activeFrom: at(2026, 10, 25)))
+        try PetLifecycle.restore(kong, now: back, in: context)
+        XCTAssertEqual(try InsulinPlan.open(for: kong.id, in: context).map(\.slots), [[InsulinSlot(time: "09:00", units: 3)]])
+
+        let bori = pet("보리")
+        bori.hasDiabetes = true
+        context.insert(InsulinPlan(now: created, petId: bori.id, slots: [InsulinSlot(time: "08:00", units: 2)], activeFrom: created))
+        try context.save()
+        try PetLifecycle.memorialize(bori, now: kept, in: context)
+        bori.hasDiabetes = false
+        try PetLifecycle.restore(bori, now: back, in: context)
+        XCTAssertEqual(try InsulinPlan.open(for: bori.id, in: context).count, 0)
+    }
+
+    /// 지우면 선택 칸을 비운다(데이터 1-4).
+    func testDeleteClearsOptionalFields() throws {
+        let kong = pet()
+        kong.diagnosis = "IBD"
+        kong.familyDate = "2023-05-26"
+        let record = Record(now: created, petId: kong.id, kind: .vomit, occurredAt: created, data: #"{"color":"yellow"}"#)
+        context.insert(record)
+        try context.save()
+        try PetLifecycle.delete(kong, now: kept, in: context)
+        XCTAssertNil(kong.diagnosis)
+        XCTAssertNil(kong.familyDate)
+        XCTAssertEqual(record.data, "{}")
+    }
+
+    /// 당뇨 아이를 간직해도 아이 정보는 저장된다(인슐린 계획 검사 안 함).
+    func testMemorialDiabeticPetSaves() throws {
+        let kong = pet()
+        kong.hasDiabetes = true
+        try context.save()
+        try PetLifecycle.memorialize(kong, now: kept, in: context)
+        var form = PetEditing(pet: kong, context: context, today: back, calendar: seoul)
+        form.name = "콩콩"
+        try form.save(in: context, now: back, calendar: seoul)
+        XCTAssertEqual(kong.name, "콩콩")
     }
 }

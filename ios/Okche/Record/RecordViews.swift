@@ -124,7 +124,7 @@ struct QuickRecordCard: View {
         if !RecordDetail.fields(row.kind).isEmpty {
             Button { onDetail(row.kind) } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
-                    .frame(width: moreSize, height: moreSize)
+                    .frame(width: min(moreSize, 72), height: min(moreSize, 72)) // 큰 글자에서 지나치게 커지지 않게
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                     .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
                         .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))

@@ -222,6 +222,41 @@ final class PetEditingTests: XCTestCase {
         XCTAssertEqual(plans.filter { $0.activeUntil == now }.count, 2)
     }
 
+    /// 열린 계획이 둘이고 이름만 바꾸면 고른 계획(늦은 activeFrom)만 고치고 둘 다 열린 채(데이터 7장).
+    func testTwoOpenPlansNameOnlyEditsChosen() throws {
+        let pet = try makePet(diabetes: true)
+        context.insert(InsulinPlan(now: created, petId: pet.id, slots: [InsulinSlot(time: "09:00", units: 1)],
+                                   activeFrom: created.addingTimeInterval(60)))
+        var setup = InsulinSetup(pet: pet, context: context)
+        setup.name = "란투스"
+        try setup.save(in: context, now: now)
+        let plans = try all(InsulinPlan.self)
+        XCTAssertEqual(plans.filter { $0.activeUntil == nil }.count, 2)
+        XCTAssertEqual(plans.filter { $0.name == "란투스" }.map(\.slots), [[InsulinSlot(time: "09:00", units: 1)]])
+    }
+
+    /// 저장된 양을 그대로 보여 줘서, 안 고치고 저장하면 새 계획이 안 생긴다.
+    func testInsulinUnitsLoadExactly() throws {
+        let pet = try makePet()
+        context.insert(InsulinPlan(now: created, petId: pet.id,
+                                   slots: [InsulinSlot(time: "08:00", units: 2), InsulinSlot(time: "20:00", units: 1.234567)],
+                                   activeFrom: created))
+        let setup = InsulinSetup(pet: pet, context: context)
+        XCTAssertEqual(setup.slots.map(\.units), ["2", "1.234567"])
+        try setup.save(in: context, now: now)
+        XCTAssertEqual(try all(InsulinPlan.self).count, 1)
+    }
+
+    /// 이미 고른 종을 다시 골라도 품종·털색은 그대로.
+    func testReselectingSameSpeciesKeepsBreed() throws {
+        var form = editing(try makePet())
+        form.breed = "페르시안"
+        form.furColor = "고등어"
+        form.species = .cat
+        XCTAssertEqual(form.breed, "페르시안")
+        XCTAssertEqual(form.furColor, "고등어")
+    }
+
     func testInsulinSetupMakesPetDiabeticAndSetsNotify() throws {
         let pet = try makePet()
         var setup = InsulinSetup(pet: pet, context: context)

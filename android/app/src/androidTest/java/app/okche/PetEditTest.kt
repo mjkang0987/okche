@@ -7,11 +7,16 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.test.espresso.Espresso
+import app.okche.store.setOnboardingDone
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -218,6 +223,24 @@ class PetEditTest {
         assertEquals(2, plans.count { it.activeUntil == now })
     }
 
+    /** 열린 계획이 둘이고 이름만 바꾸면 고른 계획(늦은 activeFrom)만 고치고 둘 다 열린 채(데이터 7장). */
+    @Test fun twoOpenPlansNameOnlyEditsChosen() = runBlocking {
+        val id = makePet(diabetes = true)
+        dao.insert(InsulinPlan(createdAt = created, petId = id, slots = listOf(InsulinSlot("09:00", 1.0)), activeFrom = created + 60_000))
+        saveInsulinSetup(dao, InsulinSetupForm.load(dao, id).copy(name = "란투스"), now)
+        val plans = plans()
+        assertEquals(2, plans.count { it.activeUntil == null })
+        assertEquals(listOf(listOf(InsulinSlot("09:00", 1.0))), plans.filter { it.name == "란투스" }.map { it.slots })
+    }
+
+    /** 이미 고른 종을 다시 골라도 품종·털색은 그대로(아이 등록·고치기 둘 다). */
+    @Test fun reselectingSameSpeciesKeepsBreed() {
+        val edit = load(makePet()).copy(breed = "페르시안", furColor = "고등어").withSpecies(Species.cat)
+        assertEquals("페르시안" to "고등어", edit.breed to edit.furColor)
+        val register = PetForm(breed = "페르시안", furColor = "고등어").withSpecies(Species.cat)
+        assertEquals("페르시안" to "고등어", register.breed to register.furColor)
+    }
+
     @Test fun insulinSetupMakesPetDiabeticAndSetsNotify() = runBlocking {
         val id = makePet()
         val form = InsulinSetupForm.load(dao, id)
@@ -273,7 +296,7 @@ class PetEditFlowTest {
         rule.onNodeWithText("저장하기").performScrollTo().performClick()
         waitFor(hasText("인슐린 시간과 양을 먼저 설정해 주세요"))
 
-        rule.onNodeWithText("인슐린 이름·양·시간 설정 ›").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("인슐린 이름·양·시간 설정").performScrollTo().performClick()
         waitFor(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)")))
         rule.onNode(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)"))).performTextInput("2")
         rule.onNode(hasSetTextAction().and(hasContentDescription("두 번째 양 (단위)"))).performTextInput("2")
@@ -285,5 +308,30 @@ class PetEditFlowTest {
         waitFor(hasText("콩이이 · 아이 정보"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }
         assertEquals(listOf("콩이이", "true"), listOf(pet.name, pet.hasDiabetes.toString()))
+    }
+
+    /** 처음 실행에서 등록(아래로 밀어 '모시기') → 더보기 → 아이 정보: 위에서 시작하고, 뒤로 가면 더보기로 돌아온다. */
+    @Test fun editAfterRegisterStartsAtTopAndBackReturnsToMore() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            context.setOnboardingDone(false)
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasText("아이 등록하고 시작하기"))
+        rule.onNodeWithText("아이 등록하고 시작하기").performScrollTo().performClick()
+        waitFor(hasSetTextAction().and(hasText("이름")))
+        rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput("콩이")
+        rule.onNode(hasText("모시기").and(hasClickAction())).performScrollTo().performClick()
+        val tabMore = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText("더보기"))
+        waitFor(tabMore)
+        rule.onNode(tabMore).performClick()
+        waitFor(hasText("콩이 · 아이 정보"))
+        rule.onNodeWithText("콩이 · 아이 정보").performClick()
+        waitFor(hasSetTextAction().and(hasText("콩이")))
+        rule.onNode(hasSetTextAction().and(hasText("콩이"))).assertIsDisplayed()
+
+        Espresso.pressBack()
+        waitFor(hasText("콩이 · 아이 정보"))
+        rule.onNode(tabMore).assertIsDisplayed()
     }
 }

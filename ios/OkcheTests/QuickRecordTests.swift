@@ -13,6 +13,7 @@ final class QuickRecordTests: XCTestCase {
         c.timeZone = seoul
         return c.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
     }
+    private func all() -> [Record] { (try? context.fetch(FetchDescriptor<Record>())) ?? [] }
     private func row(_ kind: RecordKind) -> QuickRecord.Row { QuickRecord.rows.first { $0.kind == kind }! }
 
     override func setUp() async throws {
@@ -38,11 +39,13 @@ final class QuickRecordTests: XCTestCase {
         _ = try QuickRecord.save(row(.urine), value: "little", petId: nil, now: at(2026, 10, 24, 22), timeZone: seoul, in: context)
         let first = try QuickRecord.save(row(.stool), value: "hard", petId: nil, now: at(2026, 10, 25, 7), timeZone: seoul, in: context)
         let second = try QuickRecord.save(row(.vomit), value: "digested", petId: nil, now: at(2026, 10, 25, 9), timeZone: seoul, in: context)
-        XCTAssertEqual(try QuickRecord.latest(today: "2026-10-25", in: context)?.id, second.id)
+        XCTAssertEqual(QuickRecord.latest(all(), today: "2026-10-25")?.id, second.id)
+        second.slotKey = "slot"
         try QuickRecord.delete(second, now: at(2026, 10, 25, 9, 5), in: context)
-        XCTAssertEqual(second.data, "{}") // 지우면 data 비움
-        XCTAssertEqual(try QuickRecord.latest(today: "2026-10-25", in: context)?.id, first.id)
-        XCTAssertNil(try QuickRecord.latest(today: "2026-10-26", in: context)) // 날 바뀜
+        XCTAssertEqual(second.data, "{}") // 지우면 선택 칸 비움
+        XCTAssertNil(second.slotKey)
+        XCTAssertEqual(QuickRecord.latest(all(), today: "2026-10-25")?.id, first.id)
+        XCTAssertNil(QuickRecord.latest(all(), today: "2026-10-26")) // 날 바뀜
     }
 
     func testDayRecordsFilterSummaryAndAssign() throws {
@@ -50,11 +53,11 @@ final class QuickRecordTests: XCTestCase {
         _ = try QuickRecord.save(row(.stool), value: "normal", petId: kong, now: at(2026, 10, 25, 9), timeZone: seoul, in: context)
         _ = try QuickRecord.save(row(.stool), value: "soft", petId: bori, now: at(2026, 10, 25, 7), timeZone: seoul, in: context)
         let unknown = try QuickRecord.save(row(.vomit), value: "kibble", petId: nil, now: at(2026, 10, 26, 2), timeZone: seoul, in: context)
-        let all = try QuickRecord.records(day: "2026-10-25", petId: nil, in: context)
-        XCTAssertEqual(all.count, 3) // 02:14 같은 새벽 기록은 전날
-        XCTAssertEqual(all.first?.id, unknown.id) // 늦은 것 위
-        XCTAssertEqual(try QuickRecord.records(day: "2026-10-25", petId: kong, in: context).count, 1)
-        XCTAssertEqual(QuickRecord.summary(all), "구토 1번 · 매화 2번")
+        let day25 = QuickRecord.records(all(), day: "2026-10-25", petId: nil)
+        XCTAssertEqual(day25.count, 3) // 02:14 같은 새벽 기록은 전날
+        XCTAssertEqual(day25.first?.id, unknown.id) // 늦은 것 위
+        XCTAssertEqual(QuickRecord.records(all(), day: "2026-10-25", petId: kong).count, 1)
+        XCTAssertEqual(QuickRecord.summary(day25), "구토 1번 · 매화 2번")
         XCTAssertNil(QuickRecord.summary([]))
         try QuickRecord.assign(unknown, to: bori, now: at(2026, 10, 26, 8), in: context)
         XCTAssertEqual(unknown.petId, bori)

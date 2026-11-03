@@ -54,18 +54,14 @@ enum QuickRecord {
     }
 
     /// 방금 남긴 기록: 오늘(6시 기준) 이 기기에서 가장 늦게 남긴 지우지 않은 기록.
-    static func latest(today: String, in context: ModelContext) throws -> Record? {
-        var query = FetchDescriptor<Record>(predicate: #Predicate { $0.day == today && $0.deletedAt == nil },
-                                            sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
-        query.fetchLimit = 1
-        return try context.fetch(query).first
+    static func latest(_ records: [Record], today: String) -> Record? {
+        records.filter { $0.day == today && $0.deletedAt == nil }.max { $0.createdAt < $1.createdAt }
     }
 
-    /// 그날 기록(시간 순, 늦은 것 위). `pet`이 있으면 그 아이 것만.
-    static func records(day: String, petId: UUID?, in context: ModelContext) throws -> [Record] {
-        let all = try context.fetch(FetchDescriptor<Record>(predicate: #Predicate { $0.day == day && $0.deletedAt == nil },
-                                                            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]))
-        return petId.map { id in all.filter { $0.petId == id } } ?? all
+    /// 그날 기록(시간 순, 늦은 것 위). `petId`가 있으면 그 아이 것만.
+    static func records(_ all: [Record], day: String, petId: UUID?) -> [Record] {
+        all.filter { $0.day == day && $0.deletedAt == nil && (petId == nil || $0.petId == petId) }
+            .sorted { $0.occurredAt > $1.occurredAt }
     }
 
     /// 그날 요약: '구토 1번 · 매화 2번 · 소피 1번 · 수라 2번'(0번은 빼고, 없으면 nil).
@@ -85,11 +81,12 @@ enum QuickRecord {
         try save(context)
     }
 
-    /// 기록 지우기: `deletedAt`·`updatedAt`, '되돌릴 수 없어요'라서 `data` = `{}`(데이터 1-4).
+    /// 기록 지우기: `deletedAt`·`updatedAt`, '되돌릴 수 없어요'라서 선택 칸을 비움 — `data` = `{}`, `slotKey`(데이터 1-4).
     static func delete(_ record: Record, now: Date = .now, in context: ModelContext) throws {
         record.deletedAt = now
         record.updatedAt = now
         record.data = "{}"
+        record.slotKey = nil
         try save(context)
     }
 

@@ -77,7 +77,8 @@ struct PetEditing {
         // 읽기는 바꾸기 전에 모두 한다(읽다 실패해도 바뀐 값이 남지 않게).
         let plans = try InsulinPlan.open(for: pet.id, in: context)
         let rests = try RestPeriod.open(for: pet.id, in: context)
-        if hasDiabetes && plans.isEmpty { errors[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요" }
+        // 원래 당뇨였던 추억 아이는 간직할 때 인슐린 계획을 닫아 두므로 검사하지 않는다(6-4). 새로 켜는 건 그대로 검사.
+        if hasDiabetes && plans.isEmpty && !(pet.memorializedAt != nil && pet.hasDiabetes) { errors[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요" }
         guard errors.isEmpty else { throw PetRegistration.Invalid(errors: errors) }
 
         var birth = birthDate.map { PetRegistration.day($0, calendar) }

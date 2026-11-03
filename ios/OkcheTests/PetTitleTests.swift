@@ -36,6 +36,25 @@ final class PetTitleTests: XCTestCase {
         XCTAssertNil(PetTitle.age(nil, today: day(2026, 11, 3), calendar: seoul))
     }
 
+    func testObjectParticle() {
+        XCTAssertEqual(PetTitle.withObjectParticle("콩이"), "콩이를")
+        XCTAssertEqual(PetTitle.withObjectParticle("똘똘"), "똘똘을")
+        XCTAssertEqual(PetTitle.withObjectParticle("Coco"), "Coco을(를)")
+    }
+
+    /// 추억으로 간직한 아이는 호칭 없이 이름만, 목록 맨 뒤(6-4).
+    func testMemorialNameAndOrder() throws {
+        let container = try OkcheStore.container(inMemory: true)
+        let first = Pet(now: day(2026, 10, 1), name: "두부", species: .cat, breed: "코리안숏헤어", furColor: "치즈")
+        let second = Pet(now: day(2026, 10, 2), name: "콩이", species: .cat, breed: "코리안숏헤어", furColor: "치즈")
+        container.mainContext.insert(first)
+        container.mainContext.insert(second)
+        first.memorializedAt = day(2026, 10, 20)
+        XCTAssertEqual(PetTitle.name(first, today: day(2026, 11, 3), calendar: seoul), "두부")
+        XCTAssertEqual(PetTitle.name(second, today: day(2026, 11, 3), calendar: seoul), "콩이 아기씨")
+        XCTAssertEqual(PetTitle.ordered([first, second]).map(\.name), ["콩이", "두부"])
+    }
+
     func testCurrentPet() throws {
         let container = try OkcheStore.container(inMemory: true)
         let context = container.mainContext

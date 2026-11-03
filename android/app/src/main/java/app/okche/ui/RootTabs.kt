@@ -45,6 +45,8 @@ import app.okche.R
 import app.okche.store.OkcheDatabase
 import app.okche.store.lastPetId
 import app.okche.store.setLastPetId
+import app.okche.store.setOnboardingDone
+import app.okche.ui.pet.MemorialScreen
 import app.okche.ui.pet.PetEditFlow
 import app.okche.ui.pet.PetManageSection
 import app.okche.ui.pet.PetRegisterScreen
@@ -84,7 +86,24 @@ fun RootTabs() {
     var registering by rememberSaveable { mutableStateOf(false) }
     var switching by rememberSaveable { mutableStateOf(false) }
     editPetId?.let { id ->
-        PetEditFlow(id, onClose = { editPetId = null })
+        PetEditFlow(
+            id,
+            onClose = { editPetId = null },
+            // 간직하면 문안의 추억 화면(지금 보는 아이로), 지우면 더보기 — 마지막 아이를 지워도 시작하기로 돌아가지 않게(6-4).
+            onKept = {
+                // 지금 보는 아이를 먼저 바꾼 뒤 문안으로(다른 아이의 문안이 잠깐 보이지 않게).
+                scope.launch {
+                    context.setLastPetId(id)
+                    editPetId = null
+                    selected = Tab.Main.ordinal
+                }
+            },
+            onDeleted = {
+                editPetId = null
+                selected = Tab.More.ordinal
+                scope.launch { context.setOnboardingDone(true) }
+            },
+        )
         return
     }
     if (registering) {
@@ -170,7 +189,7 @@ fun RootTabs() {
         val modifier = Modifier.padding(padding)
         when (Tab.entries[selected]) {
             Tab.Record -> RecordTab(modifier, seal)
-            Tab.Main -> MainTab(modifier, seal)
+            Tab.Main -> if (current?.memorializedAt != null) MemorialScreen(current, modifier, seal) else MainTab(modifier, seal)
             Tab.Sillok -> SillokTab(modifier, current?.name, seal)
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {

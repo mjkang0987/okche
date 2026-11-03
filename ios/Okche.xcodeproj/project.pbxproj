@@ -15,6 +15,7 @@
 		32E248F21BEBE965A841681F /* OnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED4AD63A806E671679D1043 /* OnboardingUITests.swift */; };
 		33ABCD9E369A3EE6CD8276DB /* TabScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */; };
 		47B5D69BEBA333C23CA3FCEC /* OkcheApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */; };
+		4C11B7EF101CB5D66F5AC7B2 /* PetMemorialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */; };
 		516AA3AFF1691A66D7DB2AC0 /* StoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */; };
 		544A8FE74663DA4531AAE09C /* PetCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F746B7528E2591E8DB910CC6 /* PetCatalog.swift */; };
 		557FB933A1B43D9BD16869FA /* OkcheTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */; };
@@ -25,6 +26,7 @@
 		6E5E5956C44885F6BB9757E6 /* OkcheDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28809CA2E38D55D30DE87A2C /* OkcheDay.swift */; };
 		7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AB360783EF98AB5867AB5C /* PetRegistration.swift */; };
 		84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */; };
+		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
 		A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC98478DFCF8B973F662089 /* FixedID.swift */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
@@ -35,6 +37,7 @@
 		CA74315C30A861DA14F460D5 /* PetEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EADEDDED180083767C7591 /* PetEditing.swift */; };
 		CC249A1EEE997BB6078FFB4B /* PetTitleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8649B59BC02635CA73BE002E /* PetTitleTests.swift */; };
 		CDC88C1FF6E6902EF38A52D4 /* Food.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13CBF10BF9810FF2FF06E5CF /* Food.swift */; };
+		D5910D9C77B07EDE346F91B4 /* ConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CE93E88BDC4151CA307E93 /* ConfirmDialog.swift */; };
 		D941072A8BFE61DCBA371477 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062F522F90EA709F319790DF /* OnboardingView.swift */; };
 		DC4FCDE9A79D8A3AE1C347B1 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC982B8A4E56FC21697A2A95 /* Medication.swift */; };
 		EA602DD64B1EFC19974AB3AD /* InsulinSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD19586ECCA53AEA01EFA244 /* InsulinSetupView.swift */; };
@@ -93,10 +96,13 @@
 		CC982B8A4E56FC21697A2A95 /* Medication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Medication.swift; sourceTree = "<group>"; };
 		CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheApp.swift; sourceTree = "<group>"; };
 		D1A3F2256A1A50E4C05ADCC8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetMemorialTests.swift; sourceTree = "<group>"; };
 		D7D6C2E378358E8E76912918 /* Pet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pet.swift; sourceTree = "<group>"; };
+		D9CE93E88BDC4151CA307E93 /* ConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmDialog.swift; sourceTree = "<group>"; };
 		DD19586ECCA53AEA01EFA244 /* InsulinSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinSetupView.swift; sourceTree = "<group>"; };
 		DE008ACDAEE4E26437D18241 /* Okche.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Okche.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegisterView.swift; sourceTree = "<group>"; };
+		E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetMemorial.swift; sourceTree = "<group>"; };
 		F083B473ABC239159DAD968D /* OkcheTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OkcheTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F659238365F43F72FF6074CF /* Tabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tabs.swift; sourceTree = "<group>"; };
 		F746B7528E2591E8DB910CC6 /* PetCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetCatalog.swift; sourceTree = "<group>"; };
@@ -155,6 +161,7 @@
 				67EADEDDED180083767C7591 /* PetEditing.swift */,
 				98CDAB465E2B94F5B559EA92 /* PetEditView.swift */,
 				3243EEDC54CED5C2596666C2 /* PetFormParts.swift */,
+				E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */,
 				DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */,
 				C8AB360783EF98AB5867AB5C /* PetRegistration.swift */,
 				B09057EC665CB2A87457B924 /* PetSeal.swift */,
@@ -175,6 +182,7 @@
 			children = (
 				650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */,
 				26D4DB5EBE50D81DD114901B /* PetEditingTests.swift */,
+				D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */,
 				465382965673124E58129062 /* PetRegistrationTests.swift */,
 				8649B59BC02635CA73BE002E /* PetTitleTests.swift */,
 				891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */,
@@ -185,6 +193,7 @@
 		92A3D766F6450A40DE97DCF9 /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				D9CE93E88BDC4151CA307E93 /* ConfirmDialog.swift */,
 				057BAF60E852CAEEBD99A1FC /* FormControls.swift */,
 				B590D8DB533C4B3A72A47C59 /* gowun_batang_bold.ttf */,
 				9179F1B84DD420CB6775A1FC /* OFL-GowunBatang.txt */,
@@ -325,6 +334,7 @@
 			files = (
 				B98102180DE4DD53B6377DCA /* OkcheTests.swift in Sources */,
 				05B698CDE5DA37B28E209193 /* PetEditingTests.swift in Sources */,
+				4C11B7EF101CB5D66F5AC7B2 /* PetMemorialTests.swift in Sources */,
 				986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */,
 				CC249A1EEE997BB6078FFB4B /* PetTitleTests.swift in Sources */,
 				516AA3AFF1691A66D7DB2AC0 /* StoreTests.swift in Sources */,
@@ -343,6 +353,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5910D9C77B07EDE346F91B4 /* ConfirmDialog.swift in Sources */,
 				A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */,
 				CDC88C1FF6E6902EF38A52D4 /* Food.swift in Sources */,
 				C9380FEA3E64CDA7BE873E2D /* FormControls.swift in Sources */,
@@ -359,6 +370,7 @@
 				B674AAAE81492DE86413BCA5 /* PetEditView.swift in Sources */,
 				CA74315C30A861DA14F460D5 /* PetEditing.swift in Sources */,
 				F06FE9717024B04E23FC62F7 /* PetFormParts.swift in Sources */,
+				8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */,
 				84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */,
 				7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */,
 				1B3C5F0BD0535907A19FD5D4 /* PetSeal.swift in Sources */,

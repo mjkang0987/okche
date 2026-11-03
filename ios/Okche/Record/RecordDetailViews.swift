@@ -76,21 +76,34 @@ struct RecordDetailSheet: View {
 
     /// '지금 · 오후 2:14' + '시간 바꾸기'.
     private var timeRow: some View {
-        HStack(spacing: 12) {
-            Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
-            Spacer(minLength: 0)
-            Button("시간 바꾸기") { pickingTime = true }
-                .okcheText(OkcheType.label, weight: .regular)
-                .foregroundStyle(OkcheColor.ink)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 40)
-                .background(OkcheColor.paper, in: Capsule())
-                .overlay(Capsule().strokeBorder(OkcheColor.lineStrong, lineWidth: 1.5))
-                .frame(minHeight: 44)
+        // 큰 글자에서 한 줄에 안 들어가면 버튼을 아래로.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).fixedSize()
+                Spacer(minLength: 0)
+                timeButton
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                timeButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 14)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+    }
+
+    private var timeButton: some View {
+        Button("시간 바꾸기") { pickingTime = true }
+            .okcheText(OkcheType.label, weight: .regular)
+            .fixedSize()
+            .foregroundStyle(OkcheColor.ink)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 40)
+            .background(OkcheColor.paper, in: Capsule())
+            .overlay(Capsule().strokeBorder(OkcheColor.lineStrong, lineWidth: 1.5))
+            .frame(minHeight: 44)
     }
 
     private var timeText: String {
@@ -162,9 +175,8 @@ struct RecordDetailSheet: View {
     }
 
     private func save() {
-        guard !saving else { return } // 두 번 눌러 기록이 둘 생기지 않게
+        guard !saving else { return } // 두 번 눌러 기록이 둘 생기지 않게(닫히는 동안에도 — 실패할 때만 다시 풂)
         saving = true
-        defer { saving = false }
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         let at = target.editing == nil && !timeChanged ? Date.now : occurredAt
         do {
@@ -172,6 +184,7 @@ struct RecordDetailSheet: View {
             onSaved(record, target.editing == nil)
             dismiss()
         } catch {
+            saving = false
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
         }

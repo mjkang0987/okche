@@ -86,8 +86,19 @@ fun honorific(birthDate: String?, today: LocalDate = LocalDate.now()): String {
     return if (fullYears(birth, today) >= 1) "마마" else "아기씨"
 }
 
-/** '콩이 마마' */
-fun petTitle(pet: Pet, today: LocalDate = LocalDate.now()) = "${pet.name} ${honorific(pet.birthDate, today)}"
+/** '콩이 마마'. 추억으로 간직한 아이는 호칭 없이 이름만(6-4). */
+fun petTitle(pet: Pet, today: LocalDate = LocalDate.now()) =
+    if (pet.memorializedAt != null) pet.name else "${pet.name} ${honorific(pet.birthDate, today)}"
+
+/** 목록 순서: 모신 순, 추억으로 간직한 아이는 맨 뒤(추억끼리도 모신 순, 6-4). */
+fun orderedPets(pets: List<Pet>) = pets.filter { it.memorializedAt == null } + pets.filter { it.memorializedAt != null }
+
+/** 이름 + 을/를(받침이 있으면 '을'). 한글로 끝나지 않으면 '을(를)'. */
+fun withObjectParticle(name: String): String {
+    val last = name.lastOrNull() ?: return name
+    if (last !in '가'..'힣') return "${name}을(를)"
+    return name + if ((last - '가') % 28 == 0) "를" else "을"
+}
 
 /** 만 나이 '7살', 1살 미만은 만 개월 '3개월'(1개월 미만 '0개월'). 생일이 없으면 null. */
 fun petAge(birthDate: String?, today: LocalDate = LocalDate.now()): String? {
@@ -136,9 +147,10 @@ fun PetSeal(pet: Pet?, onSwitch: () -> Unit, onRegister: () -> Unit) {
     }
 }
 
-/** '고양이 · 7살 · 휴양 중' */
+/** '고양이 · 7살 · 휴양 중', 추억 아이는 '고양이 · 추억으로 간직 중'. */
 private fun petDetail(pet: Pet, resting: Boolean) =
-    listOfNotNull(if (pet.species == Species.cat) "고양이" else "강아지", petAge(pet.birthDate), "휴양 중".takeIf { resting }).joinToString(" · ")
+    if (pet.memorializedAt != null) listOf(if (pet.species == Species.cat) "고양이" else "강아지", "추억으로 간직 중").joinToString(" · ")
+    else listOfNotNull(if (pet.species == Species.cat) "고양이" else "강아지", petAge(pet.birthDate), "휴양 중".takeIf { resting }).joinToString(" · ")
 
 /** 아이 바꾸기 시트(보드 PetSwitch). 고르면 바로 바뀌고 닫힌다. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,7 +180,7 @@ fun PetSwitchSheet(
                 IconButton(onDismiss) { Icon(Icons.Outlined.Close, "닫기", tint = OkcheColor.Ink) }
             }
             Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
-                for (pet in pets) {
+                for (pet in orderedPets(pets)) {
                     val selected = pet.id == current?.id
                     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
                     Row(
@@ -235,9 +247,10 @@ fun PetManageSection(pets: List<Pet>, restingIds: Set<String>, onEditPet: (Strin
             OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, Modifier.padding(top = 12.dp, bottom = 10.dp), look = ButtonLook.Dashed)
             return@Column
         }
-        pets.forEachIndexed { i, pet ->
+        orderedPets(pets).forEachIndexed { i, pet ->
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
             val resting = pet.id in restingIds
+            val memorial = pet.memorializedAt != null
             val title = petTitle(pet)
             FlowRow(
                 Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -247,12 +260,14 @@ fun PetManageSection(pets: List<Pet>, restingIds: Set<String>, onEditPet: (Strin
                 Text(
                     buildAnnotatedString {
                         append(title)
-                        if (resting) withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 14.sp)) { append(" · 휴양 중") }
+                        val note = if (memorial) " · 추억으로 간직 중" else if (resting) " · 휴양 중" else null
+                        if (note != null) withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 14.sp)) { append(note) }
                     },
                     Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) { onEditPet(pet.id) }.wrapContentHeight(Alignment.CenterVertically),
                     color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
                 )
-                Row(
+                // 추억으로 간직한 아이는 휴양 스위치 없음(6-4).
+                if (!memorial) Row(
                     Modifier
                         .heightIn(min = 44.dp)
                         .toggleable(resting, enabled = !saving, role = Role.Switch) { on ->

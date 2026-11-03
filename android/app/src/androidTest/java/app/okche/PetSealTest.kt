@@ -18,12 +18,16 @@ import app.okche.store.setOnboardingDone
 import app.okche.ui.pet.PetForm
 import app.okche.ui.pet.registerPet
 import org.junit.Rule
+import androidx.compose.ui.test.assertCountEquals
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.store.OkcheDatabase
 import app.okche.store.Pet
 import app.okche.store.Species
 import app.okche.ui.pet.currentPet
+import app.okche.ui.pet.orderedPets
+import app.okche.ui.pet.petTitle
+import app.okche.ui.pet.withObjectParticle
 import app.okche.ui.pet.honorific
 import app.okche.ui.pet.petAge
 import app.okche.ui.pet.setResting
@@ -66,6 +70,21 @@ class PetSealTest {
         assertEquals("1살", petAge("2025-11-03", day(2026, 11, 3)))
         assertEquals("1개월", petAge("2026-01-31", day(2026, 2, 28))) // 달 끝
         assertNull(petAge(null, day(2026, 11, 3)))
+    }
+
+    @Test fun objectParticle() {
+        assertEquals("콩이를", withObjectParticle("콩이"))
+        assertEquals("똘똘을", withObjectParticle("똘똘"))
+        assertEquals("Coco을(를)", withObjectParticle("Coco"))
+    }
+
+    /** 추억으로 간직한 아이는 호칭 없이 이름만, 목록 맨 뒤(6-4). */
+    @Test fun memorialNameAndOrder() {
+        val dubu = Pet(createdAt = 1, name = "두부", species = Species.cat, breed = "코리안숏헤어", furColor = "치즈", memorializedAt = 5)
+        val kong = Pet(createdAt = 2, name = "콩이", species = Species.cat, breed = "코리안숏헤어", furColor = "치즈")
+        assertEquals("두부", petTitle(dubu, day(2026, 11, 3)))
+        assertEquals("콩이 아기씨", petTitle(kong, day(2026, 11, 3)))
+        assertEquals(listOf("콩이", "두부"), orderedPets(listOf(dubu, kong)).map { it.name })
     }
 
     @Test fun currentPetFallsBackToFirst() {
@@ -156,3 +175,53 @@ class PetSwitchFlowTest {
         waitFor(hasText("콩이 아기씨"))
     }
 }
+
+/** 아이 정보 → 추억으로 간직(문안에 추억 화면) → 추억에서 되돌리기 → 지우기(더보기로) (6-4). */
+class PetMemorialFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun close() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    private fun tab(name: String) = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText(name))
+
+    @Test fun keepRestoreAndDelete() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+            context.setOnboardingDone(false)
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(tab("더보기"))
+        rule.onNode(tab("더보기")).performClick()
+        waitFor(hasText("콩이 아기씨"))
+        rule.onNode(hasText("콩이 아기씨").and(hasClickAction())).performClick()
+
+        waitFor(hasText("추억으로 간직하기"))
+        rule.onNode(hasText("추억으로 간직하기")).performScrollTo().performClick()
+        waitFor(hasText("콩이의 기록을 추억으로 간직할게요"))
+        rule.onNode(hasText("간직하기").and(hasClickAction())).performClick()
+        waitFor(hasText("추억으로 간직 중", substring = true))
+        rule.onNode(tab("문안")).assertIsSelected()
+
+        rule.onNode(tab("더보기")).performClick()
+        waitFor(hasText("콩이 · 추억으로 간직 중"))
+        rule.onAllNodes(hasContentDescription("콩이 휴양 중 · 관리 쉬기")).assertCountEquals(0) // 추억 아이는 휴양 스위치 없음
+        rule.onNode(hasText("콩이 · 추억으로 간직 중")).performClick()
+        waitFor(hasText("추억에서 되돌리기"))
+        rule.onNode(hasText("추억에서 되돌리기")).performScrollTo().performClick()
+        waitFor(hasText("콩이를 다시 모실까요?"))
+        rule.onNode(hasText("다시 모시기").and(hasClickAction())).performClick()
+        waitFor(hasText("추억으로 간직하기"))
+
+        rule.onNode(hasText("이 아이 기록 지우기")).performScrollTo().performClick()
+        waitFor(hasText("콩이의 기록을 지울까요?"))
+        rule.onNode(hasText("지우기").and(hasClickAction())).performClick()
+        waitFor(hasText("아직 모신 아이가 없어요."))
+    }
+}
+

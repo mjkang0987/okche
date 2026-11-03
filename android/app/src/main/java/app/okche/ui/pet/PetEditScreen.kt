@@ -1,5 +1,11 @@
 package app.okche.ui.pet
 
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import app.okche.ui.ButtonLook
+import app.okche.ui.OkcheConfirmDialog
+import androidx.compose.runtime.rememberCoroutineScope
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -111,7 +117,7 @@ class FormSaveModel : ViewModel() {
  * 들어가는 길은 더보기 아이 관리·아이 바꾸기 시트(6-3).
  */
 @Composable
-fun PetEditFlow(petId: String, onClose: () -> Unit) {
+fun PetEditFlow(petId: String, onClose: () -> Unit, onKept: () -> Unit = onClose, onDeleted: () -> Unit = onClose) {
     var insulin by rememberSaveable { mutableStateOf(false) }
     val states = rememberSaveableStateHolder()
     if (insulin) {
@@ -123,7 +129,7 @@ fun PetEditFlow(petId: String, onClose: () -> Unit) {
             })
         }
     } else {
-        states.SaveableStateProvider("edit") { PetEditScreen(petId, onClose, onInsulin = { insulin = true }) }
+        states.SaveableStateProvider("edit") { PetEditScreen(petId, onClose, onInsulin = { insulin = true }, onKept, onDeleted) }
     }
 }
 
@@ -145,10 +151,11 @@ internal class Anchors {
  * 사료·체중 줄과 추억·지우기는 그 화면을 만드는 단계 전이라 보이기만 한다.
  */
 @Composable
-private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> Unit) {
+private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> Unit, onKept: () -> Unit, onDeleted: () -> Unit) {
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val saver: FormSaveModel = viewModel(key = "petEdit")
+    val scope = rememberCoroutineScope()
     var form by rememberSaveable { mutableStateOf<PetEditForm?>(null) }
     var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
     // 위 요약(저장된 값)과 체중 줄. 인슐린 설정에서 돌아오면 다시 읽는다.
@@ -204,7 +211,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                 Column(Modifier.semantics(mergeDescendants = true) {}) {
                     val title = OkcheType.Title.toTextStyle()
                     Text(petTitle(pet), color = OkcheColor.Ink, style = title)
-                    val days = companionDays(pet.familyDate)?.let { "동행 %,d일".format(it) }
+                    val days = if (pet.memorializedAt != null) "추억으로 간직 중" else companionDays(pet.familyDate)?.let { "동행 %,d일".format(it) }
                     Text(
                         listOfNotNull(if (pet.species == Species.cat) "고양이" else "강아지", pet.breed, days).joinToString(" · "),
                         color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
@@ -247,13 +254,25 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                 }
             }
             LaterRows(weight)
-            OkcheSwitchRow(
+            // 추억으로 간직한 아이는 휴양 스위치 없음(6-4).
+            if (saved?.memorializedAt == null) OkcheSwitchRow(
                 "휴양 중 · 관리 쉬기", "알림을 멈추고, 이 기간은 약·끼니 챙긴 횟수에서 빼요. 휴양 중에도 기록할 수 있어요.",
                 f.resting, { edit { copy(resting = it) } },
             )
             errors["save"]?.let { OkcheErrorText(it) }
             OkchePrimaryButton("저장하기", enabled = !saver.saving, onClick = { saver.save { savePetEdit(dao, f) } })
-            LaterLinks()
+            saved?.let { pet ->
+                LifecycleLinks(
+                    pet,
+                    onDone = { done ->
+                        when (done) {
+                            Lifecycle.Kept -> onKept()
+                            Lifecycle.Deleted -> onDeleted()
+                            Lifecycle.Restored -> scope.launch { saved = dao.pet(petId) }
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -284,18 +303,77 @@ private fun LaterRow(title: String, value: String) {
     }
 }
 
-/** 추억으로 간직하기 | 이 아이 기록 지우기 — 6-4에서 눌리게. TalkBack에는 '사용 중지됨'으로 읽힌다. */
+private enum class Lifecycle { Kept, Restored, Deleted }
+
+/**
+ * '추억으로 간직하기 | 이 아이 기록 지우기', 추억 아이는 '추억에서 되돌리기 | 이 아이 기록 지우기'(6-4). 누르면 확인 창.
+ * 저장은 한 트랜잭션(OkcheDao), 실패하면 아래에 문구.
+ */
 @Composable
-private fun LaterLinks() {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 44.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
-        TextButton({}, enabled = false) { Text("추억으로 간직하기", color = OkcheColor.InkMuted, style = style) }
-        Text("|", Modifier.clearAndSetSemantics {}, color = OkcheColor.Line, style = style)
-        TextButton({}, enabled = false) { Text("이 아이 기록 지우기", color = OkcheColor.Yeonji, style = style) }
+private fun LifecycleLinks(pet: Pet, onDone: (Lifecycle) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var dialog by rememberSaveable { mutableStateOf<Lifecycle?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    val memorial = pet.memorializedAt != null
+    fun run(what: Lifecycle) {
+        dialog = null
+        scope.launch {
+            val dao = OkcheDatabase.get(context).dao()
+            val now = System.currentTimeMillis()
+            failed = runCatching {
+                when (what) {
+                    Lifecycle.Kept -> dao.memorialize(pet.id, now)
+                    Lifecycle.Restored -> dao.restoreFromMemorial(pet.id, now)
+                    Lifecycle.Deleted -> dao.deletePet(pet.id, now)
+                }
+            }.isFailure
+            if (!failed) onDone(what)
+        }
+    }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+            val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
+            if (memorial) {
+                TextButton({ dialog = Lifecycle.Restored }) { Text("추억에서 되돌리기", color = OkcheColor.Namsaek, style = style) }
+            } else {
+                TextButton({ dialog = Lifecycle.Kept }) { Text("추억으로 간직하기", color = OkcheColor.InkMuted, style = style) }
+            }
+            Text("|", Modifier.clearAndSetSemantics {}, color = OkcheColor.Line, style = style)
+            TextButton({ dialog = Lifecycle.Deleted }) { Text("이 아이 기록 지우기", color = OkcheColor.Yeonji, style = style) }
+        }
+        if (failed) OkcheErrorText(SAVE_ERROR)
+    }
+    when (dialog) {
+        Lifecycle.Kept -> OkcheConfirmDialog(
+            "${pet.name}의 기록을 추억으로 간직할게요", "간직하기", { dialog = null }, { run(Lifecycle.Kept) },
+            bullets = listOf("약·기록·사진 알림은 모두 멈춰요", "기록과 사진은 그대로 남아요", "생일 같은 축하 화면은 이제 뜨지 않아요", "아이 정보에서 언제든 되돌릴 수 있어요"),
+        )
+        Lifecycle.Deleted -> OkcheConfirmDialog(
+            "${pet.name}의 기록을 지울까요?", "지우기", { dialog = null }, { run(Lifecycle.Deleted) },
+            destructive = true, message = "기록·사진·실록이 모두 사라지고, 되돌릴 수 없어요.", confirmLook = ButtonLook.Danger,
+        ) {
+            // 추억 아이에게는 간직 권유를 보이지 않는다(이미 간직 중).
+            if (!memorial) Column(
+                Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    buildAnnotatedString {
+                        append("지우는 대신 ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("추억으로 간직") }
+                        append("할 수도 있어요. 기록과 사진은 그대로 두고, 알림만 모두 멈춰요.")
+                    },
+                    color = OkcheColor.Ink, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
+                )
+                OkchePrimaryButton("추억으로 간직하기", { dialog = Lifecycle.Kept }, look = ButtonLook.Outlined)
+            }
+        }
+        Lifecycle.Restored -> OkcheConfirmDialog(
+            "${withObjectParticle(pet.name)} 다시 모실까요?", "다시 모시기", { dialog = null }, { run(Lifecycle.Restored) },
+            bullets = listOf("간직할 때 멈춘 약·인슐린·끼니 알림이 다시 시작돼요", "생일 같은 축하 화면이 다시 떠요", "휴양 중이었다면 다시 켜 주세요"),
+        )
+        null -> Unit
     }
 }
 

@@ -83,63 +83,145 @@ struct OkcheTextField: View {
     }
 }
 
-/// ② 고르기 칩: 40 높이 알약 중 하나만. `selection`이 nil이면 아무것도 안 고른 상태.
-/// `allowsNone`이면 고른 칩을 다시 눌러 안 고름으로 되돌린다('(선택)' 칸).
+/// ② 고르기 칩: 40 높이 알약. 하나만 고르기(`selection`) 또는 여러 개 고르기(`isOn`·`onTap`, 7-2 자세히 시트).
+/// 하나만 고르기에서 `selection`이 nil이면 아무것도 안 고른 상태, `allowsNone`이면 고른 칩을 다시 눌러 안 고름으로 되돌린다('(선택)' 칸).
+/// 줄에 안 들어가면 다음 줄로 넘긴다(디자인 flex-wrap).
 struct OkcheChoiceChips<Value: Hashable>: View {
     let options: [(value: Value, title: String)]
-    @Binding var selection: Value?
-    var allowsNone = true
+    private let isOn: (Value) -> Bool
+    private let onTap: (Value) -> Void
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 40
 
-    var body: some View {
-        // 큰 글자에서 한 줄에 안 들어가면 세로로 쌓는다.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) { chips }
-            VStack(alignment: .leading, spacing: 8) { chips }
-        }
+    init(options: [(value: Value, title: String)], selection: Binding<Value?>, allowsNone: Bool = true) {
+        self.options = options
+        isOn = { $0 == selection.wrappedValue }
+        onTap = { value in selection.wrappedValue = value == selection.wrappedValue && allowsNone ? nil : value }
     }
 
-    private var chips: some View {
-        ForEach(options, id: \.value) { option in
-            let on = option.value == selection
-            Button { selection = on && allowsNone ? nil : option.value } label: {
-                Text(option.title)
-                    .okcheText(OkcheType.body, weight: on ? .bold : .regular)
-                    .fixedSize()
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: height)
-                    .foregroundStyle(on ? OkcheColor.paper : OkcheColor.ink)
-                    .background(on ? OkcheColor.namsaek : OkcheColor.paper, in: Capsule())
-                    .overlay(Capsule().strokeBorder(on ? Color.clear : OkcheColor.lineStrong, lineWidth: 1.5))
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+    /// 여러 개 고르기처럼 고름·누름을 부르는 쪽이 정할 때.
+    init(options: [(value: Value, title: String)], isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
+        self.options = options
+        self.isOn = isOn
+        self.onTap = onTap
+    }
+
+    var body: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(options, id: \.value) { option in
+                let on = isOn(option.value)
+                Button { onTap(option.value) } label: {
+                    Text(option.title)
+                        .okcheText(OkcheType.body, weight: on ? .bold : .regular)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: height)
+                        .foregroundStyle(on ? OkcheColor.paper : OkcheColor.ink)
+                        .background(on ? OkcheColor.namsaek : OkcheColor.paper, in: Capsule())
+                        .overlay(Capsule().strokeBorder(on ? Color.clear : OkcheColor.lineStrong, lineWidth: 1.5))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(on ? .isSelected : [])
         }
     }
 }
 
-/// ③ 고르기 칸: 52 높이 카드를 같은 너비로 나란히, 하나만.
+/// 줄에 안 들어가면 다음 줄로 넘기는 배치(칩). 한 줄보다 넓은 것은 줄 폭으로 줄인다.
+struct FlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = rows(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for (index, size) in row.items {
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var items: [(Int, CGSize)] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func rows(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for (index, subview) in subviews.enumerated() {
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width { size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil)) }
+            if !row.items.isEmpty && row.width + spacing + size.width > width {
+                rows.append(row)
+                row = Row()
+            }
+            row.width += (row.items.isEmpty ? 0 : spacing) + size.width
+            row.height = max(row.height, size.height)
+            row.items.append((index, size))
+        }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
+    }
+}
+
+/// ③ 고르기 칸: 카드를 같은 너비로 나란히, 하나만. 아이콘을 주면 아이콘 위·글자 아래 96 높이(7-2 매화 모양),
+/// `isOn`·`onTap`을 주면 다시 눌러 풀기 같은 동작을 부르는 쪽이 정한다.
 struct OkcheChoiceCards<Value: Hashable>: View {
     let options: [(value: Value, title: String)]
-    @Binding var selection: Value
+    private let isOn: (Value) -> Bool
+    private let onTap: (Value) -> Void
+    private let icons: [Value: String]
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 52
+    @ScaledMetric(relativeTo: .body) private var iconHeight: CGFloat = 96
+
+    init(options: [(value: Value, title: String)], selection: Binding<Value>) {
+        self.options = options
+        isOn = { $0 == selection.wrappedValue }
+        onTap = { selection.wrappedValue = $0 }
+        icons = [:]
+    }
+
+    init(options: [(value: Value, title: String)], icons: [Value: String] = [:], isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
+        self.options = options
+        self.icons = icons
+        self.isOn = isOn
+        self.onTap = onTap
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: icons.isEmpty ? 8 : 6) {
             ForEach(options, id: \.value) { option in
-                let on = option.value == selection
-                Button { selection = option.value } label: {
-                    Text(option.title)
-                        .okcheText(OkcheType.body, weight: on ? .bold : .regular)
-                        .frame(maxWidth: .infinity, minHeight: height)
-                        .foregroundStyle(on ? OkcheColor.namsaekDeep : OkcheColor.ink)
-                        .background(on ? OkcheColor.namsaekSoft : OkcheColor.paper,
-                                    in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                        .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
-                            .strokeBorder(on ? OkcheColor.namsaek : OkcheColor.line, lineWidth: 1.5))
-                        .contentShape(Rectangle())
+                let on = isOn(option.value)
+                Button { onTap(option.value) } label: {
+                    VStack(spacing: 8) {
+                        if let icon = icons[option.value] {
+                            Image(systemName: icon).font(.title2).foregroundStyle(OkcheColor.namsaekDeep).accessibilityHidden(true)
+                        }
+                        Text(option.title)
+                            .okcheText(icons.isEmpty ? OkcheType.body : OkcheType.label, weight: on ? .bold : .regular)
+                            .multilineTextAlignment(.center)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .padding(.horizontal, 2)
+                    .frame(maxWidth: .infinity, minHeight: icons.isEmpty ? height : iconHeight)
+                    .foregroundStyle(on ? OkcheColor.namsaekDeep : OkcheColor.ink)
+                    .background(on ? OkcheColor.namsaekSoft : OkcheColor.paper,
+                                in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                    .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
+                        .strokeBorder(on ? OkcheColor.namsaek : OkcheColor.line, lineWidth: 1.5))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])

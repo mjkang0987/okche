@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -195,9 +196,17 @@ fun PetSwitchSheet(
                 }
             }
             Text("고른 아이가 모든 화면 오른쪽 위에 계속 보여요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-            Row(horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
-                OkchePrimaryButton("아이 정보 고치기", onEdit, Modifier.weight(1f), look = ButtonLook.Outlined)
-                OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, Modifier.weight(1f), look = ButtonLook.Dashed)
+            // 큰 글자에서는 두 버튼을 세로로 쌓는다(반쪽 폭에서 여러 줄로 꺾이지 않게).
+            if (LocalDensity.current.fontScale > 1.3f) {
+                Column(verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+                    OkchePrimaryButton("아이 정보 고치기", onEdit, look = ButtonLook.Outlined)
+                    OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, look = ButtonLook.Dashed)
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+                    OkchePrimaryButton("아이 정보 고치기", onEdit, Modifier.weight(1f), look = ButtonLook.Outlined)
+                    OkchePrimaryButton("+ 새 아기씨 모시기", onRegister, Modifier.weight(1f), look = ButtonLook.Dashed)
+                }
             }
         }
     }
@@ -209,6 +218,8 @@ fun PetManageSection(pets: List<Pet>, restingIds: Set<String>, onEditPet: (Strin
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var failed by remember { mutableStateOf(false) }
+    // 저장이 끝나 흐름이 새 값을 내보내기 전에 또 눌러 열린 기간이 둘 생기지 않게.
+    var saving by remember { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -244,9 +255,11 @@ fun PetManageSection(pets: List<Pet>, restingIds: Set<String>, onEditPet: (Strin
                 Row(
                     Modifier
                         .heightIn(min = 44.dp)
-                        .toggleable(resting, role = Role.Switch) { on ->
+                        .toggleable(resting, enabled = !saving, role = Role.Switch) { on ->
+                            saving = true
                             scope.launch {
                                 failed = runCatching { setResting(OkcheDatabase.get(context).dao(), pet.id, on) }.isFailure
+                                saving = false
                             }
                         }
                         .semantics { contentDescription = "$title 휴양 중 · 관리 쉬기" },

@@ -51,8 +51,9 @@ fun TabScreen(
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             // 큰 글자에서 한 줄에 안 들어가면 쉬운 말이 아래 줄로 내려간다. TalkBack은 한 머리말로 읽는다.
+            // 낙관 옆 남는 폭만 쓰게 해서 쉬운 말이 먼저 내려가고, 제목도 안 들어갈 때만 낙관이 아래 줄로.
             FlowRow(
-                Modifier.semantics(mergeDescendants = true) { heading() },
+                Modifier.weight(1f, fill = false).padding(end = OkcheSpacing.Space3).semantics(mergeDescendants = true) { heading() },
                 horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
                 verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
             ) {

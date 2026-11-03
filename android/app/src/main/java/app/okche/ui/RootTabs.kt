@@ -51,6 +51,7 @@ import app.okche.ui.pet.PetRegisterScreen
 import app.okche.ui.pet.PetSeal
 import app.okche.ui.pet.PetSwitchSheet
 import app.okche.ui.pet.currentPet
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheRadius
@@ -71,12 +72,13 @@ fun RootTabs() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { OkcheDatabase.get(context).dao() }
-    // 아이·휴양·지금 보는 아이는 바뀌는 대로 따라간다(6-3). 처음 읽기 전(null)에는 낙관 자리를 비워 둔다.
-    val pets by remember { dao.petsFlow() }.collectAsState(null)
+    // 아이·휴양·지금 보는 아이는 바뀌는 대로 따라간다(6-3). 아이와 lastPetId를 둘 다 읽기 전(null)에는
+    // 낙관 자리와 아이 관리를 비워 둔다(첫 아이가 잠깐 보였다 바뀌거나 '아직 모신 아이가 없어요'가 스치지 않게).
+    val loaded by remember { combine(dao.petsFlow(), context.lastPetId) { p, id -> p to id } }.collectAsState(null)
+    val pets = loaded?.first
     val rests by remember { dao.openRestPeriodsFlow() }.collectAsState(emptyList())
-    val lastPetId by remember { context.lastPetId }.collectAsState(null)
     val restingIds = rests.mapTo(mutableSetOf()) { it.petId }
-    val current = pets?.let { currentPet(it, lastPetId) }
+    val current = loaded?.let { (p, id) -> currentPet(p, id) }
     // 탭 아래 화면(하단 탭 없음 — 디자인 '화면 짜임새'): 아이 정보(6-2), 아이 등록(6-3).
     var editPetId by rememberSaveable { mutableStateOf<String?>(null) }
     var registering by rememberSaveable { mutableStateOf(false) }
@@ -91,7 +93,7 @@ fun RootTabs() {
     }
     if (switching && pets != null) {
         PetSwitchSheet(
-            pets!!, current, restingIds,
+            pets, current, restingIds,
             onPick = { id ->
                 switching = false
                 scope.launch { context.setLastPetId(id) }
@@ -172,7 +174,7 @@ fun RootTabs() {
             Tab.Sillok -> SillokTab(modifier, current?.name, seal)
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {
-                PetManageSection(pets.orEmpty(), restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
+                if (pets != null) PetManageSection(pets, restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
             }
         }
     }

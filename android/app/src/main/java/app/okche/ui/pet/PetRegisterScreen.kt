@@ -147,7 +147,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = {
                     // 새로 모신 아이는 바로 지금 보는 아이(6-3).
                     val id = newId()
-                    saver.save { registerPet(OkcheDatabase.get(context).dao(), form, petId = id).also { if (it.isEmpty()) context.setLastPetId(id) } }
+                    saver.save { registerPet(OkcheDatabase.get(context).dao(), form, petId = id).also { if (it.isEmpty()) runCatching { context.setLastPetId(id) } } }
                 })
         }
     }

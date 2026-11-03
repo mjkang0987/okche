@@ -108,7 +108,7 @@ class FormSaveModel : ViewModel() {
 
 /**
  * 아이 정보 고치기 → 인슐린 설정 두 화면. 인슐린 설정을 다녀와도 고치던 아이 정보 입력이 남게 저장 상태를 둘로 나눠 둔다.
- * 들어가는 길은 지금 더보기의 임시 줄(6-3 전).
+ * 들어가는 길은 더보기 아이 관리·아이 바꾸기 시트(6-3).
  */
 @Composable
 fun PetEditFlow(petId: String, onClose: () -> Unit) {

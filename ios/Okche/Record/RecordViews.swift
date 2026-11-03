@@ -24,8 +24,7 @@ struct RecordTab: View {
 
     var body: some View {
         NavigationStack {
-            // 위 20은 디자인 일기 화면 값(토큰에 20이 없음).
-            TabScreen(title: "승정원일기", subtitle: "매일 기록", topPadding: 20, trailing: { PetSeal() }) {
+            TabScreen(title: "승정원일기", subtitle: "매일 기록", trailing: { PetSeal() }) {
                 FieldGroup(title: "누구 기록인가요?") {
                     OkcheChoiceChips(options: chipPets.map { ($0.id.uuidString, $0.name) } + [("", "누군지 몰라요")],
                                      selection: Binding(get: { who?.uuidString ?? "" }, set: { pick($0 ?? "") }),

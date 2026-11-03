@@ -34,8 +34,11 @@ struct PetRegistration {
         var units = ""
     }
 
+    /// 칸 이름. 아이 정보 고치기(`PetEditing`)·인슐린 설정(`InsulinSetup`)도 같이 쓴다.
     enum Field: Hashable {
         case name, birth, age, weight, insulinTimes, save
+        /// 가족 된 날, 당뇨를 켰는데 인슐린 계획이 없음 (6-2)
+        case family, insulinPlan
         /// 오류는 없고 키보드 초점만 쓰는 칸
         case diagnosis, insulinName
         case insulinUnits(UUID)
@@ -50,26 +53,15 @@ struct PetRegistration {
         var errors: [Field: String] = [:]
         if trimmed(name) == nil { errors[.name] = "이름을 넣어 주세요" }
         if birthUnknown {
-            if let text = trimmed(approxAge), !(Self.wholeNumber(text).map { (0...30).contains($0) } ?? false) {
-                errors[.age] = "0에서 30 사이로 넣어 주세요"
-            }
-        } else if let birthDate, calendar.startOfDay(for: birthDate) > calendar.startOfDay(for: today) {
-            errors[.birth] = "오늘보다 뒤 날짜는 넣을 수 없어요"
+            errors[.age] = Self.ageError(approxAge)
+        } else {
+            errors[.birth] = Self.futureDayError(birthDate, today: today, calendar: calendar)
         }
         // 그램으로 반올림해 1 이상이어야 기록이 의미 있다.
         if let text = trimmed(weightKg), !(Self.number(text).map { ($0 * 1000).rounded() >= 1 && $0 <= 100 } ?? false) {
             errors[.weight] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
         }
-        if hasDiabetes {
-            for slot in insulinSlots {
-                guard let text = trimmed(slot.units) else { errors[.insulinUnits(slot.id)] = "양을 넣어 주세요"; continue }
-                if !(Self.number(text).map { $0 > 0 && $0 <= 100 } ?? false) {
-                    errors[.insulinUnits(slot.id)] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
-                }
-            }
-            if insulinSlots.isEmpty { errors[.insulinTimes] = "시간을 하나 이상 넣어 주세요" }
-            else if Set(insulinSlots.map(\.time)).count != insulinSlots.count { errors[.insulinTimes] = "같은 시간이 두 번 있어요" }
-        }
+        if hasDiabetes { errors.merge(Self.insulinErrors(insulinSlots)) { a, _ in a } }
         return errors
     }
 
@@ -96,11 +88,9 @@ struct PetRegistration {
                                   data: #"{"grams":\#(grams)}"#))
         }
         if hasDiabetes {
-            let slots = insulinSlots
-                .map { InsulinSlot(time: $0.time, units: Self.number(trimmed($0.units)!)!) }
-                .sorted { $0.time < $1.time }
+            let slots = Self.slotsToSave(insulinSlots)
             context.insert(InsulinPlan(now: now, petId: pet.id, name: trimmed(insulinName), syringe: syringe, slots: slots,
-                                       activeFrom: now))
+                                       ringDuringQuiet: true, activeFrom: now))
         }
         do {
             try context.save()
@@ -111,9 +101,42 @@ struct PetRegistration {
         return pet
     }
 
-    private func trimmed(_ text: String) -> String? {
+    private func trimmed(_ text: String) -> String? { Self.trimmed(text) }
+
+    static func trimmed(_ text: String) -> String? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
+    }
+
+    /// '나이 (대략)': 비우면 괜찮고, 넣으면 0~30 정수.
+    static func ageError(_ text: String) -> String? {
+        guard let text = trimmed(text) else { return nil }
+        return (wholeNumber(text).map { (0...30).contains($0) } ?? false) ? nil : "0에서 30 사이로 넣어 주세요"
+    }
+
+    /// 생일·가족 된 날: 오늘(기기 달력) 뒤면 안 됨.
+    static func futureDayError(_ date: Date?, today: Date, calendar: Calendar) -> String? {
+        guard let date, calendar.startOfDay(for: date) > calendar.startOfDay(for: today) else { return nil }
+        return "오늘보다 뒤 날짜는 넣을 수 없어요"
+    }
+
+    /// 인슐린 시간과 양: 시간 1개 이상·겹침 없음, 양은 0 초과 100 이하.
+    static func insulinErrors(_ slots: [InsulinSlotInput]) -> [Field: String] {
+        var errors: [Field: String] = [:]
+        for slot in slots {
+            guard let text = trimmed(slot.units) else { errors[.insulinUnits(slot.id)] = "양을 넣어 주세요"; continue }
+            if !(number(text).map { $0 > 0 && $0 <= 100 } ?? false) {
+                errors[.insulinUnits(slot.id)] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
+            }
+        }
+        if slots.isEmpty { errors[.insulinTimes] = "시간을 하나 이상 넣어 주세요" }
+        else if Set(slots.map(\.time)).count != slots.count { errors[.insulinTimes] = "같은 시간이 두 번 있어요" }
+        return errors
+    }
+
+    /// 칸 글자 → 저장할 슬롯(시간 순). 검사를 통과한 뒤에만 부른다.
+    static func slotsToSave(_ slots: [InsulinSlotInput]) -> [InsulinSlot] {
+        slots.map { InsulinSlot(time: $0.time, units: number(trimmed($0.units)!)!) }.sorted { $0.time < $1.time }
     }
 
     /// 소수점은 점·쉼표 모두 받는다(기기 지역 설정에 따라 숫자 자판이 쉼표를 낼 수 있음).
@@ -127,6 +150,13 @@ struct PetRegistration {
     /// 나이: ASCII 숫자만.
     static func wholeNumber(_ text: String) -> Int? {
         text.wholeMatch(of: /[0-9]+/) != nil ? Int(text) : nil
+    }
+
+    /// `YYYY-MM-DD` → 기기 달력의 그날 0시.
+    static func date(_ day: String, _ calendar: Calendar) -> Date? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
     }
 
     /// 기기 달력 날짜 `YYYY-MM-DD`.

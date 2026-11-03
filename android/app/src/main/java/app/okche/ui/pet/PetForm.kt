@@ -77,10 +77,35 @@ private val decimalPattern = Regex("[0-9]+([.,][0-9]*)?|[.,][0-9]+")
 private val integerPattern = Regex("[0-9]+")
 
 /** 소수 입력. 유한한 값만(아주 긴 숫자가 무한대가 되면 숫자 아님). */
-private fun String.toDecimal() = trim().takeIf { decimalPattern.matches(it) }?.replace(',', '.')?.toDouble()?.takeIf { it.isFinite() }
+internal fun String.toDecimal() = trim().takeIf { decimalPattern.matches(it) }?.replace(',', '.')?.toDouble()?.takeIf { it.isFinite() }
 
 /** 정수 입력(나이). 너무 길어 Int에 안 들어가면 숫자 아님. */
-private fun String.toWholeNumber() = trim().takeIf { integerPattern.matches(it) }?.toIntOrNull()
+internal fun String.toWholeNumber() = trim().takeIf { integerPattern.matches(it) }?.toIntOrNull()
+
+internal const val AGE_ERROR = "0에서 30 사이로 넣어 주세요"
+internal const val FUTURE_DAY_ERROR = "오늘보다 뒤 날짜는 넣을 수 없어요"
+internal const val SAVE_ERROR = "저장하지 못했어요. 다시 해 주세요."
+
+/**
+ * 인슐린 시간·양 줄 검사(아이 등록·인슐린 설정 공통). 오류(time{i}·units{i}·insulinRows → 문구)와 저장할 슬롯(시간 순).
+ * 시간 1개 이상·겹침 없음, 양은 0 초과 100 이하.
+ */
+internal fun checkInsulinRows(rows: List<InsulinRow>): Pair<Map<String, String>, List<InsulinSlot>> {
+    val errors = linkedMapOf<String, String>()
+    val slots = mutableListOf<InsulinSlot>()
+    // 화면은 마지막 줄을 못 빼게 하지만 저장 함수에서도 막는다.
+    if (rows.isEmpty()) errors["insulinRows"] = "시간을 하나 이상 넣어 주세요"
+    rows.forEachIndexed { i, row ->
+        if (rows.take(i).any { it.time == row.time }) errors["time$i"] = "같은 시간이 두 번 있어요"
+        val units = row.units.toDecimal()?.takeIf { it > 0 && it <= 100 }
+        when {
+            row.units.isBlank() -> errors["units$i"] = "양을 넣어 주세요"
+            units == null -> errors["units$i"] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
+            else -> slots += InsulinSlot(row.time, units)
+        }
+    }
+    return errors to slots.sortedBy { it.time }
+}
 
 /**
  * 검사해서 오류가 있으면 아무것도 저장하지 않고 오류를 돌려준다(칸 열쇠 → 문구, 화면 위에서부터 순서).
@@ -101,11 +126,11 @@ suspend fun registerPet(
         if (form.age.isNotBlank()) {
             val age = form.age.toWholeNumber()
             // 2/29에서 해를 빼면 java.time 규칙대로 2/28.
-            if (age == null || age !in 0..30) errors["age"] = "0에서 30 사이로 넣어 주세요" else birth = today.minusYears(age.toLong())
+            if (age == null || age !in 0..30) errors["age"] = AGE_ERROR else birth = today.minusYears(age.toLong())
         }
     } else {
         birth = form.birthDate
-        if (birth != null && birth > today) errors["birthDate"] = "오늘보다 뒤 날짜는 넣을 수 없어요"
+        if (birth != null && birth > today) errors["birthDate"] = FUTURE_DAY_ERROR
     }
 
     var kg: Double? = null
@@ -115,19 +140,11 @@ suspend fun registerPet(
         if (kg == null) errors["weight"] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
     }
 
-    val slots = mutableListOf<InsulinSlot>()
+    var slots = emptyList<InsulinSlot>()
     if (form.hasDiabetes) {
-        // 화면은 마지막 줄을 못 빼게 하지만 저장 함수에서도 막는다.
-        if (form.insulinRows.isEmpty()) errors["insulinRows"] = "시간을 하나 이상 넣어 주세요"
-        form.insulinRows.forEachIndexed { i, row ->
-            if (form.insulinRows.take(i).any { it.time == row.time }) errors["time$i"] = "같은 시간이 두 번 있어요"
-            val units = row.units.toDecimal()?.takeIf { it > 0 && it <= 100 }
-            when {
-                row.units.isBlank() -> errors["units$i"] = "양을 넣어 주세요"
-                units == null -> errors["units$i"] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
-                else -> slots += InsulinSlot(row.time, units)
-            }
-        }
+        val (rowErrors, checked) = checkInsulinRows(form.insulinRows)
+        errors += rowErrors
+        slots = checked
     }
     if (errors.isNotEmpty()) return errors
 
@@ -141,8 +158,9 @@ suspend fun registerPet(
             data = JSONObject().put("grams", Math.round(it * 1000)).toString())
     }
     val plan = if (form.hasDiabetes) {
+        // 인슐린 알림은 밤에도 울림(기획 문서 — 인슐린 설정 처음 값과 같음, 6-2).
         InsulinPlan(createdAt = now, petId = pet.id, name = form.insulinName.trim().ifEmpty { null }, syringe = form.syringe,
-            slots = slots.sortedBy { it.time }, activeFrom = now)
+            slots = slots, ringDuringQuiet = true, activeFrom = now)
     } else {
         null
     }
@@ -153,7 +171,7 @@ suspend fun registerPet(
     } catch (e: Exception) {
         // 저장소 오류는 칸 오류가 아니라 '모시기' 위에 보인다. 트랜잭션이라 아무것도 남지 않는다.
         Log.e("Okche", "아이 등록 저장 실패", e)
-        return mapOf("save" to "저장하지 못했어요. 다시 해 주세요.")
+        return mapOf("save" to SAVE_ERROR)
     }
     return errors
 }

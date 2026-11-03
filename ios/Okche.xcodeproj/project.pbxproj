@@ -22,8 +22,13 @@
 		617D645225490C8F9FAD3AB2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BBBC424F9384B64EDCFCE73C /* Assets.xcassets */; };
 		6E5E5956C44885F6BB9757E6 /* OkcheDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28809CA2E38D55D30DE87A2C /* OkcheDay.swift */; };
 		7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AB360783EF98AB5867AB5C /* PetRegistration.swift */; };
+		9782AE647767E84C0FB5F709 /* InsulinSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF4594D8B52CAE29711A849 /* InsulinSetupView.swift */; };
+		875972196AF5C55697EACCA6 /* PetEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE32C6987027E7BAB6665DB /* PetEditView.swift */; };
+		18366E0A855F9AE70A05AF69 /* PetEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7EE25B03C52EAB297A4067 /* PetEditing.swift */; };
+		AA175527055CDF82EC9624E8 /* PetFormParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF0FE12173C8E5323EB20516 /* PetFormParts.swift */; };
 		84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
+		79619394F206D95B8CD16215 /* PetEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B88900A7782769BCC76F61 /* PetEditingTests.swift */; };
 		A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC98478DFCF8B973F662089 /* FixedID.swift */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
 		B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 657947957AE14624C6573439 /* RootView.swift */; };
@@ -63,6 +68,7 @@
 		22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OkcheTokens.swift; path = ../../../design/generated/OkcheTokens.swift; sourceTree = "<group>"; };
 		28809CA2E38D55D30DE87A2C /* OkcheDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheDay.swift; sourceTree = "<group>"; };
 		465382965673124E58129062 /* PetRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistrationTests.swift; sourceTree = "<group>"; };
+		A2B88900A7782769BCC76F61 /* PetEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditingTests.swift; sourceTree = "<group>"; };
 		473738171DE9AE6187DF447C /* Setting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Setting.swift; sourceTree = "<group>"; };
 		5119E23AD833065A0FAF7789 /* Record.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Record.swift; sourceTree = "<group>"; };
 		650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheTests.swift; sourceTree = "<group>"; };
@@ -77,6 +83,10 @@
 		BBBC424F9384B64EDCFCE73C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BE50F69BB45ACED338B1B7A2 /* OkcheText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheText.swift; sourceTree = "<group>"; };
 		C8AB360783EF98AB5867AB5C /* PetRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistration.swift; sourceTree = "<group>"; };
+		4EF4594D8B52CAE29711A849 /* InsulinSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinSetupView.swift; sourceTree = "<group>"; };
+		4FE32C6987027E7BAB6665DB /* PetEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditView.swift; sourceTree = "<group>"; };
+		1A7EE25B03C52EAB297A4067 /* PetEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditing.swift; sourceTree = "<group>"; };
+		DF0FE12173C8E5323EB20516 /* PetFormParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetFormParts.swift; sourceTree = "<group>"; };
 		CC982B8A4E56FC21697A2A95 /* Medication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Medication.swift; sourceTree = "<group>"; };
 		CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheApp.swift; sourceTree = "<group>"; };
 		D1A3F2256A1A50E4C05ADCC8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -139,6 +149,10 @@
 				F746B7528E2591E8DB910CC6 /* PetCatalog.swift */,
 				DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */,
 				C8AB360783EF98AB5867AB5C /* PetRegistration.swift */,
+				4EF4594D8B52CAE29711A849 /* InsulinSetupView.swift */,
+				4FE32C6987027E7BAB6665DB /* PetEditView.swift */,
+				1A7EE25B03C52EAB297A4067 /* PetEditing.swift */,
+				DF0FE12173C8E5323EB20516 /* PetFormParts.swift */,
 			);
 			path = Pet;
 			sourceTree = "<group>";
@@ -156,6 +170,7 @@
 			children = (
 				650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */,
 				465382965673124E58129062 /* PetRegistrationTests.swift */,
+				A2B88900A7782769BCC76F61 /* PetEditingTests.swift */,
 				891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */,
 			);
 			path = OkcheTests;
@@ -304,6 +319,7 @@
 			files = (
 				B98102180DE4DD53B6377DCA /* OkcheTests.swift in Sources */,
 				986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */,
+				79619394F206D95B8CD16215 /* PetEditingTests.swift in Sources */,
 				516AA3AFF1691A66D7DB2AC0 /* StoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -334,6 +350,10 @@
 				544A8FE74663DA4531AAE09C /* PetCatalog.swift in Sources */,
 				84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */,
 				7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */,
+				9782AE647767E84C0FB5F709 /* InsulinSetupView.swift in Sources */,
+				875972196AF5C55697EACCA6 /* PetEditView.swift in Sources */,
+				18366E0A855F9AE70A05AF69 /* PetEditing.swift in Sources */,
+				AA175527055CDF82EC9624E8 /* PetFormParts.swift in Sources */,
 				0558E3345936022F6BAF06D5 /* Photo.swift in Sources */,
 				F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */,
 				FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */,

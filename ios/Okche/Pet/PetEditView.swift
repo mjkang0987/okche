@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// 아이 정보 고치기 (디자인 보드 `PetEdit`). 들어가는 길은 지금 더보기의 임시 줄.
+/// 아이 정보 고치기 (디자인 보드 `PetEdit`). 들어가는 길은 더보기 아이 관리·아이 바꾸기 시트.
 /// 사진 칸은 11단계, 호칭('마마')은 6-3, 사료·체중·추억·지우기 줄은 그 화면을 만드는 단계에서 눌리게 한다.
 struct PetEditView: View {
     @Environment(\.dismiss) private var dismiss
@@ -179,7 +179,7 @@ struct PetEditView: View {
     }
 }
 
-/// 더보기의 임시 줄에서 여는 아이 정보(저장소가 있어야 입력값을 만들 수 있어서 한 번 감쌈).
+/// 더보기 아이 관리·아이 바꾸기 시트에서 여는 아이 정보(저장소가 있어야 입력값을 만들 수 있어서 한 번 감쌈).
 struct PetEditScreen: View {
     let pet: Pet
     @Environment(\.modelContext) private var context

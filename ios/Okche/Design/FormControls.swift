@@ -208,6 +208,8 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
                     .padding(.horizontal, 14)
                     .frame(minHeight: pillHeight)
                     .background(OkcheColor.namsaek, in: Capsule())
+                    .frame(minHeight: 44) // 보이는 높이는 40, 누르는 영역은 44
+                    .contentShape(Rectangle())
             }
         }
         .multilineTextAlignment(.center)

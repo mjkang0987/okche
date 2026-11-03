@@ -108,6 +108,8 @@ struct PetSwitchSheet: View {
     let then: (Next) -> Void
     @Environment(\.dismiss) private var dismiss
     @Query(filter: #Predicate<RestPeriod> { $0.endedAt == nil && $0.deletedAt == nil }) private var rests: [RestPeriod]
+    /// 시트 높이를 내용에 맞춘다(아이가 많거나 큰 글자면 끝까지 올려 스크롤).
+    @State private var contentHeight: CGFloat = 360
 
     var body: some View {
         ScrollView {
@@ -135,9 +137,10 @@ struct PetSwitchSheet: View {
             .padding(.horizontal, OkcheSpacing.space4)
             .padding(.top, OkcheSpacing.space6)
             .padding(.bottom, OkcheSpacing.space6)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .background(OkcheColor.hanji)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.height(contentHeight), .large])
         .presentationDragIndicator(.visible)
     }
 
@@ -157,6 +160,7 @@ struct PetSwitchSheet: View {
             HStack(spacing: 12) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.title3).foregroundStyle(selected ? OkcheColor.namsaek : OkcheColor.lineStrong)
+                    .accessibilityHidden(true)
                 SealSquare()
                 VStack(alignment: .leading, spacing: 2) {
                     Text(PetTitle.name(pet)).okcheText(OkcheType.body, weight: selected ? .bold : nil)
@@ -214,27 +218,30 @@ struct PetManageSection: View {
     private func row(_ pet: Pet) -> some View {
         let resting = rests.contains { $0.petId == pet.id }
         let link = NavigationLink { PetEditScreen(pet: pet) } label: {
-            (Text(PetTitle.name(pet)).foregroundStyle(OkcheColor.ink)
-             + Text(resting ? " · 휴양 중" : "").font(.system(size: OkcheType.label.size)).foregroundStyle(OkcheColor.inkMuted))
-                .okcheText(OkcheType.body)
-                .multilineTextAlignment(.leading)
-                .frame(minHeight: 44)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(PetTitle.name(pet)).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                if resting { Text("· 휴양 중").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
+            }
+            .multilineTextAlignment(.leading)
+            .frame(minHeight: 44)
         }
+        .accessibilityLabel(PetTitle.name(pet) + (resting ? " · 휴양 중" : ""))
         let toggle = Toggle(isOn: Binding(get: { resting }, set: { on in
             do {
                 try RestPeriod.setResting(on, petId: pet.id, in: context)
                 failed = false
             } catch {
                 failed = true
+                AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
             }
         })) {
             Text("휴양 중 · 관리 쉬기").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
         }
         .tint(OkcheColor.namsaek)
-        .fixedSize()
         .accessibilityLabel("\(PetTitle.name(pet)) 휴양 중 · 관리 쉬기")
+        // 한 줄에 안 들어가면 스위치를 아래 줄로(큰 글자에서 스위치 이름도 줄바꿈).
         return ViewThatFits(in: .horizontal) {
-            HStack { link; Spacer(minLength: 8); toggle }
+            HStack { link; Spacer(minLength: 8); toggle.fixedSize() }
             VStack(alignment: .leading, spacing: 4) { link; toggle }
         }
         .frame(minHeight: 56)

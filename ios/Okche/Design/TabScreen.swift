@@ -22,29 +22,30 @@ struct TabScreen<Trailing: View, Content: View>: View {
         }
     }
 
-    private var titleBlock: some View {
-        // 큰 글자 설정에서 한 줄에 안 들어가면 쉬운 말을 아래로 내린다(제목이 글자 중간에서 끊기지 않게).
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header }
-            VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header }
-        }
-        // VoiceOver가 제목과 쉬운 말을 한 머리말로 읽게.
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+    /// VoiceOver가 제목과 쉬운 말을 한 머리말로 읽게.
+    private func titleBlock(_ layout: some View) -> some View {
+        layout
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OkcheSpacing.space4) {
-                // 머리 오른쪽 자리가 한 줄에 안 들어가면 제목 아래로 내린다.
+                // 한 줄에 안 들어가면 쉬운 말을 먼저 제목 아래로, 그래도 안 되면 오른쪽 자리를 제목 아래로 내린다.
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: OkcheSpacing.space3) {
-                        titleBlock
+                        titleBlock(HStack(alignment: .firstTextBaseline, spacing: OkcheSpacing.space2) { header })
+                        Spacer(minLength: 0)
+                        trailing
+                    }
+                    HStack(spacing: OkcheSpacing.space3) {
+                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header })
                         Spacer(minLength: 0)
                         trailing
                     }
                     VStack(alignment: .leading, spacing: OkcheSpacing.space2) {
-                        titleBlock
+                        titleBlock(VStack(alignment: .leading, spacing: OkcheSpacing.space1) { header })
                         trailing
                     }
                 }

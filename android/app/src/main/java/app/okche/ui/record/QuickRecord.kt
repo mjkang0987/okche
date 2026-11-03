@@ -35,20 +35,15 @@ fun kindName(kind: RecordKind) = when (kind) {
     RecordKind.insulin -> "인슐린"
 }
 
-/** 값 글자(데이터 3장 값 → 화면 글자). 시트에서만 고르는 값(7-2)도 미리 둔다. */
-private val valueTitles = mapOf(
-    "contents" to mapOf("kibble" to "사료", "digested" to "불은 사료", "liquidFoam" to "거품", "hairball" to "헤어볼", "plant" to "풀", "foreign" to "이물질"),
-    "shape" to mapOf("hard" to "단단", "normal" to "정상", "soft" to "무름", "loose" to "묽음", "watery" to "물 같음"),
-    "amount" to mapOf("little" to "찔끔", "normal" to "보통", "much" to "많음"),
-    "result" to mapOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음"),
-)
+/** 수라 값 글자(7-3 전 — 결과만). */
+private val mealTitles = mapOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")
 
-/** 기록 줄 값 글자: 구토 '사료', 매화 '정상', 소피 '보통', 수라 '다 먹음'. 모르는 값이면 빈 글자. */
+/** 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙([detailLine]), 수라는 '다 먹음'. 모르는 값이면 빈 글자. */
 fun recordValue(record: Record): String {
-    val row = quickRows.firstOrNull { it.kind == record.kind } ?: return ""
+    detailLine(record)?.let { return it }
+    if (record.kind != RecordKind.meal) return ""
     val json = runCatching { JSONObject(record.data) }.getOrNull() ?: return ""
-    val raw = json.optJSONArray(row.key)?.let { a -> List(a.length()) { a.optString(it) } } ?: json.optString(row.key).takeIf { it.isNotEmpty() }?.let(::listOf).orEmpty()
-    return raw.mapNotNull { valueTitles[row.key]?.get(it) }.joinToString(" · ")
+    return mealTitles[json.optString("result")].orEmpty()
 }
 
 /** 바로 기록: 그때 시각·6시 기준 `day`로 바로 저장. `petId`가 없으면 누군지 모름. */

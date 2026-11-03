@@ -23,21 +23,16 @@ enum QuickRecord {
          "med": "탕약", "glucose": "혈당", "insulin": "인슐린"][kind] ?? kind
     }
 
-    /// 값 글자(데이터 3장 값 → 화면 글자). 시트에서만 고르는 값(7-2)도 미리 둔다.
-    private static let valueTitles: [String: [String: String]] = [
-        "contents": ["kibble": "사료", "digested": "불은 사료", "liquidFoam": "거품", "hairball": "헤어볼", "plant": "풀",
-                     "foreign": "이물질"],
-        "shape": ["hard": "단단", "normal": "정상", "soft": "무름", "loose": "묽음", "watery": "물 같음"],
-        "amount": ["little": "찔끔", "normal": "보통", "much": "많음"],
-        "result": ["all": "다 먹음", "some": "남김", "none": "안 먹음"],
-    ]
+    /// 수라 값 글자(7-3 전 — 결과만).
+    private static let mealTitles = ["all": "다 먹음", "some": "남김", "none": "안 먹음"]
 
-    /// 기록 줄 값 글자: 구토 '사료', 매화 '정상', 소피 '보통', 수라 '다 먹음'. 모르는 값이면 빈 글자.
+    /// 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙(`RecordDetail.line`), 수라는 '다 먹음'. 모르는 값이면 빈 글자.
     static func value(_ record: Record) -> String {
-        guard let row = rows.first(where: { $0.kind.rawValue == record.kind }),
-              let json = try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any] else { return "" }
-        let raw: [String] = (json[row.key] as? [String]) ?? (json[row.key] as? String).map { [$0] } ?? []
-        return raw.compactMap { valueTitles[row.key]?[$0] }.joined(separator: " · ")
+        if let line = RecordDetail.line(record) { return line }
+        guard record.kind == RecordKind.meal.rawValue,
+              let json = try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any],
+              let result = json["result"] as? String else { return "" }
+        return mealTitles[result] ?? ""
     }
 
     /// 바로 기록: 그때 시각·6시 기준 `day`로 바로 저장. `petId`가 없으면 누군지 모름.

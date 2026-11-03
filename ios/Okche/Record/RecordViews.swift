@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// 일기 탭 첫 화면(보드 `Record`): '누구 기록인가요?' 칩, 바로 기록 줄, 방금 남긴 기록. 탕약·옥체·사진·⋯ 자세히는 그 단계에서.
+/// 일기 탭 첫 화면(보드 `Record`): '누구 기록인가요?' 칩, 바로 기록 줄(구토·매화·소피는 ⋯ 자세히 — 7-2), 방금 남긴 기록. 탕약·옥체·사진은 그 단계에서.
 struct RecordTab: View {
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
     @AppStorage("lastPetId") private var lastPetId = ""
@@ -11,6 +11,7 @@ struct RecordTab: View {
     /// 방금 누른 기록 — 그 기록일 때만 '아뢰었사옵니다'.
     @State private var justSaved: UUID?
     @State private var failed = false
+    @State private var detail: DetailTarget?
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
     private var chipPets: [Pet] { pets.filter { $0.memorializedAt == nil } }
@@ -30,12 +31,19 @@ struct RecordTab: View {
                                      selection: Binding(get: { who?.uuidString ?? "" }, set: { pick($0 ?? "") }),
                                      allowsNone: false)
                 }
-                QuickRecordCard { row, value in record(row, value) }
-                Text("누르면 바로 기록돼요.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { detail = DetailTarget(kind: $0, petId: who) })
+                Text("누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
+        }
+        .sheet(item: $detail) { target in
+            RecordDetailSheet(target: target) { record, isNew in
+                guard isNew else { return }
+                justSaved = record.id
+                AccessibilityNotification.Announcement("아뢰었사옵니다").post()
+            }
         }
     }
 
@@ -61,11 +69,14 @@ struct RecordTab: View {
     }
 }
 
-/// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋, 흰 카드 안 줄 사이 선(보드 `Record`). 큰 글자에선 이름 아래로 버튼.
+/// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선(보드 `Record`).
+/// 큰 글자·좁은 폭에선 이름 아래로 버튼.
 struct QuickRecordCard: View {
     let onTap: (QuickRecord.Row, String) -> Void
+    let onDetail: (RecordKind) -> Void
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,9 +87,14 @@ struct QuickRecordCard: View {
                         label(row).frame(width: labelWidth, alignment: .leading)
                         HStack(spacing: 6) { buttons(row) }
                         Spacer(minLength: 0)
+                        more(row)
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        label(row)
+                        HStack {
+                            label(row)
+                            Spacer(minLength: 6)
+                            more(row)
+                        }
                         ViewThatFits(in: .horizontal) {
                             HStack(spacing: 6) { buttons(row) }
                             VStack(alignment: .leading, spacing: 6) { buttons(row) }
@@ -96,11 +112,27 @@ struct QuickRecordCard: View {
 
     private func label(_ row: QuickRecord.Row) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: Self.icon[row.kind] ?? "circle").font(.body).frame(width: 22).accessibilityHidden(true)
+            Image(systemName: Self.icon[row.kind] ?? "circle").font(.body).frame(minWidth: 22).accessibilityHidden(true)
             Text(QuickRecord.name(row.kind.rawValue)).okcheText(OkcheType.body, weight: .bold).fixedSize()
         }
         .foregroundStyle(OkcheColor.namsaekDeep)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    /// ⋯ 자세히 남기기(점선 44) — 자세히 시트가 있는 종류만.
+    @ViewBuilder private func more(_ row: QuickRecord.Row) -> some View {
+        if !RecordDetail.fields(row.kind).isEmpty {
+            Button { onDetail(row.kind) } label: {
+                Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
+                    .frame(width: min(moreSize, 72), height: min(moreSize, 72)) // 큰 글자에서 지나치게 커지지 않게
+                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                    .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
+                        .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(QuickRecord.name(row.kind.rawValue)) 자세히 남기기")
+        }
     }
 
     /// 디자인 아이콘(물방울·알약·물방울 둘·그릇)에 가까운 SF Symbols.
@@ -131,6 +163,7 @@ struct RecentRecordSection: View {
     // shortcut: 지우지 않은 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 날 조건을 넣는다.
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }, sort: \Record.createdAt, order: .reverse) private var records: [Record]
     @State private var deleting: Record?
+    @State private var editing: DetailTarget?
 
     var body: some View {
         // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제가 오늘로 보임, 문안 탭(7-0)에서 날 바뀜을 함께 다룬다.
@@ -156,8 +189,9 @@ struct RecentRecordSection: View {
                         }
                     }
                     Spacer(minLength: 0)
-                    DeleteIconButton(label: "\(QuickRecord.time(latest)) \(RecordText.speech(latest, pets: pets)) 기록 지우기",
-                                     color: OkcheColor.inkMuted) { deleting = latest }
+                    EditRecordButton(record: latest, pets: pets, color: OkcheColor.namsaek) { editing = $0 }
+                    RowIconButton(label: "\(QuickRecord.time(latest)) \(RecordText.speech(latest, pets: pets)) 기록 지우기",
+                                  color: OkcheColor.inkMuted) { deleting = latest }
                 }
                 .padding(.leading, 14)
                 .padding(.trailing, 6)
@@ -165,6 +199,7 @@ struct RecentRecordSection: View {
                 .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
             }
             .deleteRecordDialog($deleting, pets: pets)
+            .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
         }
     }
 }
@@ -185,18 +220,35 @@ enum RecordText {
     }
 }
 
-/// 지우기 아이콘 버튼(44).
-struct DeleteIconButton: View {
+/// 기록 줄 아이콘 버튼(44): 지우기(휴지통)·고치기(연필).
+struct RowIconButton: View {
+    var icon = "trash"
     let label: String
     var color = OkcheColor.ink
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "trash").font(.body).foregroundStyle(color)
+            Image(systemName: icon).font(.body).foregroundStyle(color)
                 .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
         }
         .accessibilityLabel(label)
+    }
+}
+
+/// 고치기(연필) — 자세히 시트가 있는 종류만(수라는 7-3).
+struct EditRecordButton: View {
+    let record: Record
+    let pets: [Pet]
+    var color = OkcheColor.ink
+    let onEdit: (DetailTarget) -> Void
+
+    var body: some View {
+        if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
+            RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
+                onEdit(DetailTarget(kind: kind, editing: record))
+            }
+        }
     }
 }
 
@@ -242,7 +294,7 @@ private struct DeleteRecordDialog: ViewModifier {
     }
 }
 
-/// 기록 목록(보드 `Log`·`LogEmpty`): 날짜 이동, '누구 기록' 칩, 그날 요약, 기록 줄(지우기·누구였는지 정하기). 고치기는 7-2.
+/// 기록 목록(보드 `Log`·`LogEmpty`): 날짜 이동, '누구 기록' 칩, 그날 요약, 기록 줄(고치기·지우기·누구였는지 정하기). 수라 고치기는 7-3.
 struct RecordLogView: View {
     @Environment(\.dismiss) private var dismiss
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
@@ -252,6 +304,7 @@ struct RecordLogView: View {
     @State private var filter: String? = ""
     @State private var deleting: Record?
     @State private var assigning: Record?
+    @State private var editing: DetailTarget?
 
     var body: some View {
         let today = OkcheDay.of(.now)
@@ -288,6 +341,7 @@ struct RecordLogView: View {
         .toolbar(.hidden, for: .tabBar)
         .deleteRecordDialog($deleting, pets: pets)
         .sheet(item: $assigning) { record in AssignSheet(record: record) }
+        .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
     }
 
     /// 날짜 이동: 전날·다음 날(오늘에서 다음 날은 안 눌림), 6시 기준 날.
@@ -331,7 +385,8 @@ struct RecordLogView: View {
             }
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            DeleteIconButton(label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 지우기") { deleting = record }
+            EditRecordButton(record: record, pets: pets) { editing = $0 }
+            RowIconButton(label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 지우기") { deleting = record }
         }
         .padding(.leading, 14)
         .padding(.vertical, 10)

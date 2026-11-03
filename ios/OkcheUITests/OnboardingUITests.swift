@@ -267,6 +267,39 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["방금 남긴 기록"].exists) // 오늘 기록이 없으면 숨김
     }
 
+    /// ⋯ → 구토 시트 → 붉은색(의서 레이어, 시트 한 번에 한 번) → 이어 하기 → 기록하기 → 연필로 고치기 (7-2).
+    func testDetailSheetAlertAndEdit() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let more = app.buttons["구토 자세히 남기기"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        XCTAssertTrue(app.staticTexts["콩이 · 구토"].waitForExistence(timeout: 3))
+        app.buttons["사료 알갱이"].tap()
+        app.buttons["헤어볼"].tap()
+        app.buttons["붉은색 (피)"].tap()
+        XCTAssertTrue(app.staticTexts["의서의 '지금 바로 병원에' 목록이에요."].waitForExistence(timeout: 3))
+        app.buttons["기록 이어 하기"].tap()
+        tapBelow(app.buttons["3번 이상"], in: app)
+        XCTAssertFalse(app.staticTexts["의서의 '지금 바로 병원에' 목록이에요."].waitForExistence(timeout: 1)) // 한 번만
+        tapBelow(app.buttons["기록하기"], in: app)
+        let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS '사료 · 헤어볼 · 붉은색 · 3번 이상'")).firstMatch
+        XCTAssertTrue(line.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["아뢰었사옵니다"].exists)
+
+        app.buttons.matching(NSPredicate(format: "label ENDSWITH '콩이 구토 기록 고치기'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["콩이 · 구토"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["헤어볼"].isSelected) // 값이 채워진 채
+        app.buttons["헤어볼"].tap()
+        app.buttons["이물질 (끈·비닐 등)"].tap() // 고치기 시트에서도 처음 한 번 레이어
+        XCTAssertTrue(app.buttons["기록 이어 하기"].waitForExistence(timeout: 3))
+        app.buttons["기록 이어 하기"].tap()
+        XCTAssertTrue(app.buttons["이물질 (끈·비닐 등)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["이물질 (끈·비닐 등)"].isSelected) // 레이어를 닫아도 고른 값 그대로
+        tapBelow(app.buttons["기록하기"], in: app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '사료 · 이물질 · 붉은색 · 3번 이상'")).firstMatch.waitForExistence(timeout: 5))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

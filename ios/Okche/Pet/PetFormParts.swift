@@ -301,9 +301,11 @@ struct InsulinSlotsEditor: View {
     }
 }
 
-/// 인슐린 시각 고르기: 돌림판에서 고른 뒤 '고르기'.
-private struct TimeSheet: View {
+/// 시각 고르기: 돌림판에서 고른 뒤 '고르기'. 인슐린 시각(시·분), 기록 시간 바꾸기(날짜·시각, 지금보다 뒤 안 됨 — 7-2).
+struct TimeSheet: View {
     @Binding var time: Date
+    var components: DatePickerComponents = .hourAndMinute
+    var notAfterNow = false
     @Environment(\.dismiss) private var dismiss
     @State private var picked = Date.now
 
@@ -316,9 +318,15 @@ private struct TimeSheet: View {
             .okcheText(OkcheType.body, weight: .medium)
             .foregroundStyle(OkcheColor.namsaek)
             .frame(minHeight: 44)
-            DatePicker("시간", selection: $picked, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
+            Group {
+                if notAfterNow {
+                    DatePicker("시간", selection: $picked, in: ...Date.now, displayedComponents: components)
+                } else {
+                    DatePicker("시간", selection: $picked, displayedComponents: components)
+                }
+            }
+            .datePickerStyle(.wheel)
+            .labelsHidden()
             Button("고르기") { time = picked; dismiss() }
                 .buttonStyle(.okchePrimary)
         }

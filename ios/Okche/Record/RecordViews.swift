@@ -134,7 +134,7 @@ struct RecentRecordSection: View {
     var body: some View {
         // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제가 오늘로 보임, 문안 탭(7-0)에서 날 바뀜을 함께 다룬다.
         let today = OkcheDay.of(.now)
-        if let latest = records.first(where: { $0.day == today }) {
+        if let latest = QuickRecord.latest(records, today: today) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("방금 남긴 기록").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
@@ -150,7 +150,7 @@ struct RecentRecordSection: View {
                             + Text("  \(RecordText.title(latest, pets: pets)) \(QuickRecord.value(latest))").foregroundColor(OkcheColor.ink))
                             .okcheText(OkcheType.body)
                         if latest.id == justSaved {
-                            Text("아뢰었사옵니다").font(.custom("GowunBatang-Bold", size: 14, relativeTo: .subheadline))
+                            Text("아뢰었사옵니다").font(.custom(OkcheFontFamily.display.fontName ?? "", size: 14, relativeTo: .subheadline))
                                 .foregroundStyle(OkcheColor.geumDeep)
                         }
                     }
@@ -210,13 +210,18 @@ private struct DeleteRecordDialog: ViewModifier {
     @Binding var record: Record?
     let pets: [Pet]
     @Environment(\.modelContext) private var context
+    @State private var failed = false
 
     func body(content: Content) -> some View {
         content.fullScreenCover(item: $record) { target in
             OkcheConfirmDialog(title: "이 기록을 지울까요?", destructive: true, confirm: "지우기", confirmLook: .danger,
                                onCancel: { record = nil }, onConfirm: {
-                                   try? QuickRecord.delete(target, in: context)
-                                   record = nil
+                                   do {
+                                       try QuickRecord.delete(target, in: context)
+                                       record = nil
+                                   } catch {
+                                       failed = true
+                                   }
                                }) {
                 // 보드 `DeleteConfirm`: 기록 요약 칸이 안내 글보다 위.
                 Text("\(QuickRecord.time(target)) · \(RecordText.title(target, pets: pets)) \(QuickRecord.value(target))")
@@ -226,7 +231,9 @@ private struct DeleteRecordDialog: ViewModifier {
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                 Text("지운 기록은 되돌릴 수 없고, 실록 통계에서도 빠져요.").okcheText(OkcheType.label, weight: .regular)
                     .foregroundStyle(OkcheColor.inkMuted)
+                OkcheFieldError(message: failed ? "지우지 못했어요. 다시 해 주세요." : nil)
             }
+            .onAppear { failed = false }
             .presentationBackground(.clear)
         }
         .transaction { $0.disablesAnimations = record != nil }
@@ -246,7 +253,7 @@ struct RecordLogView: View {
 
     var body: some View {
         let today = OkcheDay.of(.now)
-        let records = allRecords.filter { $0.day == day && (filter?.isEmpty != false || $0.petId?.uuidString == filter) }
+        let records = QuickRecord.records(allRecords, day: day, petId: filter.flatMap(UUID.init(uuidString:)))
         VStack(spacing: 0) {
             FormHeader(title: "승정원일기", note: "기록 목록", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
             ScrollView {
@@ -254,6 +261,7 @@ struct RecordLogView: View {
                     dateBar(today: today)
                     OkcheChoiceChips(options: [("", "모두")] + PetTitle.ordered(pets).map { ($0.id.uuidString, $0.name) },
                                      selection: $filter, allowsNone: false)
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel("누구 기록")
                     if let summary = QuickRecord.summary(records) {
                         Text(summary).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
@@ -338,10 +346,11 @@ struct AssignSheet: View {
     let record: Record
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Pet> { $0.deletedAt == nil && $0.memorializedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var allPets: [Pet]
     @AppStorage("lastPetId") private var lastPetId = ""
     @State private var picked: UUID?
     @State private var failed = false
+    private var pets: [Pet] { allPets.filter { $0.memorializedAt == nil } }
 
     var body: some View {
         ScrollView {
@@ -384,7 +393,7 @@ struct AssignSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         // 누군지 모르는 기록이면 지금 보는 아이를 먼저 골라 둔다(보드 `Assign`).
-        .onAppear { picked = record.petId ?? pets.first { $0.id.uuidString == lastPetId }?.id }
+        .onAppear { picked = record.petId ?? PetTitle.current(allPets, lastPetId: lastPetId).flatMap { $0.memorializedAt == nil ? $0.id : nil } }
     }
 
     /// '오늘 02:14 · 구토 · 사료'

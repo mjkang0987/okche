@@ -211,7 +211,10 @@ private fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) {
     val current = Instant.ofEpochMilli(at).atZone(zone).toLocalDateTime()
     DatePickerDialog(context, { _, y, m, d ->
         TimePickerDialog(context, { _, h, min ->
-            val picked = LocalDateTime.of(y, m + 1, d, h, min).atZone(zone).toInstant().toEpochMilli()
+            val pickedTime = LocalDateTime.of(y, m + 1, d, h, min)
+            // 고르기는 분까지라, 같은 분을 다시 고르면 원래 시각(초) 그대로 — 안 바꾼 것으로 본다.
+            if (pickedTime == current.withSecond(0).withNano(0)) return@TimePickerDialog onPicked(at)
+            val picked = pickedTime.atZone(zone).toInstant().toEpochMilli()
             val now = System.currentTimeMillis()
             if (picked > now) Toast.makeText(context, "지금보다 뒤로는 바꿀 수 없어서 지금으로 했어요.", Toast.LENGTH_SHORT).show()
             onPicked(minOf(picked, now))

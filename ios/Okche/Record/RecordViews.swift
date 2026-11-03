@@ -76,6 +76,7 @@ struct QuickRecordCard: View {
     let onDetail: (RecordKind) -> Void
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 0) {
@@ -111,7 +112,7 @@ struct QuickRecordCard: View {
 
     private func label(_ row: QuickRecord.Row) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: Self.icon[row.kind] ?? "circle").font(.body).frame(width: 22).accessibilityHidden(true)
+            Image(systemName: Self.icon[row.kind] ?? "circle").font(.body).frame(minWidth: 22).accessibilityHidden(true)
             Text(QuickRecord.name(row.kind.rawValue)).okcheText(OkcheType.body, weight: .bold).fixedSize()
         }
         .foregroundStyle(OkcheColor.namsaekDeep)
@@ -123,7 +124,7 @@ struct QuickRecordCard: View {
         if !RecordDetail.fields(row.kind).isEmpty {
             Button { onDetail(row.kind) } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
-                    .frame(width: 44, height: 44)
+                    .frame(width: moreSize, height: moreSize)
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                     .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
                         .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))

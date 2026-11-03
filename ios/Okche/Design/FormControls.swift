@@ -194,6 +194,8 @@ struct OkcheChoiceCards<Value: Hashable>: View {
     private let isOn: (Value) -> Bool
     private let onTap: (Value) -> Void
     private let icons: [Value: String]
+    /// 고른 카드를 다시 눌러 풀 수 있으면 화면 읽기에 '선택 해제' 동작.
+    private let deselectable: Bool
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 52
     @ScaledMetric(relativeTo: .body) private var iconHeight: CGFloat = 96
 
@@ -202,6 +204,7 @@ struct OkcheChoiceCards<Value: Hashable>: View {
         isOn = { $0 == selection.wrappedValue }
         onTap = { selection.wrappedValue = $0 }
         icons = [:]
+        deselectable = false
     }
 
     init(options: [(value: Value, title: String)], icons: [Value: String] = [:], isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
@@ -209,11 +212,19 @@ struct OkcheChoiceCards<Value: Hashable>: View {
         self.icons = icons
         self.isOn = isOn
         self.onTap = onTap
+        deselectable = true
     }
 
     var body: some View {
-        HStack(spacing: icons.isEmpty ? 8 : 6) {
-            ForEach(options, id: \.value) { option in
+        // 큰 글자에서 나란히 안 들어가면 세로로 쌓는다(넘친 칸이 화면을 옆으로 밀지 않게).
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: icons.isEmpty ? 8 : 6) { cards }
+            VStack(spacing: 6) { cards }
+        }
+    }
+
+    private var cards: some View {
+        ForEach(options, id: \.value) { option in
                 let on = isOn(option.value)
                 Button { onTap(option.value) } label: {
                     VStack(spacing: 8) {
@@ -223,7 +234,7 @@ struct OkcheChoiceCards<Value: Hashable>: View {
                         Text(option.title)
                             .okcheText(icons.isEmpty ? OkcheType.body : OkcheType.label, weight: on ? .bold : .regular)
                             .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 2)
                     .frame(maxWidth: .infinity, minHeight: icons.isEmpty ? height : iconHeight)
@@ -236,7 +247,9 @@ struct OkcheChoiceCards<Value: Hashable>: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])
-            }
+                .accessibilityActions {
+                    if on && deselectable { Button("선택 해제") { onTap(option.value) } }
+                }
         }
     }
 }

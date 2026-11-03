@@ -74,7 +74,9 @@ struct PetEditing {
     /// 아이 칸·인슐린 계획 닫기·휴양 기간을 한 번에 저장한다. 오류가 있으면 아무것도 바꾸지 않는다.
     func save(in context: ModelContext, now: Date = .now, calendar: Calendar = .okcheDevice) throws {
         var errors = validate(today: now, calendar: calendar)
+        // 읽기는 바꾸기 전에 모두 한다(읽다 실패해도 바뀐 값이 남지 않게).
         let plans = try InsulinPlan.open(for: pet.id, in: context)
+        let rests = try RestPeriod.open(for: pet.id, in: context)
         if hasDiabetes && plans.isEmpty { errors[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요" }
         guard errors.isEmpty else { throw PetRegistration.Invalid(errors: errors) }
 
@@ -119,7 +121,6 @@ struct PetEditing {
             }
         }
         // 휴양: 켤 때는 열린 기간이 없을 때만 새로, 끌 때는 열린 기간을 모두 닫는다(데이터 2-1).
-        let rests = try RestPeriod.open(for: pet.id, in: context)
         if resting && rests.isEmpty {
             context.insert(RestPeriod(now: now, petId: pet.id, startedAt: now))
         } else if !resting {
@@ -166,7 +167,7 @@ struct InsulinSetup {
         let plan = (try? InsulinPlan.open(for: pet.id, in: context))?.first
         name = plan?.name ?? ""
         syringe = plan?.syringe ?? .unknown
-        slots = plan.map { $0.slots.map { .init(time: $0.time, units: String(format: "%g", $0.units)) } }
+        slots = plan.map { $0.slots.map { .init(time: $0.time, units: $0.units == $0.units.rounded() ? String(Int($0.units)) : String($0.units)) } }
             ?? [.init(time: "08:00"), .init(time: "20:00")]
         ringDuringQuiet = plan?.ringDuringQuiet ?? true
         leadMinutes = plan?.leadMinutes ?? 10
@@ -181,7 +182,9 @@ struct InsulinSetup {
         let errors = PetRegistration.insulinErrors(slots)
         guard errors.isEmpty else { throw PetRegistration.Invalid(errors: errors) }
 
+        // 읽기는 바꾸기 전에 모두 한다(읽다 실패해도 바뀐 값이 남지 않게).
         let plans = try InsulinPlan.open(for: pet.id, in: context)
+        let setting = try Setting.loadOrCreate(in: context)
         let newSlots = PetRegistration.slotsToSave(slots)
         let name = PetRegistration.trimmed(self.name)
         if let current = plans.first, current.slots.sorted(by: { $0.time < $1.time }) == newSlots {
@@ -205,7 +208,6 @@ struct InsulinSetup {
             pet.hasDiabetes = true
             pet.updatedAt = now
         }
-        let setting = try Setting.loadOrCreate(in: context)
         if setting.notify.insulinTime != notify {
             setting.notify.insulinTime = notify
             setting.updatedAt = now

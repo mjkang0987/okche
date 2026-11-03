@@ -16,6 +16,7 @@
 		33ABCD9E369A3EE6CD8276DB /* TabScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */; };
 		3845BBC987E9608D145B36D1 /* RecordDetailTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC5A22B158B3162629C6935 /* RecordDetailTests.swift */; };
 		47B5D69BEBA333C23CA3FCEC /* OkcheApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */; };
+		47E69A733C055FBF45DB1209 /* RecordDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587A130CDC735508E9872722 /* RecordDetailViews.swift */; };
 		4C11B7EF101CB5D66F5AC7B2 /* PetMemorialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */; };
 		516AA3AFF1691A66D7DB2AC0 /* StoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891D5CF6B3A1B4C187005EB3 /* StoreTests.swift */; };
 		544A8FE74663DA4531AAE09C /* PetCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F746B7528E2591E8DB910CC6 /* PetCatalog.swift */; };
@@ -83,6 +84,7 @@
 		465382965673124E58129062 /* PetRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistrationTests.swift; sourceTree = "<group>"; };
 		473738171DE9AE6187DF447C /* Setting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Setting.swift; sourceTree = "<group>"; };
 		5119E23AD833065A0FAF7789 /* Record.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Record.swift; sourceTree = "<group>"; };
+		587A130CDC735508E9872722 /* RecordDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordDetailViews.swift; sourceTree = "<group>"; };
 		650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheTests.swift; sourceTree = "<group>"; };
 		657947957AE14624C6573439 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		67EADEDDED180083767C7591 /* PetEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditing.swift; sourceTree = "<group>"; };
@@ -240,6 +242,7 @@
 			children = (
 				A207A9255AA19D05F7D40457 /* QuickRecord.swift */,
 				EAEB6C7DDAA30D8B29AA1153 /* RecordDetail.swift */,
+				587A130CDC735508E9872722 /* RecordDetailViews.swift */,
 				026A0B16D0F9C96FEAC020DC /* RecordViews.swift */,
 			);
 			path = Record;
@@ -403,6 +406,7 @@
 				B8EE434637CD34B5F452CC4F /* QuickRecord.swift in Sources */,
 				F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */,
 				F0469C41CFF59B6E42281B57 /* RecordDetail.swift in Sources */,
+				47E69A733C055FBF45DB1209 /* RecordDetailViews.swift in Sources */,
 				8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */,
 				FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */,
 				B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */,

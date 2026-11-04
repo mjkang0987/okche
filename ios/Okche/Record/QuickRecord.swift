@@ -40,6 +40,7 @@ enum QuickRecord {
         if let line = RecordDetail.line(record) { return line }
         if record.kind == RecordKind.snack.rawValue {
             // 목록에서 뺀 다과도 이름은 남음(1-4) — 지운 줄까지 읽는다.
+            // shortcut: 다과 이름을 고쳐도 기록 줄은 그 기록이 다시 그려질 때 바뀜, 느리거나 헷갈리면 화면에서 `@Query` 다과를 넘긴다.
             return SnackRules.value(record, snacks: (try? record.modelContext?.fetch(FetchDescriptor<Snack>())) ?? [])
         }
         if record.kind == RecordKind.weight.rawValue {

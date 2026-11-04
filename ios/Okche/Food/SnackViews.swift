@@ -41,6 +41,7 @@ struct SnackListView: View {
         }
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .sheet(item: $form) { SnackFormSheet(mode: $0) }
     }
 }
@@ -55,6 +56,7 @@ struct SnackRow: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Text("간식").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.namsaekDeep)
+                    .lineLimit(1).minimumScaleFactor(0.5).padding(.horizontal, 4) // 칸은 48 그대로
                     .frame(width: 48, height: 48)
                     .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusSm))
                     .accessibilityHidden(true)
@@ -148,9 +150,11 @@ struct SnackFormSheet: View {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button(buttonTitle, action: save).buttonStyle(.okchePrimary)
                 if editing != nil {
-                    Button("목록에서 빼기") { removing = true }
-                        .okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.yeonji)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                    Button { removing = true } label: {
+                        Text("목록에서 빼기").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.yeonji)
+                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, OkcheSpacing.space4)
@@ -235,6 +239,8 @@ struct SnackFormSheet: View {
 struct SnackRecordSheet: View {
     let pet: Pet
     var editing: Record?
+    /// 저장한 기록 — 부른 화면이 눈에 보이게 알린다(수라 화면 '아뢰었사옵니다').
+    var onSaved: (Record) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query private var snacks: [Snack]
@@ -249,9 +255,10 @@ struct SnackRecordSheet: View {
     @State private var failed = false
     @State private var saving = false
 
-    init(pet: Pet, editing: Record? = nil) {
+    init(pet: Pet, editing: Record? = nil, onSaved: @escaping (Record) -> Void = { _ in }) {
         self.pet = pet
         self.editing = editing
+        self.onSaved = onSaved
         if let editing {
             _occurredAt = State(initialValue: editing.occurredAt)
             _picked = State(initialValue: SnackRules.snackId(editing).flatMap(UUID.init(uuidString:)))
@@ -290,9 +297,11 @@ struct SnackRecordSheet: View {
                             pickError = nil
                         }
                     }
-                    Button("+ 새 다과 들이기") { adding = true }
-                        .okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.namsaek)
-                        .frame(minHeight: 44)
+                    Button { adding = true } label: {
+                        Text("+ 새 다과 들이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.namsaek)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     OkcheFieldError(message: pickError)
                 }
                 OkcheTextField(label: "얼마나 줬나요?", note: "(선택)", text: $amount, placeholder: "예: 3알, 반 개")
@@ -331,8 +340,7 @@ struct SnackRecordSheet: View {
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         let at = editing == nil && !timeChanged ? Date.now : occurredAt
         do {
-            try SnackRules.record(snackId: picked, amount: amount, occurredAt: at, editing: editing, petId: pet.id, in: context)
-            AccessibilityNotification.Announcement("아뢰었사옵니다").post()
+            onSaved(try SnackRules.record(snackId: picked, amount: amount, occurredAt: at, editing: editing, petId: pet.id, in: context))
             dismiss()
         } catch {
             saving = false

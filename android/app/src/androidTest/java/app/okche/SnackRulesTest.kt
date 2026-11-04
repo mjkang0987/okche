@@ -156,6 +156,7 @@ class SnackFlowTest {
         rule.onNode(hasSetTextAction().and(hasText("얼마나 줬나요?", substring = true))).performTextInput("반 개")
         rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("다과에 들이고 고르기")).fetchSemanticsNodes().isEmpty() && rule.onAllNodes(hasText("얼마나 줬나요?", substring = true)).fetchSemanticsNodes().isEmpty() }
+        waitFor(hasText("다과 연어 퓨레 · 반 개", substring = true).and(hasText("아뢰었사옵니다", substring = true))) // 수라 화면에 방금 남긴 다과
         rule.onNode(hasContentDescription("뒤로")).performClick()
         waitFor(hasText("오늘 일기 전체"))
         rule.onNode(hasText("오늘 일기 전체")).performScrollTo().performClick()

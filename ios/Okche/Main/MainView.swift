@@ -153,6 +153,9 @@ struct TodayRecordSection: View {
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
         .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
+        .sheet(item: $snackEditing) { record in
+            if let pet = pets.first(where: { $0.id == petId }) { SnackRecordSheet(pet: pet, editing: record) }
+        }
     }
 
     private var title: some View {
@@ -166,11 +169,10 @@ struct TodayRecordSection: View {
     @ViewBuilder private func row(_ record: Record) -> some View {
         let value = QuickRecord.value(record)
         let label = "\(QuickRecord.time(record)) \(QuickRecord.name(record.kind))\(value.isEmpty ? "" : " \(value)") · 고치기"
-        if record.kind == RecordKind.snack.rawValue, let pet = pets.first(where: { $0.id == petId }) {
+        if record.kind == RecordKind.snack.rawValue {
             Button { snackEditing = record } label: { rowContent(record, value) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)
-                .sheet(item: $snackEditing) { SnackRecordSheet(pet: pet, editing: $0) }
         } else if record.kind == RecordKind.meal.rawValue {
             NavigationLink(value: RecordRoute.sura(petId)) { rowContent(record, value) }
                 .buttonStyle(.plain)

@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -128,7 +130,12 @@ private fun SnackRow(name: String, detail: String, onClick: () -> Unit) {
         Box(
             Modifier.size(48.dp).background(OkcheColor.NamsaekSoft, RoundedCornerShape(OkcheRadius.RadiusSm)).clearAndSetSemantics {},
             contentAlignment = Alignment.Center,
-        ) { Text("간식", color = OkcheColor.NamsaekDeep, style = OkcheType.Caption.toTextStyle()) }
+        ) {
+            // 칸은 48 그대로라 큰 글자에선 글자를 줄여 넣는다.
+            val caption = OkcheType.Caption.toTextStyle()
+            Text("간식", color = OkcheColor.NamsaekDeep, style = caption, maxLines = 1, softWrap = false,
+                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = caption.fontSize * 0.5f, maxFontSize = caption.fontSize))
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(name, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
             Text(detail, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
@@ -224,7 +231,7 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
             if (editing != null) {
                 Text(
                     "목록에서 빼기",
-                    Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button) { removing = true }.padding(vertical = 10.dp),
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { removing = true }.padding(vertical = 12.dp),
                     color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Bold),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -239,7 +246,7 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SnackRecordSheet(pet: Pet, editing: Record? = null, onClose: () -> Unit) {
+fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit = {}, onClose: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -274,12 +281,14 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onClose: () -> Unit) {
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         val at = if (editing == null && !timeChanged) System.currentTimeMillis() else occurredAt
         scope.launch {
-            failed = runCatching { recordSnack(dao, id, amount, at, editing, pet.id) }.isFailure
+            val saved = runCatching { recordSnack(dao, id, amount, at, editing, pet.id) }
+            failed = saved.isFailure
             busy = false
             if (failed) {
                 view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
             } else {
                 view.announceForAccessibility("아뢰었사옵니다")
+                onSaved(saved.getOrThrow())
                 onClose()
             }
         }
@@ -307,7 +316,7 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onClose: () -> Unit) {
                     timeChanged = true
                 }
             }
-            Column(Modifier.semantics { isTraversalGroup = true }, verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
                 OkcheFieldLabel("어떤 다과를 줬나요?", Modifier.semantics { heading() })
                 for ((snack, lastDay) in options) {
                     SnackPickCard(
@@ -321,7 +330,7 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onClose: () -> Unit) {
                 }
                 Text(
                     "+ 새 다과 들이기",
-                    Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) { adding = true }.padding(vertical = 10.dp),
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { adding = true }.padding(vertical = 12.dp),
                     color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                 )
                 pickError?.let { OkcheErrorText(it) }
@@ -348,8 +357,7 @@ private fun SnackPickCard(name: String, detail: String, isOn: Boolean, onClick: 
         Modifier.fillMaxWidth().heightIn(min = 52.dp)
             .background(if (isOn) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
             .border(1.5.dp, if (isOn) OkcheColor.Namsaek else OkcheColor.Line, shape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .semantics(mergeDescendants = true) { selected = isOn }
+            .selectable(isOn, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,

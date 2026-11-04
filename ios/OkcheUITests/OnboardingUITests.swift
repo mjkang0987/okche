@@ -415,6 +415,8 @@ final class OnboardingUITests: XCTestCase {
         amount.tap()
         amount.typeText("반 개")
         tapBelow(app.buttons["기록하기"], in: app)
+        // 수라 화면에 방금 남긴 다과가 보임
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '다과 연어 퓨레 · 반 개' AND label CONTAINS '아뢰었사옵니다'")).firstMatch.waitForExistence(timeout: 3))
         app.buttons["뒤로"].firstMatch.tap()
         tapBelow(app.buttons["오늘 일기 전체"], in: app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '연어 퓨레 · 반 개'")).firstMatch.waitForExistence(timeout: 3))

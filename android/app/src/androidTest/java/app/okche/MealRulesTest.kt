@@ -32,6 +32,7 @@ import app.okche.ui.record.recordValue
 import app.okche.ui.record.saveMealPlan
 import app.okche.ui.record.saveQuickRecord
 import app.okche.ui.record.setLeftGrams
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,12 +75,12 @@ class MealRulesTest {
     /** 구간: 자기 시간 1시간 전 ~ 다음 끼니 1시간 전. */
     @Test fun currentWindow() = runBlocking {
         val p = plan(MealMode.direct, listOf("08:00", "18:00"), at(2026, 10, 1, 0))
-        assertEquals("아침", currentMeal(p, at(2026, 10, 25, 7), seoul)?.slot?.name)
-        assertEquals("아침", currentMeal(p, at(2026, 10, 25, 16, 59), seoul)?.slot?.name)
-        val evening = currentMeal(p, at(2026, 10, 25, 17), seoul)
+        assertEquals("아침", currentMeal(listOf(p), at(2026, 10, 25, 7), seoul)?.slot?.name)
+        assertEquals("아침", currentMeal(listOf(p), at(2026, 10, 25, 16, 59), seoul)?.slot?.name)
+        val evening = currentMeal(listOf(p), at(2026, 10, 25, 17), seoul)
         assertEquals("저녁", evening?.slot?.name)
         assertEquals("${p.id}|2026-10-25|18:00", evening?.key)
-        assertEquals("${p.id}|2026-10-25|18:00", currentMeal(p, at(2026, 10, 26, 3), seoul)?.key) // 새벽은 어제 저녁
+        assertEquals("${p.id}|2026-10-25|18:00", currentMeal(listOf(p), at(2026, 10, 26, 3), seoul)?.key) // 새벽은 어제 저녁
     }
 
     @Test fun quickMealGoesToSlotThenExtra() = runBlocking {
@@ -142,6 +143,36 @@ class MealRulesTest {
         val morning = mealOccurrences(p, "2026-10-25", seoul)[0]
         assertTrue(checkNotNull(dao.recordBySlot(morning.key)).auto)
         assertEquals(false, pickMeal(dao, "none", morning, pet, at(2026, 10, 26, 9), seoul).auto)
+    }
+
+    /** 전체 리뷰: 바로 기록도 급식기 차례면 고정 ID, 같은 결과는 그대로(자동 표시 유지), 자동 기록은 '방금 남긴 기록'에서 뺌. */
+    @Test fun fullReviewMealRules() = runBlocking {
+        val p = plan(MealMode.feeder, listOf("08:00", "19:00"), at(2026, 10, 24, 12))
+        val quick = saveQuickRecord(dao, quickRows[3], "none", pet, at(2026, 10, 25, 7, 30), seoul)
+        assertEquals(FixedIds.feederRecord("${p.id}|2026-10-25|08:00"), quick.id)
+        fillFeeder(dao, at(2026, 10, 25, 20), seoul)
+        val evening = checkNotNull(dao.recordBySlot("${p.id}|2026-10-25|19:00"))
+        assertEquals(at(2026, 10, 25, 20), evening.createdAt)
+        assertEquals(at(2026, 10, 25, 19), evening.updatedAt)
+        val slot = mealOccurrences(listOf(p), "2026-10-25", seoul).last()
+        assertTrue(pickMeal(dao, "all", slot, pet, at(2026, 10, 25, 21), seoul).auto) // 같은 결과는 아무것도 안 바꿈
+        assertEquals(quick.id, dao.latestRecordFlow("2026-10-25").first()?.id) // 자동 기록 뺌
+    }
+
+    /** 바꾼 것 없이 저장하면 새 줄 없음, 미리 남긴 아직 안 온 끼니는 같은 시각 새 차례로, 6시 전 끼니 이름은 하루 마지막. */
+    @Test fun savePlanNoOpMoveAndNames() = runBlocking {
+        val old = plan(MealMode.direct, listOf("08:00", "18:00"), at(2026, 10, 1, 9))
+        saveMealPlan(dao, pet, MealMode.direct, old.slots, at(2026, 10, 2, 9), seoul)
+        assertEquals(1, dao.mealPlans(pet).size)
+        val early = saveQuickRecord(dao, quickRows[3], "all", pet, at(2026, 10, 25, 17, 30), seoul)
+        assertEquals("${old.id}|2026-10-25|18:00", early.slotKey)
+        saveMealPlan(dao, pet, MealMode.feeder, old.slots, at(2026, 10, 25, 17, 45), seoul)
+        val new = checkNotNull(openMealPlan(dao.mealPlans(pet)))
+        assertEquals("${new.id}|2026-10-25|18:00", dao.petMealsWithSlot(pet).single().slotKey) // 같은 시각 새 차례로
+        assertEquals(listOf("아침", "저녁"), namedSlots(listOf(MealSlot("", "05:30"), MealSlot("", "08:00"))).map { it.name })
+        assertEquals(listOf("08:00", "05:30"), namedSlots(listOf(MealSlot("", "05:30"), MealSlot("", "08:00"))).map { it.time })
+        assertEquals("4.63kg", app.okche.ui.record.kgText(4625))
+        assertEquals("5kg", app.okche.ui.record.kgText(5000))
     }
 
     /** 급식기: 빠진 날까지 채우고, 고정 ID라 한 번만, 지운 것은 되살리지 않고, 계획 전·지금 뒤 끼니는 안 만듦. */
@@ -211,5 +242,35 @@ class SuraFlowTest {
 
         rule.onNode(hasText("급식기 (수라간)")).performClick()
         waitFor(hasContentDescription("급식기 시간 바꾸기"))
+    }
+}
+
+/** 기록 목록의 수라 연필 → 수라 화면 → 뒤로 → 기록 목록으로 돌아옴(전체 리뷰). iOS testMealPencilOpensSuraAndBackToLog와 같은 흐름. */
+class MealPencilFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun closeScenario() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test fun pencilOpensSuraAndBackToLog() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasContentDescription("수라 다 먹음 · 바로 기록"))
+        rule.onNode(hasContentDescription("수라 다 먹음 · 바로 기록")).performScrollTo().performClick()
+        waitFor(hasText("오늘 일기 전체")) // 저장이 끝나야 '방금 남긴 기록'이 생긴다
+        rule.onNode(hasText("오늘 일기 전체")).performScrollTo().performClick()
+        waitFor(hasContentDescription("콩이 수라 기록 고치기", substring = true))
+        rule.onNode(hasContentDescription("콩이 수라 기록 고치기", substring = true)).performClick()
+        waitFor(hasText("지금 먹은 것"))
+        rule.onNode(hasContentDescription("뒤로")).performClick()
+        waitFor(hasContentDescription("전날")) // 기록 목록
     }
 }

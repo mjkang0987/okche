@@ -207,12 +207,13 @@ struct OkcheChoiceCards<Value: Hashable>: View {
         deselectable = false
     }
 
-    init(options: [(value: Value, title: String)], icons: [Value: String] = [:], isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
+    init(options: [(value: Value, title: String)], icons: [Value: String] = [:], deselectable: Bool = true,
+         isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
         self.options = options
         self.icons = icons
         self.isOn = isOn
         self.onTap = onTap
-        deselectable = true
+        self.deselectable = deselectable
     }
 
     var body: some View {

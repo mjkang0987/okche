@@ -330,6 +330,22 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["급식기 시간 바꾸기"].waitForExistence(timeout: 3))
     }
 
+    /// 기록 목록의 수라 연필 → 수라 화면 → 뒤로 → 기록 목록으로 돌아옴(전체 리뷰).
+    func testMealPencilOpensSuraAndBackToLog() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let all = app.buttons["수라 다 먹음 · 바로 기록"]
+        XCTAssertTrue(all.waitForExistence(timeout: 5))
+        all.tap()
+        tapBelow(app.buttons["오늘 일기 전체"], in: app)
+        let pencil = app.buttons.matching(NSPredicate(format: "label ENDSWITH '콩이 수라 기록 고치기'")).firstMatch
+        XCTAssertTrue(pencil.waitForExistence(timeout: 3))
+        pencil.tap()
+        XCTAssertTrue(app.staticTexts["지금 먹은 것"].waitForExistence(timeout: 5))
+        app.buttons["뒤로"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["전날"].waitForExistence(timeout: 3)) // 기록 목록
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

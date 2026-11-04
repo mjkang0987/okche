@@ -26,6 +26,8 @@ struct PetEditing {
     var hasDiabetes: Bool
     /// 휴양 중 · 관리 쉬기
     var resting: Bool
+    /// 처음 읽은 휴양 값(못 읽었으면 nil) — 못 읽은 채 기본값으로 실제 휴양을 덮지 않게, 보호자가 바꿨을 때만 저장.
+    private var loadedResting: Bool?
     /// 열 때 넣어 둔 나이. 이걸 안 고치면 어림잡은 생일을 그대로 둔다(저장할 때마다 생일이 밀리지 않게).
     private let loadedAge: String
 
@@ -47,7 +49,8 @@ struct PetEditing {
         familyDate = pet.familyDate.flatMap { PetRegistration.date($0, calendar) }
         diagnosis = pet.diagnosis ?? ""
         hasDiabetes = pet.hasDiabetes
-        resting = !((try? RestPeriod.open(for: pet.id, in: context)) ?? []).isEmpty
+        loadedResting = (try? RestPeriod.open(for: pet.id, in: context)).map { !$0.isEmpty }
+        resting = loadedResting ?? false
     }
 
     typealias Field = PetRegistration.Field
@@ -78,7 +81,8 @@ struct PetEditing {
         let plans = try InsulinPlan.open(for: pet.id, in: context)
         let rests = try RestPeriod.open(for: pet.id, in: context)
         // 원래 당뇨였던 추억 아이는 간직할 때 인슐린 계획을 닫아 두므로 검사하지 않는다(6-4). 새로 켜는 건 그대로 검사.
-        if hasDiabetes && plans.isEmpty && !(pet.memorializedAt != nil && pet.hasDiabetes) { errors[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요" }
+        // 추억 아이는 인슐린 계획 없이 둔다(간직할 때 닫고, 새로 열지 않음 — 되돌릴 때 6-4 규칙). 그래서 검사하지 않는다.
+        if hasDiabetes && plans.isEmpty && pet.memorializedAt == nil { errors[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요" }
         guard errors.isEmpty else { throw PetRegistration.Invalid(errors: errors) }
 
         var birth = birthDate.map { PetRegistration.day($0, calendar) }
@@ -121,7 +125,9 @@ struct PetEditing {
                 plan.updatedAt = now
             }
         }
-        RestPeriod.apply(resting, open: rests, petId: pet.id, now: now, in: context)
+        if resting != (loadedResting ?? false) || loadedResting != nil {
+            RestPeriod.apply(resting, open: rests, petId: pet.id, now: now, in: context)
+        }
         do {
             try context.save()
         } catch {
@@ -147,6 +153,8 @@ struct InsulinSetup {
     var slots: [PetRegistration.InsulinSlotInput]
     /// 인슐린 시간 알림 — 설정 `notify.insulinTime`(모든 아이 공통)
     var notify: Bool
+    /// 처음 읽은 알림 값(못 읽었으면 nil) — 못 읽은 채 기본값으로 실제 설정을 덮지 않게.
+    private var loadedNotify: Bool?
     /// 밤에도 울리기
     var ringDuringQuiet: Bool
     var leadMinutes: Int
@@ -166,7 +174,8 @@ struct InsulinSetup {
         leadMinutes = plan?.leadMinutes ?? 10
         // 설정 줄은 앱 시작 때 만들어 둔다(`OkcheApp`). 여기서는 읽기만.
         let id = UUID.setting
-        notify = (try? context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.id == id })).first)?.notify.insulinTime ?? true
+        loadedNotify = (try? context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.id == id })).first)?.notify.insulinTime
+        notify = loadedNotify ?? true
     }
 
     /// 계획 저장: 시간·양이 바뀌면 열린 줄을 닫고 새 줄, 나머지만 바뀌면 그 줄을 고침(데이터 7장·5장).
@@ -201,7 +210,7 @@ struct InsulinSetup {
             pet.hasDiabetes = true
             pet.updatedAt = now
         }
-        if setting.notify.insulinTime != notify {
+        if setting.notify.insulinTime != notify && (loadedNotify != nil || notify != true) {
             setting.notify.insulinTime = notify
             setting.updatedAt = now
         }

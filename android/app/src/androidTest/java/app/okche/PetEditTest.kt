@@ -188,11 +188,15 @@ class PetEditTest {
     }
 
     /** 당뇨가 없던 추억 아이가 당뇨를 새로 켜면 인슐린 계획 검사는 그대로(6-2 규칙). */
-    @Test fun memorialPetTurningDiabetesOnStillNeedsPlan() = runBlocking {
+    /** 추억 아이는 당뇨를 새로 켜도 인슐린 계획 없이 저장된다(계획을 새로 열지 않음 — 전체 리뷰 2026-11-04). 되돌린 뒤엔 6-2 검사 그대로. */
+    @Test fun memorialPetTurningDiabetesOnNeedsNoPlan() = runBlocking {
         val id = makePet()
         dao.memorialize(id, now)
-        assertEquals(mapOf("insulinPlan" to "인슐린 시간과 양을 먼저 설정해 주세요"), save(load(id).copy(hasDiabetes = true)))
-        assertFalse(pet(id).hasDiabetes)
+        assertEquals(emptyMap<String, String>(), save(load(id).copy(hasDiabetes = true)))
+        assertTrue(pet(id).hasDiabetes)
+        assertEquals(0, dao.openInsulinPlans(id).size)
+        dao.restoreFromMemorial(id, now + 1)
+        assertEquals(mapOf("insulinPlan" to "인슐린 시간과 양을 먼저 설정해 주세요"), save(load(id).copy(name = "콩콩")))
     }
 
     // 인슐린 설정

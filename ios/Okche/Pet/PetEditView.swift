@@ -52,7 +52,8 @@ struct PetEditView: View {
                             .focused($focused, equals: .diagnosis)
                         VStack(alignment: .leading, spacing: 4) {
                             OkcheSwitchRow(title: "당뇨가 있어요", detail: "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", isOn: $form.hasDiabetes)
-                            if form.hasDiabetes {
+                            // 추억 아이는 인슐린을 새로 설정하지 않는다(간직하면 계획을 닫아 둠 — 되돌릴 때 6-4 규칙대로).
+                            if form.hasDiabetes && pet.memorializedAt == nil {
                                 NavigationLink {
                                     InsulinSetupScreen(pet: pet)
                                 } label: {
@@ -152,8 +153,7 @@ struct PetEditView: View {
         guard let record = weights.first,
               let json = try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any],
               let grams = json["grams"] as? Int else { return nil }
-        let kg = (Double(grams) / 1000).formatted(.number.precision(.fractionLength(0...2)))
-        return "\(kg)kg · \(record.occurredAt.formatted(.dateTime.month().day()))"
+        return "\(QuickRecord.kgText(grams: grams)) · \(record.occurredAt.formatted(.dateTime.month().day()))"
     }
 
     /// '추억으로 간직하기 | 이 아이 기록 지우기', 추억 아이는 '추억에서 되돌리기 | 이 아이 기록 지우기'(6-4). 누르면 확인 창.

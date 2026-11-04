@@ -170,7 +170,7 @@ struct RecordDetailSheet: View {
                     .multilineTextAlignment(.leading)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("의서 안내를 열어요")
+            .accessibilityHint("의서 안내 열기")
         }
     }
 

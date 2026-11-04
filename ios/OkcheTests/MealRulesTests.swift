@@ -16,7 +16,7 @@ final class MealRulesTests: XCTestCase {
     }
     private func plan(_ mode: MealMode, _ times: [String], from: Date) throws -> MealPlan {
         try MealRules.savePlan(petId: pet, mode: mode, slots: times.map { MealSlot(name: "", time: $0) }, now: from, in: context)
-        return try XCTUnwrap(MealRules.openPlan(petId: pet, in: context))
+        return try XCTUnwrap(MealRules.openPlan(context.fetch(FetchDescriptor<MealPlan>())))
     }
     private func meals() throws -> [Record] { try context.fetch(FetchDescriptor<Record>()).filter { $0.kind == "meal" } }
 
@@ -35,13 +35,13 @@ final class MealRulesTests: XCTestCase {
     /// 구간: 자기 시간 1시간 전 ~ 다음 끼니 1시간 전. 08:00·18:00이면 07:00~17:00 아침, 17:00~다음 날 07:00 저녁.
     func testCurrentWindow() throws {
         let p = try plan(.direct, ["08:00", "18:00"], from: at(2026, 10, 1, 0))
-        XCTAssertEqual(MealRules.current(p, now: at(2026, 10, 25, 7), timeZone: seoul)?.slot.name, "아침")
-        XCTAssertEqual(MealRules.current(p, now: at(2026, 10, 25, 16, 59), timeZone: seoul)?.slot.name, "아침")
-        let evening = MealRules.current(p, now: at(2026, 10, 25, 17), timeZone: seoul)
+        XCTAssertEqual(MealRules.current([p], now: at(2026, 10, 25, 7), timeZone: seoul)?.slot.name, "아침")
+        XCTAssertEqual(MealRules.current([p], now: at(2026, 10, 25, 16, 59), timeZone: seoul)?.slot.name, "아침")
+        let evening = MealRules.current([p], now: at(2026, 10, 25, 17), timeZone: seoul)
         XCTAssertEqual(evening?.slot.name, "저녁")
         XCTAssertEqual(evening?.key, "\(p.id.uuidString.lowercased())|2026-10-25|18:00")
         // 새벽 3시는 어제 저녁 차례(6시 기준 날도 어제)
-        XCTAssertEqual(MealRules.current(p, now: at(2026, 10, 26, 3), timeZone: seoul)?.key, "\(p.id.uuidString.lowercased())|2026-10-25|18:00")
+        XCTAssertEqual(MealRules.current([p], now: at(2026, 10, 26, 3), timeZone: seoul)?.key, "\(p.id.uuidString.lowercased())|2026-10-25|18:00")
     }
 
     /// 일기 바로 기록: 지금 차례로, 이미 있으면 추가 식사(`slotKey` 없음), 끼니 없으면 없음.
@@ -67,7 +67,7 @@ final class MealRulesTests: XCTestCase {
         XCTAssertEqual(new.mode, .feeder)
         XCTAssertEqual(new.slots.map(\.name), ["아침", "저녁"])
         try MealRules.savePlan(petId: pet, mode: .direct, slots: [], now: at(2026, 10, 3, 9), in: context)
-        XCTAssertNil(try MealRules.openPlan(petId: pet, in: context))
+        XCTAssertNil(MealRules.openPlan(try context.fetch(FetchDescriptor<MealPlan>())))
     }
 
     /// 화면에서 고르기: 없으면 만들고 있으면 결과만, 남김이 아니면 남은 양 비움.
@@ -117,6 +117,36 @@ final class MealRulesTests: XCTestCase {
         XCTAssertTrue(morning.auto)
         try MealRules.pick("none", for: MealRules.occurrences(p, day: "2026-10-25", timeZone: seoul)[0], petId: pet, now: at(2026, 10, 26, 9), timeZone: seoul, in: context)
         XCTAssertFalse(morning.auto)
+    }
+
+    /// 전체 리뷰: 바로 기록도 급식기 차례면 고정 ID, 같은 결과는 그대로(자동 표시 유지), 자동 기록은 '방금 남긴 기록'에서 뺌.
+    func testFullReviewMealRules() throws {
+        let p = try plan(.feeder, ["08:00", "19:00"], from: at(2026, 10, 24, 12))
+        let quick = try QuickRecord.save(QuickRecord.rows[3], value: "none", petId: pet, now: at(2026, 10, 25, 7, 30), timeZone: seoul, in: context)
+        XCTAssertEqual(quick.id, UUID.feederRecord(slotKey: "\(p.id.uuidString.lowercased())|2026-10-25|08:00"))
+        try MealRules.fillFeeder(now: at(2026, 10, 25, 20), timeZone: seoul, in: context)
+        let evening = try XCTUnwrap(MealRules.record(key: "\(p.id.uuidString.lowercased())|2026-10-25|19:00", in: context))
+        XCTAssertEqual(evening.createdAt, at(2026, 10, 25, 20)) // 만든 때
+        XCTAssertEqual(evening.updatedAt, at(2026, 10, 25, 19)) // 끼니 예정 시각
+        let slot = try XCTUnwrap(MealRules.occurrences([p], day: "2026-10-25", timeZone: seoul).last)
+        try MealRules.pick("all", for: slot, petId: pet, now: at(2026, 10, 25, 21), timeZone: seoul, in: context)
+        XCTAssertTrue(evening.auto) // 같은 결과는 아무것도 안 바꿈
+        XCTAssertEqual(QuickRecord.latest(try meals(), today: "2026-10-25")?.id, quick.id) // 자동 기록 뺌
+    }
+
+    /// 바꾼 것 없이 저장하면 새 줄 없음, 미리 남긴 아직 안 온 끼니는 같은 시각 새 차례로, 6시 전 끼니 이름은 하루 마지막.
+    func testSavePlanNoOpMoveAndNames() throws {
+        let old = try plan(.direct, ["08:00", "18:00"], from: at(2026, 10, 1, 9))
+        try MealRules.savePlan(petId: pet, mode: .direct, slots: old.slots, now: at(2026, 10, 2, 9), in: context)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<MealPlan>()).count, 1)
+        let early = try QuickRecord.save(QuickRecord.rows[3], value: "all", petId: pet, now: at(2026, 10, 25, 17, 30), timeZone: seoul, in: context)
+        XCTAssertEqual(early.slotKey, "\(old.id.uuidString.lowercased())|2026-10-25|18:00")
+        let new = try plan(.feeder, ["08:00", "18:00"], from: at(2026, 10, 25, 17, 45))
+        XCTAssertEqual(early.slotKey, "\(new.id.uuidString.lowercased())|2026-10-25|18:00") // 같은 시각 새 차례로
+        XCTAssertEqual(MealRules.named([MealSlot(name: "", time: "05:30"), MealSlot(name: "", time: "08:00")]).map(\.name), ["아침", "저녁"])
+        XCTAssertEqual(MealRules.named([MealSlot(name: "", time: "05:30"), MealSlot(name: "", time: "08:00")]).map(\.time), ["08:00", "05:30"])
+        XCTAssertEqual(QuickRecord.kgText(grams: 4625), "4.63kg")
+        XCTAssertEqual(QuickRecord.kgText(grams: 5000), "5kg")
     }
 
     /// 급식기: 빠진 날까지 채우고, 고정 ID라 한 번만, 지운 것은 되살리지 않고, 계획 전·지금 뒤 끼니는 안 만듦.

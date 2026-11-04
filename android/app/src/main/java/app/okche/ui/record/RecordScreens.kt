@@ -114,7 +114,8 @@ fun RecordTab(
     onPickPet: (String) -> Unit,
     onOpenLog: () -> Unit,
     state: QuickRecordState,
-    onOpenSura: () -> Unit = {},
+    /** 수라 화면 열기 — 아이 ID가 있으면 그 아이로(기록 줄 연필), 없으면 지금 보는 아이. */
+    onOpenSura: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -143,7 +144,7 @@ fun RecordTab(
         if (pets != null) {
             // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
             val mealMore = current != null && current.memorializedAt == null
-            QuickRecordCard(mealMore, onDetail = { if (it == RecordKind.meal) onOpenSura() else detail = DetailTarget(it, petId = who) }) { row, value ->
+            QuickRecordCard(mealMore, onDetail = { if (it == RecordKind.meal) onOpenSura(null) else detail = DetailTarget(it, petId = who) }) { row, value ->
                 scope.launch {
                     runCatching { saveQuickRecord(dao, row, value, who) }
                         .onSuccess {
@@ -158,7 +159,7 @@ fun RecordTab(
         }
         if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
-        if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog)
+        if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
     }
     detail?.let { target ->
         RecordDetailSheet(target, pets.orEmpty(), onSaved = { record, isNew ->
@@ -191,7 +192,7 @@ private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
     else -> Icons.Outlined.Restaurant
 }
 
-/** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
+/** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 수라 화면), 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
 @Composable
 private fun QuickRecordCard(mealMore: Boolean, onDetail: (RecordKind) -> Unit, onTap: (QuickRow, String) -> Unit) {
     // 큰 글자에선 이름 아래로 버튼. 그보다 작아도 폭이 모자라면 버튼이 다음 줄로(FlowRow).
@@ -293,7 +294,7 @@ private fun recordSpeech(record: Record, pets: List<Pet>) =
 
 /** 방금 남긴 기록: 오늘 이 기기에서 가장 늦게 남긴 기록 하나, 누른 직후에만 '아뢰었사옵니다'. 오늘 기록이 없으면 숨김. */
 @Composable
-private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onOpenLog: () -> Unit) {
+private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onOpenLog: () -> Unit, onOpenSura: (String?) -> Unit) {
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제가 오늘로 보임, 문안 탭(7-0)에서 날 바뀜을 함께 다룬다.
     val today = remember { OkcheDay.of(System.currentTimeMillis()) }
     val latest by remember(today) { dao.latestRecordFlow(today) }.collectAsState(null)
@@ -331,7 +332,7 @@ private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onO
                     Text("아뢰었사옵니다", color = OkcheColor.GeumDeep, style = OkcheType.Display.toTextStyle().copy(fontSize = 14.sp, lineHeight = 20.sp))
                 }
             }
-            EditIcon(record, pets, OkcheColor.Namsaek) { editing = it }
+            EditIcon(record, pets, OkcheColor.Namsaek, onOpenSura) { editing = it }
             DeleteIcon("${recordTime(record)} ${recordSpeech(record, pets)} 기록 지우기", OkcheColor.InkMuted) { deleting = record }
         }
     }
@@ -342,11 +343,12 @@ private fun DeleteIcon(label: String, tint: androidx.compose.ui.graphics.Color, 
     IconButton(onClick, Modifier.size(44.dp)) { Icon(Icons.Outlined.DeleteOutline, label, Modifier.size(22.dp), tint = tint) }
 }
 
-/** 고치기(연필) — 자세히 시트가 있는 종류만(수라는 7-3). */
+/** 고치기(연필) — 자세히 시트가 있는 종류, 수라는 그 아이 수라 화면(2026-11-04 사용자 — 누군지 모르는 수라는 먼저 누구였는지 정하기). */
 @Composable
-private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.graphics.Color, onEdit: (DetailTarget) -> Unit) {
-    if (detailFields(record.kind).isEmpty()) return
-    IconButton({ onEdit(DetailTarget(record.kind, editing = record)) }, Modifier.size(44.dp)) {
+private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.graphics.Color, onOpenSura: (String?) -> Unit, onEdit: (DetailTarget) -> Unit) {
+    val mealPet = record.petId?.takeIf { id -> record.kind == RecordKind.meal && pets.any { it.id == id && it.memorializedAt == null } }
+    if (detailFields(record.kind).isEmpty() && mealPet == null) return
+    IconButton({ if (mealPet != null) onOpenSura(mealPet) else onEdit(DetailTarget(record.kind, editing = record)) }, Modifier.size(44.dp)) {
         Icon(Icons.Outlined.Edit, "${recordTime(record)} ${recordSpeech(record, pets)} 기록 고치기", Modifier.size(22.dp), tint = tint)
     }
 }
@@ -382,9 +384,9 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
     }
 }
 
-/** 기록 목록(보드 Log·LogEmpty): 날짜 이동, '누구 기록' 칩, 그날 요약, 기록 줄(고치기·지우기·누구였는지 정하기). 수라 고치기는 7-3. 하단 탭 없음. */
+/** 기록 목록(보드 Log·LogEmpty): 날짜 이동, '누구 기록' 칩, 그날 요약, 기록 줄(고치기 — 수라는 수라 화면·지우기·누구였는지 정하기). 하단 탭 없음. */
 @Composable
-fun RecordLogScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
+fun RecordLogScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit, onOpenSura: (String) -> Unit = {}) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -420,7 +422,7 @@ fun RecordLogScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
-                    for (record in records) LogRow(record, pets, onDelete = { deleting = record }, onAssign = { assigning = record }, onEdit = { editing = it })
+                    for (record in records) LogRow(record, pets, onDelete = { deleting = record }, onAssign = { assigning = record }, onEdit = { editing = it }, onOpenSura = onOpenSura)
                 }
             }
         }
@@ -450,7 +452,7 @@ private fun DateBar(day: String, today: String, onDay: (String) -> Unit) {
 }
 
 @Composable
-private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssign: () -> Unit, onEdit: (DetailTarget) -> Unit) {
+private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssign: () -> Unit, onEdit: (DetailTarget) -> Unit, onOpenSura: (String) -> Unit) {
     val unknown = record.petId == null
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
@@ -470,7 +472,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
             if (unknown) {
                 Text(
                     "누구였는지 정하기",
-                    Modifier.heightIn(min = 32.dp).clickable(role = Role.Button, onClick = onAssign).wrapContentHeight(Alignment.CenterVertically),
+                    Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onAssign).wrapContentHeight(Alignment.CenterVertically),
                     color = OkcheColor.Namsaek, style = OkcheType.Label.toTextStyle(),
                 )
             } else {
@@ -479,7 +481,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
                 }
             }
         }
-        EditIcon(record, pets, OkcheColor.Ink, onEdit)
+        EditIcon(record, pets, OkcheColor.Ink, { id -> id?.let(onOpenSura) }, onEdit)
         DeleteIcon("${recordTime(record)} ${recordSpeech(record, pets)} 기록 지우기", OkcheColor.Ink, onDelete)
     }
 }

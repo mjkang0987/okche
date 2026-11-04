@@ -24,9 +24,14 @@ enum MealRules {
         return base + (base.count..<max(count, base.count)).map { "끼니 \($0 + 1)" }
     }
 
-    /// 시간 순으로 정렬하고 이름을 붙인 끼니들.
+    /// 하루(6시 기준) 안 순서: 6시 전 끼니는 그날의 마지막(1-2).
+    static func dayOrder(_ time: String) -> String {
+        (time < String(format: "%02d:00", OkcheDay.startHour) ? "1" : "0") + time
+    }
+
+    /// 하루 순서(6시 기준)로 정렬하고 이름을 붙인 끼니들.
     static func named(_ slots: [MealSlot]) -> [MealSlot] {
-        let sorted = slots.sorted { $0.time < $1.time }
+        let sorted = slots.sorted { dayOrder($0.time) < dayOrder($1.time) }
         return zip(sorted, names(sorted.count)).map { MealSlot(name: $1, time: $0.time, grams: $0.grams) }
     }
 
@@ -34,10 +39,6 @@ enum MealRules {
     static func openPlan(_ plans: [MealPlan]) -> MealPlan? {
         plans.filter { $0.activeUntil == nil && $0.deletedAt == nil }
             .max { ($0.activeFrom, $0.updatedAt) < ($1.activeFrom, $1.updatedAt) }
-    }
-
-    static func openPlan(petId: UUID, in context: ModelContext) throws -> MealPlan? {
-        try openPlan(context.fetch(FetchDescriptor<MealPlan>(predicate: #Predicate { $0.petId == petId })))
     }
 
     /// 달력 날짜 `date`의 `time`에 오는 차례(시간대 = `timeZone`).
@@ -93,15 +94,6 @@ enum MealRules {
         .sorted { $0.at < $1.at }
     }
 
-    /// 지금 차례: 각 차례 구간은 자기 시간 1시간 전부터 다음 차례 1시간 전까지(7장 인슐린과 같은 규칙).
-    static func current(_ plan: MealPlan, now: Date, timeZone: TimeZone = .autoupdatingCurrent) -> Occurrence? {
-        let cal = calendar(timeZone)
-        let candidates = (-1...1).flatMap { offset in
-            plan.slots.compactMap { occurrence(plan, $0, on: cal.date(byAdding: .day, value: offset, to: now)!, cal) }
-        }
-        return candidates.filter { $0.at.addingTimeInterval(-3600) <= now }.max { $0.at < $1.at }
-    }
-
     /// 수라 기록 `data`: 결과 + 끼니 이름·준 양·남은 양(있을 때만).
     static func data(result: String, slotName: String?, givenGrams: Int?, leftGrams: Int?) -> String {
         var json: [String: Any] = ["result": result]
@@ -132,6 +124,15 @@ enum MealRules {
         return slot
     }
 
+    /// 끼니 차례 기록의 새 ID: 급식기 차례는 자동 기록과 같은 고정 ID(1-5 — 다른 기기의 자동 기록과 합쳐지게), 그 ID 줄이 지운 채 있으면 새 ID.
+    static func newRecordId(for slot: Occurrence, in context: ModelContext) throws -> UUID {
+        guard slot.mode == .feeder else { return UUID() }
+        let fixed = UUID.feederRecord(slotKey: slot.key)
+        var taken = FetchDescriptor<Record>(predicate: #Predicate { $0.id == fixed })
+        taken.fetchLimit = 1
+        return try context.fetch(taken).isEmpty ? fixed : UUID()
+    }
+
     /// 수라 화면에서 끼니 결과를 고름: 그 차례 기록이 있으면 결과만 고치고(남김이 아니면 남은 양 비움), 없으면 지금 시각으로 만든다.
     @discardableResult
     static func pick(_ result: String, for slot: Occurrence, petId: UUID, now: Date = .now, timeZone: TimeZone = .autoupdatingCurrent,
@@ -139,23 +140,34 @@ enum MealRules {
         let record: Record
         if let existing = try self.record(key: slot.key, in: context) {
             let json = json(existing)
+            // 같은 결과를 다시 고르면 아무것도 안 바꾼다('자동 기록됨' 표시도 그대로).
+            if json["result"] as? String == result { return existing }
             existing.data = data(result: result, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
                                  leftGrams: json["leftGrams"] as? Int)
             existing.updatedAt = now
             existing.auto = false // 보호자가 고친 기록
             record = existing
         } else {
-            // 급식기 차례는 자동 기록과 같은 고정 ID로(1-5 — 다른 기기의 자동 기록과 합쳐지게). 그 ID 줄이 지운 채 있으면 새 ID.
-            let fixed = UUID.feederRecord(slotKey: slot.key)
-            var taken = FetchDescriptor<Record>(predicate: #Predicate { $0.id == fixed })
-            taken.fetchLimit = 1
-            let id = try slot.mode == .feeder && context.fetch(taken).isEmpty ? fixed : UUID()
-            record = Record(id: id, now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot.key,
+            record = Record(id: try newRecordId(for: slot, in: context), now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot.key,
                             data: data(result: result, slotName: slot.slot.name, givenGrams: slot.slot.grams, leftGrams: nil))
             context.insert(record)
         }
         try save(context)
         return record
+    }
+
+    /// 수라 결과(값, 화면 글자) — 일기 수라 줄·수라 화면·결과 바꾸기가 같이 쓴다.
+    static let results: [(value: String, title: String)] = [("all", "다 먹음"), ("some", "남김"), ("none", "안 먹음")]
+
+    /// 끼니 없이 남긴 수라의 결과 바꾸기: 결과만(남김이 아니면 남은 양 비움), 같은 결과면 그대로.
+    static func setResult(_ result: String, on record: Record, now: Date = .now, in context: ModelContext) throws {
+        let json = json(record)
+        guard json["result"] as? String != result else { return }
+        record.data = data(result: result, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
+                           leftGrams: json["leftGrams"] as? Int)
+        record.updatedAt = now
+        record.auto = false
+        try save(context)
     }
 
     /// 끼니 없이 '지금 먹은 것': 지금 시각, `slotKey` 없음.
@@ -178,16 +190,43 @@ enum MealRules {
     }
 
     /// 끼니 시간 저장·급여 방식 바꾸기: 열린 계획을 지금 닫고 같은 시각 새 줄(지난 기록은 그대로). 직접 급여에서 끼니가 없으면 닫기만.
-    static func savePlan(petId: UUID, mode: MealMode, slots: [MealSlot], now: Date = .now, in context: ModelContext) throws {
+    /// 바꾼 게 없으면 아무것도 안 한다. 아직 오지 않은 끼니를 미리 남겼으면(1시간 전 구간) 새 계획에 같은 시각이 있을 때 그 차례로 옮긴다.
+    static func savePlan(petId: UUID, mode: MealMode, slots: [MealSlot], now: Date = .now, timeZone: TimeZone = .autoupdatingCurrent,
+                         in context: ModelContext) throws {
         let plans = try context.fetch(FetchDescriptor<MealPlan>(predicate: #Predicate { $0.petId == petId }))
+        let old = openPlan(plans)
+        let newSlots = named(slots)
+        if let old, old.mode == mode, old.slots == newSlots { return }
+        if old == nil && newSlots.isEmpty { return }
         for plan in plans where plan.activeUntil == nil && plan.deletedAt == nil {
             plan.activeUntil = now
             plan.updatedAt = now
         }
-        if !slots.isEmpty {
-            context.insert(MealPlan(now: now, petId: petId, mode: mode, slots: named(slots), activeFrom: now))
+        if !newSlots.isEmpty {
+            let plan = MealPlan(now: now, petId: petId, mode: mode, slots: newSlots, activeFrom: now)
+            context.insert(plan)
+            if let old { try moveEarlyRecords(from: old, to: plan, now: now, timeZone: timeZone, in: context) }
         }
         try save(context)
+    }
+
+    /// 앞 계획 차례로 미리 남긴(아직 끼니 시각 전) 기록을 새 계획의 같은 시각 차례로 옮긴다 — 안 그러면 새 칸이 '아직 기록 전'이 되어 두 번 기록된다.
+    private static func moveEarlyRecords(from old: MealPlan, to new: MealPlan, now: Date, timeZone: TimeZone, in context: ModelContext) throws {
+        let prefix = old.id.uuidString.lowercased() + "|"
+        let petId = old.petId
+        let meal = RecordKind.meal.rawValue
+        let records = try context.fetch(FetchDescriptor<Record>(predicate: #Predicate {
+            $0.petId == petId && $0.kind == meal && $0.deletedAt == nil && $0.slotKey != nil
+        }))
+        for record in records {
+            guard let key = record.slotKey, key.hasPrefix(prefix) else { continue }
+            let parts = key.split(separator: "|").map(String.init)
+            guard parts.count == 3, let slot = new.slots.first(where: { $0.time == parts[2] }),
+                  let o = occurrences(new, day: parts[1], timeZone: timeZone).first(where: { $0.slot.time == slot.time }),
+                  o.at >= now else { continue }
+            record.slotKey = o.key
+            record.updatedAt = now
+        }
     }
 
     // shortcut: 앞으로 올 때마다 급식기 계획의 모든 날을 처음부터 돈다(이미 있으면 건너뜀), 오래 쓰다 느려지면 마지막으로 채운 날을 기기 설정에 두고 그 뒤만 돈다.
@@ -216,8 +255,11 @@ enum MealRules {
                           plan.activeUntil.map({ o.at < $0 }) ?? true else { continue }
                     let id = UUID.feederRecord(slotKey: o.key)
                     guard !ids.contains(id), !keys.contains(o.key) else { continue }
-                    context.insert(Record(id: id, now: o.at, petId: plan.petId, kind: .meal, occurredAt: o.at, timeZone: timeZone, slotKey: o.key,
-                                          data: data(result: "all", slotName: slot.name, givenGrams: slot.grams, leftGrams: nil), auto: true))
+                    // `createdAt`은 만든 때, `updatedAt`만 끼니 예정 시각(1-5 — 보호자가 고친 기록이 병합에서 이기게).
+                    let record = Record(id: id, now: now, petId: plan.petId, kind: .meal, occurredAt: o.at, timeZone: timeZone, slotKey: o.key,
+                                        data: data(result: "all", slotName: slot.name, givenGrams: slot.grams, leftGrams: nil), auto: true)
+                    record.updatedAt = o.at
+                    context.insert(record)
                     ids.insert(id)
                     keys.insert(o.key)
                     made += 1

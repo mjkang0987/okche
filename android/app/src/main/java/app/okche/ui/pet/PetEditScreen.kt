@@ -247,7 +247,8 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
             OkcheTextField(f.diagnosis, { edit { copy(diagnosis = it) } }, "진단명", hint = "(있을 때만)")
             Column(anchors.of("insulinPlan"), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", f.hasDiabetes, { edit("insulinPlan") { copy(hasDiabetes = it) } })
-                if (f.hasDiabetes) {
+                // 추억 아이는 인슐린을 새로 설정하지 않는다(간직하면 계획을 닫아 둠 — 되돌릴 때 6-4 규칙대로).
+                if (f.hasDiabetes && saved?.memorializedAt == null) {
                     TextButton(onInsulin, Modifier.heightIn(min = 44.dp)) {
                         // 화면 읽기는 '›' 없이 읽게
                         Text("인슐린 이름·양·시간 설정 ›", Modifier.semantics { contentDescription = "인슐린 이름·양·시간 설정" }, color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium))
@@ -339,7 +340,8 @@ private fun LifecycleLinks(pet: Pet, enabled: Boolean, onBusy: (Boolean) -> Unit
         }
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(Modifier.heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 큰 글자에서 한 줄에 안 들어가면 다음 줄로(버튼이 찌그러지지 않게).
+        FlowRow(Modifier.heightIn(min = 44.dp), horizontalArrangement = Arrangement.Center, itemVerticalAlignment = Alignment.CenterVertically) {
             val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
             val alpha = if (enabled) 1f else 0.4f // 막혀 있을 땐 흐리게
             if (memorial) {

@@ -189,14 +189,19 @@ final class PetMemorialTests: XCTestCase {
         XCTAssertEqual(kong.name, "콩콩")
     }
 
-    /// 당뇨가 없던 추억 아이가 당뇨를 새로 켜면 인슐린 계획 검사는 그대로(6-2 규칙).
-    func testMemorialPetTurningDiabetesOnStillNeedsPlan() throws {
+    /// 추억 아이는 당뇨를 새로 켜도 인슐린 계획 없이 저장된다(계획을 새로 열지 않음 — 전체 리뷰 2026-11-04). 되돌린 뒤엔 6-2 검사 그대로.
+    func testMemorialPetTurningDiabetesOnNeedsNoPlan() throws {
         let kong = pet()
         try context.save()
         try PetLifecycle.memorialize(kong, now: kept, in: context)
         var form = PetEditing(pet: kong, context: context, today: back, calendar: seoul)
         form.hasDiabetes = true
-        XCTAssertThrowsError(try form.save(in: context, now: back, calendar: seoul))
-        XCTAssertFalse(kong.hasDiabetes)
+        try form.save(in: context, now: back, calendar: seoul)
+        XCTAssertTrue(kong.hasDiabetes)
+        XCTAssertTrue(try InsulinPlan.open(for: kong.id, in: context).isEmpty)
+        try PetLifecycle.restore(kong, now: back, in: context)
+        var again = PetEditing(pet: kong, context: context, today: back, calendar: seoul)
+        again.name = "콩콩"
+        XCTAssertThrowsError(try again.save(in: context, now: back, calendar: seoul)) // 되돌린 뒤엔 인슐린을 설정해야 저장
     }
 }

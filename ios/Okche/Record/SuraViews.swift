@@ -16,6 +16,7 @@ struct SuraScreen: View {
     @State private var failed = false
     /// 1분마다 — 켜 둔 채 시간이 지나도 '아직 시간 전'·오늘(6시 기준)·급식기 자동 기록이 따라가게.
     @State private var now = Date.now
+    @Environment(\.scenePhase) private var scenePhase
 
     private var pet: Pet? { PetTitle.current(pets, lastPetId: lastPetId).flatMap { $0.memorializedAt == nil ? $0 : nil } }
 
@@ -38,6 +39,7 @@ struct SuraScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear { try? MealRules.fillFeeder(in: context) }
+        .onChange(of: scenePhase) { if scenePhase == .active { now = .now } } // 돌아오자마자 지금 시각으로
         .task {
             // 화면이 떠 있는 동안 1분마다(다시 그려도 처음부터 세지 않게 task로).
             while !Task.isCancelled {
@@ -110,7 +112,17 @@ struct SuraScreen: View {
         }
         VStack(alignment: .leading, spacing: 12) {
             Text("지금 먹은 것").okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink).accessibilityAddTraits(.isHeader)
-            HStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { nowButtons(pet) }
+                VStack(spacing: 8) { nowButtons(pet) }
+            }
+        }
+        .padding(16)
+        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+        todayList(pet)
+    }
+
+    @ViewBuilder private func nowButtons(_ pet: Pet) -> some View {
                 ForEach(MealCard.results, id: \.value) { result in
                     Button(result.title) { run { try MealRules.pickNow(result.value, petId: pet.id, in: context) } }
                         .okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink)
@@ -119,10 +131,9 @@ struct SuraScreen: View {
                         .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(OkcheColor.line, lineWidth: 1.5))
                         .accessibilityLabel("지금 \(result.title)")
                 }
-            }
-        }
-        .padding(16)
-        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+    }
+
+    @ViewBuilder private func todayList(_ pet: Pet) -> some View {
         let today = meals.filter { $0.petId == pet.id && $0.day == OkcheDay.of(now) }
         if !today.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
@@ -177,7 +188,18 @@ struct ModePicker: View {
     let onPick: (MealMode) -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
+        // 큰 글자에서 나란히 안 들어가면 위아래로.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) { options }
+            VStack(spacing: 4) { options }
+        }
+        .padding(4)
+        .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("급여 방식")
+    }
+
+    private var options: some View {
             ForEach([(MealMode.direct, "직접 급여"), (.feeder, "급식기 (수라간)")], id: \.0) { value, title in
                 let on = value == mode
                 Button { onPick(value) } label: {
@@ -192,11 +214,6 @@ struct ModePicker: View {
                 .frame(minHeight: 44)
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
-        }
-        .padding(4)
-        .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("급여 방식")
     }
 }
 
@@ -300,6 +317,11 @@ private struct MealCard: View {
         let text = left.trimmingCharacters(in: .whitespaces)
         guard text != stored else { return leftError = nil }
         let given = MealRules.json(record)["givenGrams"] as? Int
+        let valid = text.isEmpty || Int(text).map { (0...(given ?? 2000)).contains($0) } == true
+        if !valid && stored.isEmpty { // 이미 비어 있으면 다시 쓰지 않는다(바뀐 줄이 늘지 않게)
+            leftError = given.map { "준 양(\($0)g)보다 많을 수 없어요" } ?? "0에서 2000 사이 숫자로 넣어 주세요"
+            return
+        }
         if text.isEmpty {
             leftError = nil
             onLeft(record, nil)

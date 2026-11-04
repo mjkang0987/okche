@@ -300,9 +300,9 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                                 v.isBlank() -> { error = null; onLeft(record, null) }
                                 grams != null && grams in 0..(given ?: 2000) -> { error = null; onLeft(record, grams) }
                                 else -> {
-                                    // 잘못된 값이면 치는 중 저장된 앞 숫자(30을 치다 남은 3)가 남지 않게 비운다.
+                                    // 잘못된 값이면 치는 중 저장된 앞 숫자(30을 치다 남은 3)가 남지 않게 비운다. 이미 비어 있으면 다시 쓰지 않음.
                                     error = given?.let { "준 양(${it}g)보다 많을 수 없어요" } ?: "0에서 2000 사이 숫자로 넣어 주세요"
-                                    onLeft(record, null)
+                                    if (leftGrams(record) != null) onLeft(record, null)
                                 }
                             }
                         },

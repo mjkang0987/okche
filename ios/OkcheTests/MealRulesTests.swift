@@ -49,7 +49,7 @@ final class MealRulesTests: XCTestCase {
         let row = QuickRecord.rows[3]
         let none = try QuickRecord.save(row, value: "all", petId: pet, now: at(2026, 10, 25, 8), timeZone: seoul, in: context)
         XCTAssertNil(none.slotKey) // 끼니 없음
-        _ = try plan(.direct, ["08:00", "18:00"], from: at(2026, 10, 25, 9))
+        _ = try plan(.direct, ["08:00", "18:00"], from: at(2026, 10, 25, 6)) // 아침 전에 정함
         try context.fetch(FetchDescriptor<MealPlan>()).first!.slots[0].grams = 40
         let first = try QuickRecord.save(row, value: "some", petId: pet, now: at(2026, 10, 25, 9, 30), timeZone: seoul, in: context)
         XCTAssertNotNil(first.slotKey)
@@ -89,6 +89,34 @@ final class MealRulesTests: XCTestCase {
         let list = MealRules.occurrences(p, day: "2026-10-25", timeZone: seoul)
         XCTAssertEqual(list.map(\.at), [at(2026, 10, 25, 8), at(2026, 10, 26, 2)])
         XCTAssertEqual(Set(list.map(\.day)), ["2026-10-25"])
+    }
+
+    /// 그날 끼니를 바꿔도 지난 끼니는 앞 계획의 차례로 남는다(두 번 기록 안 됨 — 리뷰 1회차).
+    func testPlanChangeMidDayKeepsPastSlot() throws {
+        let old = try plan(.direct, ["08:00", "18:00"], from: at(2026, 10, 1, 9))
+        let morning = try XCTUnwrap(MealRules.occurrences(old, day: "2026-10-25", timeZone: seoul).first)
+        try MealRules.pick("all", for: morning, petId: pet, now: at(2026, 10, 25, 8, 10), timeZone: seoul, in: context)
+        _ = try plan(.direct, ["09:00", "19:00"], from: at(2026, 10, 25, 10)) // 10시에 시간 바꿈
+        let plans = try context.fetch(FetchDescriptor<MealPlan>())
+        let today = MealRules.occurrences(plans, day: "2026-10-25", timeZone: seoul)
+        XCTAssertEqual(today.map(\.slot.time), ["08:00", "19:00"]) // 앞 계획 아침 + 새 계획 저녁(09:00은 바꾸기 전이라 없음)
+        XCTAssertEqual(today[0].key, morning.key)
+        // 10:30 바로 기록 → 지금 차례는 앞 계획 아침이고 이미 있어 추가 식사
+        let extra = try QuickRecord.save(QuickRecord.rows[3], value: "all", petId: pet, now: at(2026, 10, 25, 10, 30), timeZone: seoul, in: context)
+        XCTAssertNil(extra.slotKey)
+    }
+
+    /// 급식기 차례를 손으로 남기면 자동 기록과 같은 고정 ID, 자동 기록을 고치면 auto 꺼짐.
+    func testFeederManualPickUsesFixedId() throws {
+        let p = try plan(.feeder, ["07:00", "19:00"], from: at(2026, 10, 24, 12))
+        let evening = try XCTUnwrap(MealRules.occurrences(p, day: "2026-10-25", timeZone: seoul).last)
+        let manual = try MealRules.pick("some", for: evening, petId: pet, now: at(2026, 10, 25, 18, 50), timeZone: seoul, in: context)
+        XCTAssertEqual(manual.id, UUID.feederRecord(slotKey: evening.key))
+        try MealRules.fillFeeder(now: at(2026, 10, 26, 8), timeZone: seoul, in: context)
+        let morning = try XCTUnwrap(MealRules.record(key: MealRules.occurrences(p, day: "2026-10-25", timeZone: seoul)[0].key, in: context))
+        XCTAssertTrue(morning.auto)
+        try MealRules.pick("none", for: MealRules.occurrences(p, day: "2026-10-25", timeZone: seoul)[0], petId: pet, now: at(2026, 10, 26, 9), timeZone: seoul, in: context)
+        XCTAssertFalse(morning.auto)
     }
 
     /// 급식기: 빠진 날까지 채우고, 고정 ID라 한 번만, 지운 것은 되살리지 않고, 계획 전·지금 뒤 끼니는 안 만듦.

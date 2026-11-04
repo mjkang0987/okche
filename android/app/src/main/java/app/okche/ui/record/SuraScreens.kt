@@ -41,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -84,6 +85,7 @@ import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val mealResults = listOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")
@@ -100,7 +102,15 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
     val dao = remember { OkcheDatabase.get(context).dao() }
     val scope = rememberCoroutineScope()
     val petId = pet?.takeIf { it.memorializedAt == null }?.id
-    val today = remember { OkcheDay.of(System.currentTimeMillis()) }
+    // 1분마다 — 켜 둔 채 시간이 지나도 '아직 시간 전'·오늘(6시 기준)·급식기 자동 기록이 따라가게.
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(60_000)
+            value = System.currentTimeMillis()
+            runCatching { fillFeeder(dao) }
+        }
+    }
+    val today = OkcheDay.of(now)
     val plans by remember(petId) { petId?.let { dao.mealPlansFlow(it) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     val meals by remember(petId) { petId?.let { dao.dayMealsFlow(it, today) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     val dismissed by remember { context.mealHintDismissed }.collectAsState(null)
@@ -138,8 +148,14 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
                 }
                 if (plan != null) {
                     PlanRow(plan) { editing = plan.mode }
-                    for (slot in mealOccurrences(plan, today)) {
-                        MealCard(plan, slot, meals.firstOrNull { it.slotKey == slot.key },
+                    // 그날 계획을 바꿨으면 바꾸기 전 끼니는 앞 계획의 차례로 보인다.
+                    val slots = mealOccurrences(plans, today)
+                    if (slots.isEmpty()) {
+                        // 오늘 처음 정해 끼니가 모두 지났을 때('아직 지나지 않은 끼니부터 적용').
+                        Text("오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
+                    }
+                    for (slot in slots) {
+                        MealCard(slot, now, meals.firstOrNull { it.slotKey == slot.key },
                             onPick = { result -> run { pickMeal(dao, result, slot, petId) } },
                             onLeft = { record, grams -> run { setLeftGrams(dao, record, grams) } })
                     }
@@ -235,9 +251,9 @@ private fun PillButton(text: String, label: String, onClick: () -> Unit) {
 
 /** 끼니 칸: 이름(급식기는 시각)·준 양 + 상태, 다 먹음·남김·안 먹음(기존 고르기 카드), 남김이면 '남은 양 (g, 선택)'. */
 @Composable
-private fun MealCard(plan: MealPlan, slot: MealOccurrence, record: Record?, onPick: (String) -> Unit, onLeft: (Record, Int?) -> Unit) {
-    val feeder = plan.mode == MealMode.feeder
-    val waiting = feeder && slot.at > System.currentTimeMillis() && record == null
+private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (String) -> Unit, onLeft: (Record, Int?) -> Unit) {
+    val feeder = slot.mode == MealMode.feeder
+    val waiting = feeder && slot.at > now && record == null
     val result = record?.let(::mealResult)
     Column(
         Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(16.dp),
@@ -263,8 +279,10 @@ private fun MealCard(plan: MealPlan, slot: MealOccurrence, record: Record?, onPi
         if (!waiting) {
             OkcheChoiceCards("${slot.slot.name} 식사량", mealResults, result, onPick, hideLabel = true)
             if (result == "some" && record != null) {
-                var left by remember(record.id) { mutableStateOf(leftGrams(record)?.toString().orEmpty()) }
-                var error by remember(record.id) { mutableStateOf<String?>(null) }
+                // 결과가 바뀌면 기록에서 다시 읽는다(다 먹음 → 남김으로 돌아오면 지운 값이 남지 않게).
+                var left by remember(record.id, result) { mutableStateOf(leftGrams(record)?.toString().orEmpty()) }
+                var error by remember(record.id, result) { mutableStateOf<String?>(null) }
+                val given = givenGrams(record)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         buildAnnotatedString {
@@ -280,8 +298,8 @@ private fun MealCard(plan: MealPlan, slot: MealOccurrence, record: Record?, onPi
                             val grams = v.trim().toIntOrNull()
                             when {
                                 v.isBlank() -> { error = null; onLeft(record, null) }
-                                grams != null && grams in 0..2000 -> { error = null; onLeft(record, grams) }
-                                else -> error = "0에서 2000 사이 숫자로 넣어 주세요"
+                                grams != null && grams in 0..(given ?: 2000) -> { error = null; onLeft(record, grams) }
+                                else -> error = given?.let { "준 양(${it}g)보다 많을 수 없어요" } ?: "0에서 2000 사이 숫자로 넣어 주세요"
                             }
                         },
                         "${slot.slot.name} 남은 양 (그램, 선택)",
@@ -432,7 +450,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
                         val name = names[i]
                         val timeField = @Composable { m: Modifier ->
                             OkchePickerField(time, "$name 시간", onClick = {
-                                val t = java.time.LocalTime.parse(time)
+                                val t = runCatching { java.time.LocalTime.parse(time) }.getOrDefault(java.time.LocalTime.NOON) // 다른 기기에서 온 틀린 글자
                                 TimePickerDialog(context, { _, h, min ->
                                     rows[i] = "%02d:%02d".format(h, min) to rows[i].second
                                     rows.sortBy { it.first }

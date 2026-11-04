@@ -85,7 +85,7 @@ class MealRulesTest {
     @Test fun quickMealGoesToSlotThenExtra() = runBlocking {
         val row = quickRows[3]
         assertNull(saveQuickRecord(dao, row, "all", pet, at(2026, 10, 25, 8), seoul).slotKey) // 끼니 없음
-        saveMealPlan(dao, pet, MealMode.direct, listOf(MealSlot("", "08:00", 40), MealSlot("", "18:00")), at(2026, 10, 25, 9))
+        saveMealPlan(dao, pet, MealMode.direct, listOf(MealSlot("", "08:00", 40), MealSlot("", "18:00")), at(2026, 10, 25, 6)) // 아침 전에 정함
         val first = saveQuickRecord(dao, row, "some", pet, at(2026, 10, 25, 9, 30), seoul)
         assertNotNull(first.slotKey)
         assertEquals("""{"givenGrams":40,"result":"some","slotName":"아침"}""", first.data)
@@ -119,6 +119,29 @@ class MealRulesTest {
         val list = mealOccurrences(p, "2026-10-25", seoul)
         assertEquals(listOf(at(2026, 10, 25, 8), at(2026, 10, 26, 2)), list.map { it.at })
         assertEquals(setOf("2026-10-25"), list.map { it.day }.toSet())
+    }
+
+    /** 그날 끼니를 바꿔도 지난 끼니는 앞 계획의 차례로 남는다(두 번 기록 안 됨 — 리뷰 1회차). */
+    @Test fun planChangeMidDayKeepsPastSlot() = runBlocking {
+        val old = plan(MealMode.direct, listOf("08:00", "18:00"), at(2026, 10, 1, 9))
+        val morning = mealOccurrences(old, "2026-10-25", seoul).first()
+        pickMeal(dao, "all", morning, pet, at(2026, 10, 25, 8, 10), seoul)
+        plan(MealMode.direct, listOf("09:00", "19:00"), at(2026, 10, 25, 10))
+        val today = mealOccurrences(dao.mealPlans(pet), "2026-10-25", seoul)
+        assertEquals(listOf("08:00", "19:00"), today.map { it.slot.time })
+        assertEquals(morning.key, today[0].key)
+        assertNull(saveQuickRecord(dao, quickRows[3], "all", pet, at(2026, 10, 25, 10, 30), seoul).slotKey) // 추가 식사
+    }
+
+    /** 급식기 차례를 손으로 남기면 자동 기록과 같은 고정 ID, 자동 기록을 고치면 auto 꺼짐. */
+    @Test fun feederManualPickUsesFixedId() = runBlocking {
+        val p = plan(MealMode.feeder, listOf("07:00", "19:00"), at(2026, 10, 24, 12))
+        val evening = mealOccurrences(p, "2026-10-25", seoul).last()
+        assertEquals(FixedIds.feederRecord(evening.key), pickMeal(dao, "some", evening, pet, at(2026, 10, 25, 18, 50), seoul).id)
+        fillFeeder(dao, at(2026, 10, 26, 8), seoul)
+        val morning = mealOccurrences(p, "2026-10-25", seoul)[0]
+        assertTrue(checkNotNull(dao.recordBySlot(morning.key)).auto)
+        assertEquals(false, pickMeal(dao, "none", morning, pet, at(2026, 10, 26, 9), seoul).auto)
     }
 
     /** 급식기: 빠진 날까지 채우고, 고정 ID라 한 번만, 지운 것은 되살리지 않고, 계획 전·지금 뒤 끼니는 안 만듦. */
@@ -177,9 +200,14 @@ class SuraFlowTest {
         waitFor(hasText("저장하기"))
         rule.onNode(hasText("저장하기")).performScrollTo().performClick()
         waitFor(hasContentDescription("끼니 시간 바꾸기"))
-        rule.onNode(hasText("저녁")).assertExists()
-        rule.onAllNodes(hasText("남김").and(isSelectable()))[0].performClick()
-        waitFor(hasContentDescription("남은 양 (그램, 선택)", substring = true))
+        // 오늘 정한 끼니는 아직 지나지 않은 것만 칸이 생긴다(18시 뒤엔 없음) — 있으면 남김까지.
+        val some = rule.onAllNodes(hasText("남김").and(isSelectable())).fetchSemanticsNodes()
+        if (some.isNotEmpty()) {
+            rule.onAllNodes(hasText("남김").and(isSelectable()))[0].performClick()
+            waitFor(hasContentDescription("남은 양 (그램, 선택)", substring = true))
+        } else {
+            rule.onNode(hasText("오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.")).assertExists()
+        }
 
         rule.onNode(hasText("급식기 (수라간)")).performClick()
         waitFor(hasContentDescription("급식기 시간 바꾸기"))

@@ -246,6 +246,9 @@ abstract class OkcheDao {
 
     @Query("SELECT slot_key FROM record WHERE kind = 'meal' AND deleted_at IS NULL AND slot_key IS NOT NULL") abstract suspend fun mealSlotKeys(): List<String>
 
+    /** 그 ID의 기록 줄이 있는지(지운 줄 포함). */
+    @Query("SELECT COUNT(*) FROM record WHERE id = :id") abstract suspend fun recordIdCount(id: String): Int
+
     /** 끼니 시간 저장·방식 바꾸기: 열린 계획을 닫고 새 줄(끼니가 없으면 닫기만) — 한 번에. */
     @Transaction
     open suspend fun replaceMealPlan(petId: String, plan: MealPlan?, now: Long) {

@@ -14,6 +14,8 @@ struct SuraScreen: View {
     @AppStorage("mealHintDismissed") private var hintDismissed = ""
     @State private var editing: MealMode?
     @State private var failed = false
+    /// 1분마다 — 켜 둔 채 시간이 지나도 '아직 시간 전'·오늘(6시 기준)·급식기 자동 기록이 따라가게.
+    @State private var now = Date.now
 
     private var pet: Pet? { PetTitle.current(pets, lastPetId: lastPetId).flatMap { $0.memorializedAt == nil ? $0 : nil } }
 
@@ -36,6 +38,10 @@ struct SuraScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear { try? MealRules.fillFeeder(in: context) }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) {
+            now = $0
+            try? MealRules.fillFeeder(now: $0, in: context)
+        }
         .sheet(item: $editing) { mode in
             if let pet { MealTimeSheet(petId: pet.id, mode: mode, plan: plan(pet)) }
         }
@@ -56,9 +62,14 @@ struct SuraScreen: View {
         }
         if let plan {
             PlanRow(plan: plan) { editing = plan.mode }
-            let today = OkcheDay.of(.now)
-            ForEach(MealRules.occurrences(plan, day: today), id: \.key) { slot in
-                MealCard(plan: plan, slot: slot, record: meals.first { $0.slotKey == slot.key }) { result in
+            // 그날 계획을 바꿨으면 바꾸기 전 끼니는 앞 계획의 차례로 보인다.
+            let slots = MealRules.occurrences(plans.filter { $0.petId == pet.id }, day: OkcheDay.of(now))
+            if slots.isEmpty {
+                // 오늘 처음 정해 끼니가 모두 지났을 때('아직 지나지 않은 끼니부터 적용').
+                Text("오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.").okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
+            }
+            ForEach(slots, id: \.key) { slot in
+                MealCard(slot: slot, now: now, record: meals.first { $0.slotKey == slot.key }) { result in
                     run { try MealRules.pick(result, for: slot, petId: pet.id, in: context) }
                 } onLeft: { record, grams in
                     run { try MealRules.setLeft(grams, on: record, in: context) }
@@ -78,7 +89,7 @@ struct SuraScreen: View {
 
     /// 끼니 없음(보드 `SuraNoPlan`): 안내(한 번 — '괜찮아요'면 그 아이는 다시 안 뜸), 지금 먹은 것, 오늘 남긴 수라.
     @ViewBuilder private func noPlan(_ pet: Pet) -> some View {
-        let id = pet.id.uuidString
+        let id = pet.id.uuidString.lowercased() // ID 글자는 소문자(5-1)
         if !hintDismissed.split(separator: ",").contains(Substring(id)) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("끼니 시간을 정해 둘까요?").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaekDeep)
@@ -108,7 +119,7 @@ struct SuraScreen: View {
         }
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
-        let today = meals.filter { $0.petId == pet.id && $0.day == OkcheDay.of(.now) }
+        let today = meals.filter { $0.petId == pet.id && $0.day == OkcheDay.of(now) }
         if !today.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text("오늘 남긴 수라").okcheText(OkcheType.label).foregroundStyle(OkcheColor.inkMuted)
@@ -221,8 +232,8 @@ private struct PlanRow: View {
 private struct MealCard: View {
     static let results: [(value: String, title: String)] = [("all", "다 먹음"), ("some", "남김"), ("none", "안 먹음")]
 
-    let plan: MealPlan
     let slot: MealRules.Occurrence
+    let now: Date
     let record: Record?
     let onPick: (String) -> Void
     let onLeft: (Record, Int?) -> Void
@@ -230,8 +241,8 @@ private struct MealCard: View {
     @State private var leftError: String?
 
     var body: some View {
-        let feeder = plan.mode == .feeder
-        let waiting = feeder && slot.at > .now && record == nil
+        let feeder = slot.mode == .feeder
+        let waiting = feeder && slot.at > now && record == nil
         let result = record.flatMap { MealRules.json($0)["result"] as? String }
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
@@ -268,7 +279,8 @@ private struct MealCard: View {
         }
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
-        .onAppear { left = record.flatMap { (MealRules.json($0)["leftGrams"] as? Int).map(String.init) } ?? "" }
+        .onAppear { left = stored }
+        .onChange(of: result) { left = stored } // 다 먹음 → 남김으로 돌아오면 지운 값이 남지 않게
     }
 
     private func status(feeder: Bool, waiting: Bool) -> String {
@@ -277,17 +289,21 @@ private struct MealCard: View {
         return record.auto ? "자동 기록됨" : QuickRecord.time(record)
     }
 
-    /// 0~2000 정수, 비우면 없음. 잘못된 값은 저장하지 않고 칸 아래에 알림.
+    private var stored: String { record.flatMap { (MealRules.json($0)["leftGrams"] as? Int).map(String.init) } ?? "" }
+
+    /// 0~2000 정수(준 양이 있으면 그보다 많을 수 없음), 비우면 없음. 잘못된 값은 저장하지 않고 칸 아래에 알림. 기록과 같으면 저장 안 함.
     private func saveLeft(_ record: Record) {
         let text = left.trimmingCharacters(in: .whitespaces)
+        guard text != stored else { return leftError = nil }
+        let given = MealRules.json(record)["givenGrams"] as? Int
         if text.isEmpty {
             leftError = nil
             onLeft(record, nil)
-        } else if let grams = Int(text), (0...2000).contains(grams) {
+        } else if let grams = Int(text), (0...(given ?? 2000)).contains(grams) {
             leftError = nil
             onLeft(record, grams)
         } else {
-            leftError = "0에서 2000 사이 숫자로 넣어 주세요"
+            leftError = given.map { "준 양(\($0)g)보다 많을 수 없어요" } ?? "0에서 2000 사이 숫자로 넣어 주세요"
         }
     }
 }
@@ -404,8 +420,8 @@ struct MealTimeSheet: View {
             HStack(spacing: 8) {
                 Text(name).okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink).fixedSize()
                 Spacer(minLength: 0)
-                time.frame(width: 132)
-                grams.frame(width: 84)
+                time.frame(width: 120)
+                grams.frame(width: 76)
                 remove
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -430,6 +446,7 @@ struct MealTimeSheet: View {
     private func timeBinding(_ index: Int) -> Binding<Date> {
         Binding {
             let parts = rows[index].time.split(separator: ":").compactMap { Int($0) }
+            guard parts.count == 2 else { return .now } // 다른 기기에서 온 틀린 글자
             return Calendar.okcheDevice.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: .now) ?? .now
         } set: { date in
             let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)

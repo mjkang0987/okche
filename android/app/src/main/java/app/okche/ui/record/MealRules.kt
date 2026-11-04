@@ -16,7 +16,7 @@ import java.time.ZoneId
 // 수라·끼니·급식기 규칙(plan.md 7-3, 데이터 7·8장, 고정 ID 1-5). iOS `MealRules`와 같은 규칙.
 
 /** 끼니 차례 하나: 그 끼니가 그날 오는 때와 `slotKey`. */
-data class MealOccurrence(val slot: MealSlot, val at: Long, val day: String, val key: String)
+data class MealOccurrence(val slot: MealSlot, val at: Long, val day: String, val key: String, val mode: MealMode = MealMode.direct)
 
 /** 끼니 이름: 시간 순으로 1개 아침, 2개 아침·저녁, 3개 아침·점심·저녁, 넷째부터 '끼니 4'(2026-11-04 사용자 — 보드대로 자동). */
 fun mealNames(count: Int): List<String> {
@@ -39,24 +39,46 @@ fun namedSlots(slots: List<MealSlot>): List<MealSlot> {
 fun openMealPlan(plans: List<MealPlan>): MealPlan? =
     plans.filter { it.activeUntil == null && it.deletedAt == null }.maxWithOrNull(compareBy({ it.activeFrom }, { it.updatedAt }))
 
-/** 달력 날짜 [date]의 끼니 시각에 오는 차례. ID 글자는 소문자(5-1) — iOS와 같은 `slotKey`·고정 ID. */
-private fun occurrence(plan: MealPlan, slot: MealSlot, date: LocalDate, zone: ZoneId): MealOccurrence {
-    val at = date.atTime(LocalTime.parse(slot.time)).atZone(zone).toInstant().toEpochMilli()
+/** 달력 날짜 [date]의 끼니 시각에 오는 차례. ID 글자는 소문자(5-1) — iOS와 같은 `slotKey`·고정 ID. 시각 글자가 틀리면 없음(다른 기기에서 온 줄). */
+private fun occurrence(plan: MealPlan, slot: MealSlot, date: LocalDate, zone: ZoneId): MealOccurrence? {
+    val time = runCatching { LocalTime.parse(slot.time) }.getOrNull() ?: return null
+    val at = date.atTime(time).atZone(zone).toInstant().toEpochMilli()
     val day = OkcheDay.of(at, zone)
-    return MealOccurrence(slot, at, day, "${plan.id.lowercase()}|$day|${slot.time}")
+    return MealOccurrence(slot, at, day, "${plan.id.lowercase()}|$day|${slot.time}", plan.mode)
+}
+
+/** 그 계획이 쓰이던 동안의 차례인지: `activeFrom` ≤ 시각 < `activeUntil`. 끼니를 바꾸면 '아직 지나지 않은 끼니부터' 새 계획(8장). */
+private fun MealPlan.covers(at: Long) = at >= activeFrom && (activeUntil == null || at < activeUntil)
+
+/** 쓸 계획들: 닫힌 줄 전부 + 열린 줄은 하나(7장 — 두 기기 백업을 합쳐 둘이어도 분모가 두 배가 안 되게). */
+private fun usable(plans: List<MealPlan>): List<MealPlan> {
+    val live = plans.filter { it.deletedAt == null }
+    return live.filter { it.activeUntil != null } + listOfNotNull(openMealPlan(live))
+}
+
+/** 그날(6시 기준) 끼니 차례들 — 그날 계획을 바꿨으면 바꾸기 전 차례는 앞 계획, 뒤는 새 계획에서. 시각 순. */
+fun mealOccurrences(plans: List<MealPlan>, day: String, zone: ZoneId = ZoneId.systemDefault()): List<MealOccurrence> =
+    usable(plans).flatMap { plan -> mealOccurrences(plan, day, zone).filter { plan.covers(it.at) } }.sortedBy { it.at }
+
+/** 지금 차례(여러 계획 — 바꾼 날에도 지난 끼니는 앞 계획의 차례). */
+fun currentMeal(plans: List<MealPlan>, now: Long, zone: ZoneId = ZoneId.systemDefault()): MealOccurrence? {
+    val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    return usable(plans).flatMap { plan ->
+        (-1L..1L).flatMap { offset -> plan.slots.mapNotNull { occurrence(plan, it, today.plusDays(offset), zone) } }.filter { plan.covers(it.at) }
+    }.filter { it.at - 3_600_000 <= now }.maxByOrNull { it.at }
 }
 
 /** 그날(6시 기준) 끼니 차례들, 시각 순. 6시 전 끼니는 달력 다음 날에 온다. */
 fun mealOccurrences(plan: MealPlan, day: String, zone: ZoneId = ZoneId.systemDefault()): List<MealOccurrence> {
     val date = LocalDate.parse(day)
-    return plan.slots.map { occurrence(plan, it, if (it.time < "%02d:00".format(OkcheDay.START_HOUR)) date.plusDays(1) else date, zone) }
+    return plan.slots.mapNotNull { occurrence(plan, it, if (it.time < "%02d:00".format(OkcheDay.START_HOUR)) date.plusDays(1) else date, zone) }
         .sortedBy { it.at }
 }
 
 /** 지금 차례: 각 차례 구간은 자기 시간 1시간 전부터 다음 차례 1시간 전까지(7장 인슐린과 같은 규칙). */
 fun currentMeal(plan: MealPlan, now: Long, zone: ZoneId = ZoneId.systemDefault()): MealOccurrence? {
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-    return (-1L..1L).flatMap { offset -> plan.slots.map { occurrence(plan, it, today.plusDays(offset), zone) } }
+    return (-1L..1L).flatMap { offset -> plan.slots.mapNotNull { occurrence(plan, it, today.plusDays(offset), zone) } }
         .filter { it.at - 3_600_000 <= now }
         .maxByOrNull { it.at }
 }
@@ -78,13 +100,17 @@ private fun mealJson(record: Record) = runCatching { JSONObject(record.data) }.g
 /** 기록의 남은 양(g) — 남김일 때만. */
 fun leftGrams(record: Record): Int? = mealJson(record).intOrNull("leftGrams")
 
+/** 기록의 준 양(g). */
+fun givenGrams(record: Record): Int? = mealJson(record).intOrNull("givenGrams")
+
 /** 기록의 결과(`all`·`some`·`none`). */
 fun mealResult(record: Record): String? = mealJson(record).optString("result").takeIf { it.isNotEmpty() }
 
 /** 일기 수라 바로 기록의 차례: 끼니가 있으면 지금 차례, 그 차례에 이미 기록이 있으면 없음(추가 식사). 끼니가 없으면 없음. */
 suspend fun quickMealSlot(dao: OkcheDao, petId: String?, now: Long, zone: ZoneId = ZoneId.systemDefault()): MealOccurrence? {
-    val plan = petId?.let { openMealPlan(dao.mealPlans(it)) } ?: return null
-    val slot = currentMeal(plan, now, zone) ?: return null
+    val plans = petId?.let { dao.mealPlans(it) } ?: return null
+    if (openMealPlan(plans) == null) return null
+    val slot = currentMeal(plans, now, zone) ?: return null
     return slot.takeIf { dao.recordBySlot(it.key) == null }
 }
 
@@ -93,10 +119,14 @@ suspend fun pickMeal(dao: OkcheDao, result: String, slot: MealOccurrence, petId:
     val existing = dao.recordBySlot(slot.key)
     return if (existing != null) {
         val json = mealJson(existing)
-        existing.copy(data = mealData(result, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now)
+        // 보호자가 고친 기록은 자동 기록이 아니다.
+        existing.copy(data = mealData(result, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now, auto = false)
             .also { dao.update(it) }
     } else {
-        Record(createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot.key,
+        // 급식기 차례는 자동 기록과 같은 고정 ID로(1-5 — 다른 기기의 자동 기록과 합쳐지게). 그 ID 줄이 지운 채 있으면 새 ID.
+        val fixed = FixedIds.feederRecord(slot.key)
+        val id = if (slot.mode == MealMode.feeder && dao.recordIdCount(fixed) == 0) fixed else app.okche.store.newId()
+        Record(id = id, createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot.key,
             data = mealData(result, slot.slot.name, slot.slot.grams, null)).also { dao.insert(it) }
     }
 }
@@ -120,6 +150,8 @@ suspend fun saveMealPlan(dao: OkcheDao, petId: String, mode: MealMode, slots: Li
     dao.replaceMealPlan(petId, if (slots.isEmpty()) null else MealPlan(createdAt = now, petId = petId, mode = mode, slots = namedSlots(slots), activeFrom = now), now)
 }
 
+// shortcut: 앞으로 올 때마다 급식기 계획의 모든 날을 처음부터 돈다(이미 있으면 건너뜀), 오래 쓰다 느려지면 마지막으로 채운 날을 기기 설정에 두고 그 뒤만 돈다.
+// shortcut: 확인과 넣기가 한 트랜잭션이 아니라 수라 고르기와 동시에 돌면 한 차례에 둘이 생길 수 있음(아주 짧은 순간), 백업 합치기(13단계) 때 차례 중복 정리와 함께 본다.
 /**
  * 급식기 자동 기록: 급식기 계획마다 `activeFrom`부터 지금(닫혔으면 닫힌 때)까지 지난 차례를 '다 먹음'으로 고정 ID로 채운다.
  * 같은 ID 줄이 있으면(지운 줄 포함) 만들지 않고, 그 차례에 보호자가 남긴 기록이 있어도 만들지 않는다. 몇 개 만들었는지 돌려준다.
@@ -137,7 +169,7 @@ suspend fun fillFeeder(dao: OkcheDao, now: Long = System.currentTimeMillis(), zo
         val last = java.time.Instant.ofEpochMilli(until).atZone(zone).toLocalDate()
         while (!date.isAfter(last)) {
             for (slot in plan.slots) {
-                val o = occurrence(plan, slot, date, zone)
+                val o = occurrence(plan, slot, date, zone) ?: continue
                 if (o.at < plan.activeFrom || o.at > until || (plan.activeUntil != null && o.at >= plan.activeUntil)) continue
                 val id = FixedIds.feederRecord(o.key)
                 if (id in ids || o.key in keys) continue

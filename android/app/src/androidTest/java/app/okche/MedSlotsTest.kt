@@ -7,7 +7,10 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -28,6 +31,14 @@ import app.okche.ui.med.medValue
 import app.okche.ui.med.recordSlot
 import app.okche.ui.med.remainingSlots
 import app.okche.ui.med.spokenTime
+import app.okche.ui.med.clockText
+import app.okche.ui.med.extraMedOptions
+import app.okche.ui.med.hhmm
+import app.okche.ui.med.medRemaining
+import app.okche.ui.med.recordSlots
+import app.okche.ui.med.saveExtraMed
+import app.okche.ui.med.slotDetail
+import app.okche.ui.med.todaySlots
 import app.okche.ui.pet.PetForm
 import app.okche.ui.pet.registerPet
 import app.okche.ui.record.deleteRecord
@@ -150,6 +161,50 @@ class MedSlotsTest {
         assertEquals("프레드니솔론 먹고 토함", medValue(given(s, "x", at(27, 9), status = "vomited"), listOf(med)))
         assertEquals("오후 9시", spokenTime(at(27, 21)))
     }
+
+    /** 8-3b: 오늘 모든 차례(기록한 것 포함)·여러 개 한 번에·예정에 없던 약·기록 고치기·고르기 순서. */
+    @Test fun todaySheetAndExtra() = runBlocking {
+        val med = Medication(name = "프레드니솔론", category = MedCategory.medicine, form = MedForm.pill, doseAmount = 1.0, unit = DoseUnit.pill, stockAmount = 10.0)
+        val syrup = Medication(name = "위장약 시럽", category = MedCategory.medicine, form = MedForm.liquid, doseAmount = 2.0, unit = DoseUnit.ml)
+        val other = Medication(name = "유산균", category = MedCategory.supplement, form = MedForm.powder, doseAmount = 1.0, unit = DoseUnit.pack)
+        listOf(med, syrup, other).forEach { dao.insert(it) }
+        val s = row(times = listOf("08:00", "20:00"), med = med.id, from = at(20, 9))
+        val need = row(MedFrequency.asNeeded, med = syrup.id, from = at(20, 9))
+        // 08:00은 줬고 20:00은 남음 — 시트에는 둘 다, 기록한 차례는 그 기록과 함께.
+        val given8 = given(s, key(s, "08:00"), at(27, 8, 5))
+        val entries = todaySlots(listOf(s, need), listOf(given8), pet, day)
+        assertEquals(listOf(at(27, 8), at(27, 20)), entries.map { it.slot.due })
+        assertTrue(entries[0].record === given8)
+        assertEquals(null, entries[1].record)
+        assertEquals("08:05", hhmm(at(27, 8, 5)))
+        assertEquals("오후 8:00", clockText(at(27, 20)))
+        assertEquals("알약 · 1알", slotDetail(s, med))
+
+        // 기록하기: 고른 차례마다(건너뜀도) 한 번에.
+        val saved = recordSlots(dao, listOf(entries[1].slot to "skipped"), at(27, 21))
+        assertEquals(listOf(key(s, "20:00")), saved.map { it.slotKey })
+        assertEquals("프레드니솔론 건너뜀", recordValue(saved[0], meds = listOf(med)))
+        assertTrue(remainingSlots(listOf(s, need), listOf(given8) + saved, pet, day).isEmpty())
+
+        // 예정에 없던 약: 키 없음, 약방 남은 양에서 빠짐.
+        val extra = saveExtraMed(dao, pet, med, 2.0, "given", at(27, 12))
+        assertEquals(null, extra.slotKey)
+        assertFalse(JSONObject(extra.data).has("scheduleId"))
+        assertEquals(8.0, medRemaining(med, listOf(extra))!!, 0.0)
+        assertEquals(2, remainingSlots(listOf(s), listOf(extra), pet, day).size) // 차례는 그대로
+
+        // 고치기: 양·상태·시간. 차례 기록은 차례의 날 그대로, 예정에 없던 약은 바뀐 시각의 날.
+        val slotRecord = recordSlot(dao, entries[1].slot, now = at(27, 21))
+        val edited = saveExtraMed(dao, pet, med, 1.0, "vomited", at(28, 7), editing = slotRecord)
+        assertEquals(listOf(day, "프레드니솔론 먹고 토함"), listOf(edited.day, recordValue(edited, meds = listOf(med))))
+        assertEquals("2026-10-28", saveExtraMed(dao, pet, med, 2.0, "given", at(28, 7), editing = extra).day)
+
+        // 고르기 순서: 이 아이의 필요할 때만 → 먹는 약 → 나머지.
+        val kong = app.okche.store.Pet(id = pet, name = "콩이", species = app.okche.store.Species.cat, breed = "", furColor = "")
+        val options = extraMedOptions(listOf(other, med, syrup), listOf(s, need), kong)
+        assertEquals(listOf("위장약 시럽", "프레드니솔론", "유산균"), options.map { it.first.name })
+        assertEquals(listOf("물약 · 필요할 때만", "알약 · 콩이가 먹는 약", "가루"), options.map { it.second })
+    }
 }
 
 /** 몇 시간마다 약(처음 먹일 때 = 지금) → 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴(8-3a). */
@@ -188,5 +243,42 @@ class RecordMedFlowTest {
         rule.onNode(hasText("되돌리기").and(hasClickAction())).performClick()
         waitFor(give) // 차례가 줄에 돌아옴
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("탕약 프레드니솔론", substring = true)).fetchSemanticsNodes().isEmpty() }
+    }
+
+    /** 8-3b: ⋯ 오늘 먹일 약 시트 → 줬어요 → 기록하기, 예정에 없던 약 → 기록하기, 연필 → 먹고 토함으로 고치기. */
+    @Test fun sheetExtraEdit() {
+        runBlocking {
+            val dao = OkcheDatabase.get(context).dao()
+            OkcheDatabase.get(context).clearAllTables()
+            val petId = newId()
+            registerPet(dao, PetForm(name = "콩이"), petId = petId)
+            val med = Medication(name = "프레드니솔론", category = MedCategory.medicine, form = MedForm.pill, doseAmount = 1.0, unit = DoseUnit.pill)
+            dao.insert(med)
+            val now = System.currentTimeMillis()
+            dao.insert(MedSchedule(petId = petId, medicationId = med.id, amount = 1.0, unit = DoseUnit.pill, frequency = MedFrequency.everyNHours,
+                everyHours = 8, firstAt = now, activeFrom = now))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(tab("일기"))
+        rule.onNode(tab("일기")).performClick()
+        waitFor(hasContentDescription("탕약 자세히 남기기"))
+        rule.onNode(hasContentDescription("탕약 자세히 남기기")).performClick()
+        waitFor(hasText("다음 차례"))
+        rule.onNode(hasText("기록하기").and(hasClickAction())).assertIsNotEnabled() // 고른 게 없으면 눌리지 않음
+        rule.onAllNodes(hasText("줬어요").and(hasClickAction()))[0].performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))
+        rule.onNode(hasContentDescription("탕약 자세히 남기기")).performClick()
+        waitFor(hasText("에 기록함", substring = true))
+        rule.onNode(hasText("+ 예정에 없던 약 남기기")).performScrollTo().performClick()
+        waitFor(hasText("정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요."))
+        rule.onNode(hasText("프레드니솔론").and(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))).performClick()
+        rule.onAllNodes(hasText("기록하기").and(hasClickAction())).onLast().performScrollTo().performClick() // 위에 뜬 시트의 것
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("+ 예정에 없던 약 남기기")).fetchSemanticsNodes().isEmpty() } // 두 시트 다 닫힘
+        rule.onNode(hasContentDescription("콩이 탕약 기록 고치기", substring = true)).performScrollTo().performClick()
+        waitFor(hasText("콩이 · 탕약 기록", substring = true))
+        rule.onNode(hasText("먹고 토함").and(hasClickAction())).performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        waitFor(hasText("탕약 프레드니솔론 먹고 토함", substring = true))
     }
 }

@@ -138,6 +138,8 @@ fun RecordTab(
     var justSaved by state.justSaved
     var failed by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<DetailTarget?>(null) }
+    /** 탕약 ⋯ 오늘 먹일 약 시트(지금 보는 아이). */
+    var medSheet by remember { mutableStateOf<Pet?>(null) }
     // 지금 보는 아이가 칩에 없으면(추억·아이 없음) '누군지 몰라요'(2026-11-03 사용자).
     val who = current?.takeIf { !unknownPicked && it.memorializedAt == null }?.id
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 쿼리에 아이·날 조건을 넣는다.
@@ -210,7 +212,13 @@ fun RecordTab(
                             @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
                         }
                 }
-            }, onDetail = { if (it == RecordKind.meal) onOpenSura(null) else detail = DetailTarget(it, petId = who) }) { row, value ->
+            }, onDetail = {
+                when (it) {
+                    RecordKind.meal -> onOpenSura(null)
+                    RecordKind.med -> medSheet = pets.firstOrNull { p -> p.id == who }
+                    else -> detail = DetailTarget(it, petId = who)
+                }
+            }) { row, value ->
                 scope.launch {
                     undoFailed = false
                     runCatching { saveQuickRecord(dao, row, value, who) }
@@ -254,6 +262,14 @@ fun RecordTab(
                 }
         }
     })
+    }
+    medSheet?.let { pet ->
+        app.okche.ui.med.MedTodaySheet(pet, onSaved = { saved ->
+            saved.lastOrNull()?.let {
+                justSaved = it.id
+                @Suppress("DEPRECATION") view.announceForAccessibility("아뢰었사옵니다")
+            }
+        }) { medSheet = null }
     }
     detail?.let { target ->
         RecordDetailSheet(target, pets.orEmpty(), onSaved = { record, isNew ->
@@ -309,7 +325,7 @@ private fun QuickRecordCard(mealMore: Boolean, med: MedLine?, onGive: (MedSlot) 
         quickRows.forEachIndexed { i, row ->
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
             if (row.kind == RecordKind.meal && med != null) {
-                MedRow(med, large, onGive)
+                MedRow(med, large, onGive) { MoreButton(RecordKind.med, onDetail) }
                 HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
             }
             val label = @Composable {
@@ -347,7 +363,7 @@ private fun QuickRecordCard(mealMore: Boolean, med: MedLine?, onGive: (MedSlot) 
 
 /** 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음, 한 줄만). ⋯ 오늘 먹일 약 시트는 8-3b. */
 @Composable
-private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit) {
+private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit, more: @Composable () -> Unit) {
     val label = @Composable {
         Row(
             Modifier.then(if (large) Modifier else Modifier.width(62.dp)).semantics(mergeDescendants = true) { heading() },
@@ -381,13 +397,17 @@ private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit) {
     }
     if (large) {
         Column(Modifier.padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            label()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { label() }
+                more()
+            }
             content(Modifier.fillMaxWidth())
         }
     } else {
         Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             label()
             content(Modifier.weight(1f))
+            more()
         }
     }
 }
@@ -414,7 +434,7 @@ private fun QuickButton(title: String, label: String, softWrap: Boolean = true, 
 /** ⋯ 자세히 남기기(점선 44) — 자세히 시트가 있는 종류만. */
 @Composable
 private fun MoreButton(kind: RecordKind, onDetail: (RecordKind) -> Unit) {
-    if (detailFields(kind).isEmpty() && kind != RecordKind.meal) return
+    if (detailFields(kind).isEmpty() && kind != RecordKind.meal && kind != RecordKind.med) return
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     val dash = with(LocalDensity.current) { PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())) }
     Box(
@@ -502,6 +522,16 @@ private fun DeleteIcon(label: String, tint: androidx.compose.ui.graphics.Color, 
 /** 고치기(연필) — 자세히 시트가 있는 종류, 수라는 그 아이 수라 화면(2026-11-04 사용자 — 누군지 모르는 수라는 먼저 누구였는지 정하기). */
 @Composable
 private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.graphics.Color, onOpenSura: (String?) -> Unit, onEdit: (DetailTarget) -> Unit) {
+    // 탕약은 기록 하나 고치기 시트(8-3b — 약은 고정).
+    val medPet = record.petId?.let { id -> pets.firstOrNull { it.id == id && it.memorializedAt == null } }?.takeIf { record.kind == RecordKind.med }
+    if (medPet != null) {
+        var editingMed by remember { mutableStateOf(false) }
+        if (editingMed) app.okche.ui.med.MedExtraSheet(medPet, record) { editingMed = false }
+        IconButton({ editingMed = true }, Modifier.size(44.dp)) {
+            Icon(Icons.Outlined.Edit, "${recordTime(record)} ${recordSpeech(record, pets)} 기록 고치기", Modifier.size(22.dp), tint = tint)
+        }
+        return
+    }
     // 다과는 같은 다과 기록 시트(7-4b).
     val snackPet = record.petId?.let { id -> pets.firstOrNull { it.id == id && it.memorializedAt == null } }?.takeIf { record.kind == RecordKind.snack }
     if (snackPet != null) {

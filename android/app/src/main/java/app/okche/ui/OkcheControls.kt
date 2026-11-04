@@ -262,6 +262,8 @@ fun <T> OkcheChoiceChips(
     hideLabel: Boolean = false,
     /** 묶음 이름 옆 작은 버튼(자세히 시트 빛깔 옆 '?'). */
     labelTrailing: (@Composable () -> Unit)? = null,
+    /** 거짓이면 고른 채로 보이기만(오늘 먹일 약 시트의 이미 기록한 차례). */
+    enabled: Boolean = true,
 ) {
     Column(modifier) {
         // 묶음 이름(legend)은 화면 글자 그대로 읽힌다 — 바로 뒤가 그 묶음의 칩들.
@@ -277,13 +279,13 @@ fun <T> OkcheChoiceChips(
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(OkcheRadius.RadiusPill))
-                        .selectable(isSelected, role = Role.RadioButton, onClick = {
+                        .selectable(isSelected, enabled = enabled, role = Role.RadioButton, onClick = {
                             if (isSelected && onDeselect != null) onDeselect() else onSelect(value)
                         })
                         // 고른 라디오는 기기 접근성 노드에서 누르기 동작이 빠지므로(Compose 규칙), 풀 수 있는 칩엔
                         // '선택 해제'를 사용자 지정 동작으로 단다(TalkBack 동작 메뉴).
                         .then(
-                            if (isSelected && onDeselect != null) {
+                            if (isSelected && onDeselect != null && enabled) {
                                 Modifier.semantics { customActions = listOf(CustomAccessibilityAction("선택 해제") { onDeselect(); true }) }
                             } else {
                                 Modifier

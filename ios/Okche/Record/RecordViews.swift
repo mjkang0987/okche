@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// 일기 탭 첫 화면(보드 `Record`): '누구 기록인가요?' 칩, 바로 기록 줄(구토·매화·소피는 ⋯ 자세히 — 7-2), 방금 남긴 기록. 탕약·옥체·사진은 그 단계에서.
+/// 일기 탭 첫 화면(보드 `Record`): '누구 기록인가요?' 칩, 바로 기록 줄(구토·매화·소피는 ⋯ 자세히 — 7-2, 탕약 — 8-3a), 방금 남긴 기록. 옥체·사진은 그 단계에서.
 struct RecordTab: View {
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
     @AppStorage("lastPetId") private var lastPetId = ""
@@ -14,6 +14,16 @@ struct RecordTab: View {
     @State private var detail: DetailTarget?
     /// 일기 탭 안 화면 쌓기(수라 화면 — 7-3). `navigationDestination(isPresented:)`는 이 탭에서 화면을 끝없이 다시 그려 멈춰서(2026-11-04 확인) 경로로.
     @State private var path: [RecordRoute] = []
+    // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 아이·날 조건을 넣는다.
+    @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
+    @Query private var meds: [Medication]
+    @State private var undoFailed = false
+    @Query(filter: #Predicate<Record> { $0.kind == "med" && $0.deletedAt == nil }) private var medRecords: [Record]
+    /// 방금 누른 탕약 버튼 — 약 1초 '✓ 프레드'로 보였다가 빠짐.
+    @State private var checked: (key: String, medicationId: UUID, title: String, name: String)?
+    /// 탭 바 위 '프레드니솔론 줌 · 21:02 · 되돌리기'와 되돌릴 기록.
+    @State private var toast: UndoToastItem?
+    @State private var undoRecord: Record?
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
     private var chipPets: [Pet] { pets.filter { $0.memorializedAt == nil } }
@@ -36,12 +46,16 @@ struct RecordTab: View {
                 let suraPet = PetTitle.current(pets, lastPetId: lastPetId).map { $0.memorializedAt == nil } ?? false
                 QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
                     if kind == .meal { path.append(.sura(nil)) } else { detail = DetailTarget(kind: kind, petId: who) }
-                }, mealMore: suraPet)
-                Text("누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+                }, mealMore: suraPet, med: medLine, onGive: give)
+                Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
+                     : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                OkcheFieldError(message: undoFailed ? "되돌리지 못했어요. 다시 해 주세요." : failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .undoToast($toast, onUndo: undo)
+            .onChange(of: toast == nil) { if toast == nil { undoFailed = false } } // 알림이 닫히면 되돌리기 실패 문구도
+            .onChange(of: who) { toast = nil } // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음
             .navigationDestination(for: RecordRoute.self) { route in
                 switch route {
                 case .sura(let petId): SuraScreen(petId: petId)
@@ -58,6 +72,62 @@ struct RecordTab: View {
         }
     }
 
+    /// 오늘 남은 차례(6-2) — 지금 보는 아이. 누군지 모르면 없음.
+    private var slots: [MedSlots.Slot] {
+        guard let who else { return [] }
+        return MedSlots.remaining(schedules, records: medRecords, petId: who, day: OkcheDay.of(.now))
+    }
+
+    /// 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
+    private var medLine: MedLine? {
+        guard let who, MedSlots.hasOpen(schedules, petId: who) else { return nil }
+        // 약을 못 찾은 차례는 버튼으로 만들지 않음(빈 글자 버튼 방지).
+        let buttons = MedSlots.buttons(slots.filter { $0.schedule.medicationId != checked?.medicationId }).compactMap { slot -> MedLine.Button? in
+            guard let med = meds.first(where: { $0.id == slot.schedule.medicationId }) else { return nil }
+            return MedLine.Button(slot: slot, title: MedSlots.shortName(med),
+                                  label: "탕약 \(med.name) \(MedSlots.spokenTime(slot.due)) · 줬어요 · 바로 기록")
+        }
+        return MedLine(checked: checked.map { ($0.key, $0.title, $0.name) }, buttons: Array(buttons.prefix(checked == nil ? 3 : 2)))
+    }
+
+    /// 탕약 버튼: 바로 `med` 기록 → 약 1초 '✓' → 빠짐, 탭 바 위 되돌리기 알림.
+    private func give(_ slot: MedSlots.Slot) {
+        let med = meds.first { $0.id == slot.schedule.medicationId }
+        do {
+            let saved = try MedSlots.record(slot, in: context)
+            failed = false
+            undoFailed = false
+            justSaved = saved.id
+            undoRecord = saved
+            checked = (slot.key, slot.schedule.medicationId, "✓ \(MedSlots.shortName(med))", med?.name ?? "약")
+            toast = UndoToastItem(text: "\(med?.name ?? "약") 줌 · \(QuickRecord.time(saved))")
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                if checked?.key == slot.key { checked = nil } // 그새 다른 약을 눌렀으면 그 '✓'는 남김
+            }
+        } catch {
+            undoFailed = false
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+        }
+    }
+
+    /// 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
+    private func undo() {
+        guard let record = undoRecord else { return }
+        do {
+            try QuickRecord.delete(record, in: context)
+            undoRecord = nil
+            checked = nil
+            toast = nil
+            undoFailed = false
+            AccessibilityNotification.Announcement("되돌렸어요").post()
+        } catch {
+            undoFailed = true // 알림은 남겨 다시 누를 수 있게
+            AccessibilityNotification.Announcement("되돌리지 못했어요. 다시 해 주세요.").post()
+        }
+    }
+
     /// 칩에서 아이를 고르면 지금 보는 아이도 바뀐다(다른 탭도). '누군지 몰라요'는 이 화면에서만.
     private func pick(_ id: String) {
         if id.isEmpty {
@@ -70,6 +140,7 @@ struct RecordTab: View {
 
     private func record(_ row: QuickRecord.Row, _ value: String) {
         do {
+            undoFailed = false
             justSaved = try QuickRecord.save(row, value: value, petId: who, in: context).id
             failed = false
             AccessibilityNotification.Announcement("아뢰었사옵니다").post()
@@ -84,6 +155,17 @@ struct RecordTab: View {
 /// 기록 목록도 값으로 쌓는다 — 경로 쌓기와 화면을 직접 넘기는 쌓기를 섞으면 뒤로 갈 때 기록 목록이 빠질 수 있다.
 enum RecordRoute: Hashable { case sura(UUID?), log }
 
+/// 탕약 줄 내용: 방금 누른 '✓' 버튼과 남은 차례 버튼(같은 약 하나·최대 3). 둘 다 없으면 '오늘 줄 약을 다 줬어요'.
+struct MedLine {
+    struct Button {
+        let slot: MedSlots.Slot
+        let title: String
+        let label: String
+    }
+    let checked: (key: String, title: String, name: String)?
+    let buttons: [Button]
+}
+
 /// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 수라 화면), 흰 카드 안 줄 사이 선(보드 `Record`).
 /// 큰 글자·좁은 폭에선 이름 아래로 버튼.
 struct QuickRecordCard: View {
@@ -91,6 +173,9 @@ struct QuickRecordCard: View {
     let onDetail: (RecordKind) -> Void
     /// 수라 ⋯(수라 화면)을 보일지.
     var mealMore = false
+    /// 탕약 줄(소피 다음) — 없으면 줄 없음(보드 `RecordNoMed`).
+    var med: MedLine? = nil
+    var onGive: (MedSlots.Slot) -> Void = { _ in }
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
@@ -99,6 +184,10 @@ struct QuickRecordCard: View {
         VStack(spacing: 0) {
             ForEach(Array(QuickRecord.rows.enumerated()), id: \.element.kind) { index, row in
                 if index > 0 { OkcheColor.line.frame(height: 1) }
+                if row.kind == .meal, let med {
+                    medRow(med)
+                    OkcheColor.line.frame(height: 1)
+                }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 6) {
                         label(row).frame(width: labelWidth, alignment: .leading)
@@ -149,6 +238,67 @@ struct QuickRecordCard: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(QuickRecord.name(row.kind.rawValue)) 자세히 남기기")
+        }
+    }
+
+    /// 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음). ⋯ 오늘 먹일 약 시트는 8-3b.
+    private func medRow(_ line: MedLine) -> some View {
+        let label = HStack(spacing: 4) {
+            Image(systemName: "pill").font(.body).frame(minWidth: 22).accessibilityHidden(true)
+            Text("탕약").okcheText(OkcheType.body, weight: .bold).fixedSize()
+        }
+        .foregroundStyle(OkcheColor.namsaekDeep)
+        .accessibilityAddTraits(.isHeader)
+        // 큰 글자·좁은 폭에선 다른 줄처럼 이름 아래로 버튼.
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                label.frame(width: labelWidth, alignment: .leading)
+                medContent(line)
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                label
+                medContent(line)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder private func medContent(_ line: MedLine) -> some View {
+        if line.checked == nil && line.buttons.isEmpty {
+            Text("오늘 줄 약을 다 줬어요").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                .frame(minHeight: buttonHeight)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                ForEach((1...max(1, line.buttons.count + (line.checked == nil ? 0 : 1))).reversed(), id: \.self) { n in
+                    HStack(spacing: 6) { medButtons(line, count: n) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func medButtons(_ line: MedLine, count: Int) -> some View {
+        if let checked = line.checked {
+            Text(checked.title).okcheText(OkcheType.body, weight: .bold).foregroundStyle(.white)
+                .fixedSize()
+                .padding(.horizontal, 8)
+                .frame(minWidth: 52, minHeight: buttonHeight)
+                .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                .accessibilityLabel("탕약 \(checked.name) 줬어요 · 기록됨")
+        }
+        ForEach(Array(line.buttons.prefix(count - (line.checked == nil ? 0 : 1))), id: \.slot.key) { b in
+            Button { onGive(b.slot) } label: {
+                Text(b.title).okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink)
+                    .fixedSize()
+                    .padding(.horizontal, 8)
+                    .frame(minWidth: 52, minHeight: buttonHeight)
+                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                    .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(OkcheColor.lineStrong, lineWidth: 1.5))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(b.label)
         }
     }
 

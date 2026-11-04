@@ -43,6 +43,10 @@ enum QuickRecord {
             // shortcut: 다과 이름을 고쳐도 기록 줄은 그 기록이 다시 그려질 때 바뀜, 느리거나 헷갈리면 화면에서 `@Query` 다과를 넘긴다.
             return SnackRules.value(record, snacks: (try? record.modelContext?.fetch(FetchDescriptor<Snack>())) ?? [])
         }
+        if record.kind == RecordKind.med.rawValue {
+            // 약방에서 뺀 약도 이름은 남음(1-4) — 다과와 같이 지운 약까지 읽는다.
+            return MedSlots.value(record, meds: (try? record.modelContext?.fetch(FetchDescriptor<Medication>())) ?? [])
+        }
         if record.kind == RecordKind.weight.rawValue {
             let grams = (try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any])?["grams"] as? Int
             return grams.map(kgText) ?? ""

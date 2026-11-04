@@ -250,7 +250,7 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
 /** 오늘 기록 줄 52: '07:20  소피 · 소변' · 값 · 연필. 화면 읽기 이름 '07:20 소피 보통 · 고치기'. */
 @Composable
 private fun RecordRow(record: Record, onClick: () -> Unit) {
-    val value = recordValue(record, app.okche.ui.record.rememberSnacks())
+    val value = recordValue(record, app.okche.ui.record.rememberSnacks(), app.okche.ui.record.rememberMeds())
     val label = "${recordTime(record)} ${kindName(record.kind)}${if (value.isEmpty()) "" else " $value"} · 고치기"
     Row(
         Modifier

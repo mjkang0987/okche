@@ -148,8 +148,8 @@ private fun PetCard(pet: Pet, today: java.time.LocalDate) {
                 start = Offset.Zero, end = Offset(size.width, size.height),
             )
         }
-        // 큰 글자에서도 금테(12 안쪽 + 매듭 9) 안에 머물게.
-        .padding(horizontal = 28.dp, vertical = 24.dp)
+        // 금테(12 안쪽 + 매듭 9) 안에 머물면서 알약이 있어도 148.
+        .padding(horizontal = 28.dp, vertical = 21.dp)
         .semantics { contentDescription = "${pet.name} 카드" }
     val photo = @Composable {
         Box(

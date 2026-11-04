@@ -62,14 +62,19 @@ struct MainTab: View {
 struct MainPetCard: View {
     let pet: Pet
     let today: Date
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) { photo; texts }
-            VStack(alignment: .leading, spacing: 12) { photo; texts }
+        // 글자 크기로 정한다(폭으로 정하면 작은 폰 보통 글자에서도 세로가 됨) — 안드로이드 글자 1.3배와 맞춤.
+        Group {
+            if typeSize >= .xxxLarge {
+                VStack(alignment: .leading, spacing: 12) { photo; texts }
+            } else {
+                HStack(spacing: 16) { photo; texts }
+            }
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 24) // 큰 글자에서도 금테(12 안쪽 + 매듭 9) 안에 머물게
+        .padding(.vertical, 21) // 금테(12 안쪽 + 매듭 9) 안에 머물면서 알약이 있어도 148
         .frame(maxWidth: .infinity, minHeight: 148, alignment: .leading)
         .background(OkcheColor.namsaekDeep)
         .overlay(GoldFrame(inset: 12).stroke(LinearGradient(colors: [OkcheColor.geumLight, OkcheColor.geum, OkcheColor.geumShade],

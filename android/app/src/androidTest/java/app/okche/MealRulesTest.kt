@@ -1,5 +1,16 @@
 package app.okche
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ActivityScenario
+import app.okche.ui.pet.PetForm
+import app.okche.ui.pet.registerPet
+import org.junit.Rule
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import app.okche.store.FixedIds
@@ -132,5 +143,45 @@ class MealRulesTest {
     /** 고정 ID는 iOS와 같은 값(1-5) — iOS MealRulesTests와 같은 글자. */
     @Test fun feederIdIsLowercaseNameBased() {
         assertEquals("759216b2-dbd6-38f6-80c0-02009c1eba67", FixedIds.feederRecord("p|2026-10-25|07:00"))
+    }
+}
+
+/** 수라 ⋯ → 끼니 없음(지금 먹은 것·오늘 남긴 수라) → 끼니 시간 정하기 → 끼니 칸 남김 → 급식기로 바꾸기 (7-3). iOS testSuraNoPlanThenPlanThenFeeder와 같은 흐름. */
+class SuraFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun closeScenario() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test fun noPlanThenPlanThenFeeder() {
+        // 아이 ID가 매번 새로라 '괜찮아요'를 누른 기록은 남아 있지 않다.
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasContentDescription("수라 자세히 남기기"))
+        rule.onNode(hasContentDescription("수라 자세히 남기기")).performScrollTo().performClick()
+        waitFor(hasText("끼니 시간을 정해 둘까요?"))
+        rule.onNode(hasContentDescription("지금 남김")).performClick()
+        waitFor(hasText("오늘 남긴 수라"))
+        rule.onNode(hasText("괜찮아요")).performClick()
+        rule.waitUntil(3_000) { rule.onAllNodes(hasText("끼니 시간을 정해 둘까요?")).fetchSemanticsNodes().isEmpty() }
+
+        rule.onNode(hasText("끼니 시간 정하기 ›")).performScrollTo().performClick()
+        waitFor(hasText("저장하기"))
+        rule.onNode(hasText("저장하기")).performScrollTo().performClick()
+        waitFor(hasContentDescription("끼니 시간 바꾸기"))
+        rule.onNode(hasText("저녁")).assertExists()
+        rule.onAllNodes(hasText("남김").and(isSelectable()))[0].performClick()
+        waitFor(hasContentDescription("남은 양 (그램, 선택)", substring = true))
+
+        rule.onNode(hasText("급식기 (수라간)")).performClick()
+        waitFor(hasContentDescription("급식기 시간 바꾸기"))
     }
 }

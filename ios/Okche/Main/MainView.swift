@@ -73,7 +73,9 @@ struct MainPetCard: View {
     }
 
     private var photo: some View {
+        // 자리는 96 그대로라 큰 글자에선 글자를 줄여 넣는다.
         Text("프로필 사진").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.geumLight)
+            .lineLimit(1).minimumScaleFactor(0.4).padding(.horizontal, 4)
             .frame(width: 96, height: 96)
             .background(OkcheColor.namsaek)
             .overlay(Rectangle().strokeBorder(OkcheColor.geum, lineWidth: 1))
@@ -114,9 +116,10 @@ struct TodayRecordSection: View {
     var body: some View {
         let rows = MainCard.todayRecords(records, petId: petId, day: day)
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("오늘의 승정원일기").okcheText(titleStyle).foregroundStyle(OkcheColor.ink)
-                Text("오늘 기록").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
+            // 큰 글자에서 한 줄에 안 들어가면 '오늘 기록'을 아래로(제목이 낱말 가운데서 끊기지 않게).
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) { title; caption }
+                VStack(alignment: .leading, spacing: 2) { title; caption }
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
@@ -136,6 +139,14 @@ struct TodayRecordSection: View {
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
         .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
+    }
+
+    private var title: some View {
+        Text("오늘의 승정원일기").okcheText(titleStyle).foregroundStyle(OkcheColor.ink).lineLimit(1).minimumScaleFactor(0.5)
+    }
+
+    private var caption: some View {
+        Text("오늘 기록").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
     }
 
     @ViewBuilder private func row(_ record: Record) -> some View {

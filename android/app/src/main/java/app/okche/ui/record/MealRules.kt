@@ -145,7 +145,9 @@ suspend fun pickMealNow(dao: OkcheDao, result: String, petId: String, now: Long 
         .also { dao.insert(it) }
 
 /** '남은 양 (g, 선택)': 0~2000 정수, 비우면 없음. */
-suspend fun setLeftGrams(dao: OkcheDao, record: Record, grams: Int?, now: Long = System.currentTimeMillis()): Record {
+suspend fun setLeftGrams(dao: OkcheDao, stale: Record, grams: Int?, now: Long = System.currentTimeMillis()): Record {
+    // 화면이 쥔 기록 대신 지금 저장된 줄을 다시 읽어 고친다(같은 순간 결과 고르기를 덮어 되돌리지 않게).
+    val record = stale.slotKey?.let { dao.recordBySlot(it) } ?: stale
     val json = mealJson(record)
     return record.copy(
         data = mealData(json.optString("result").ifEmpty { "some" }, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), grams),

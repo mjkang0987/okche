@@ -87,6 +87,7 @@ import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -120,9 +121,11 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
     LaunchedEffect(Unit) { runCatching { fillFeeder(dao) } }
     // 볼 아이가 없어지면(추억으로 간직·지우기·추억 아이 고름) 빈 화면 대신 닫는다.
     // 연필로 다른 아이 수라를 열었으면 지금 보는 아이가 그 아이로 바뀐 뒤부터 본다(바뀌기 전 추억 아이로 닫히지 않게).
+    // 지금 보는 아이가 바뀌기만 해도 도착으로 본다(연 아이가 지워졌거나 저장이 실패해 다른 아이로 바뀐 경우에도 빈 화면에 남지 않게).
     var arrived by remember { mutableStateOf(openedFor == null) }
+    val firstId = remember { pet?.id }
     LaunchedEffect(pet, petId) {
-        if (!arrived && pet?.id == openedFor) arrived = true
+        if (!arrived && (pet?.id == openedFor || pet?.id != firstId)) arrived = true
         if (arrived && pet != null && petId == null) onBack()
     }
     var busy by remember { mutableStateOf(false) }
@@ -172,7 +175,12 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
                             onPick = { result -> run { pickMeal(dao, result, slot, petId) } },
                             // 남은 양은 바로 저장(다른 저장 중이라고 버리지 않게 `run`의 막기를 거치지 않음).
                             onLeft = { record, grams ->
-                                runCatching { setLeftGrams(dao, record, grams) }.onFailure {
+                                try {
+                                    setLeftGrams(dao, record, grams)
+                                    failed = false
+                                } catch (e: CancellationException) {
+                                    throw e // 다음 글자로 취소된 것 — 실패가 아님
+                                } catch (e: Exception) {
                                     failed = true
                                     @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
                                 }

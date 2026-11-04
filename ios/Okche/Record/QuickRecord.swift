@@ -57,7 +57,7 @@ enum QuickRecord {
             let slot = try MealRules.quickSlot(petId: petId, now: now, timeZone: timeZone, in: context)
             let record = Record(id: try slot.map { try MealRules.newRecordId(for: $0, in: context) } ?? UUID(),
                                 now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot?.key,
-                                data: MealRules.data(result: value, slotName: slot?.slot.name, givenGrams: slot?.slot.grams, leftGrams: nil))
+                                data: MealRules.data(result: value, foodId: try MealRules.foodId(petId, now, timeZone, in: context), slotName: slot?.slot.name, givenGrams: slot?.slot.grams, leftGrams: nil))
             context.insert(record)
             try save(context)
             return record

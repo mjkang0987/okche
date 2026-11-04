@@ -373,6 +373,25 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["콩이 아기씨, 오늘도 강녕하시옵소서"].waitForExistence(timeout: 3))
     }
 
+    /// 더보기 '사료 · 처방식' → 사료 바꾸기 시트(이름 없으면 알림) → 바꾸기 → 아이 정보 '지금 먹는 사료' 줄 (7-4a).
+    func testFoodChangeFromMore() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["사료 · 처방식"], in: app)
+        XCTAssertTrue(app.staticTexts["콩이 · 사료 바꾸기"].waitForExistence(timeout: 3))
+        app.buttons["바꾸기"].tap()
+        XCTAssertTrue(app.staticTexts["사료 이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        let field = app.textFields["사료 이름"]
+        field.tap()
+        field.typeText("가수분해 처방식")
+        app.buttons["바꾸기"].tap()
+        XCTAssertFalse(app.staticTexts["콩이 · 사료 바꾸기"].waitForExistence(timeout: 2)) // 닫힘
+        app.buttons["콩이 아기씨"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '가수분해 처방식 · '")).firstMatch.waitForExistence(timeout: 5))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

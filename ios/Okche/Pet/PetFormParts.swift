@@ -147,6 +147,8 @@ struct DateField: View {
     let label: String
     @Binding var date: Date?
     let error: String?
+    /// 꼭 있어야 하는 날짜(사료 먹기 시작한 날)는 '지우기' 없음.
+    var clearable = true
     @State private var picking = false
 
     var body: some View {
@@ -167,7 +169,7 @@ struct DateField: View {
             .accessibilityValue(date.map { $0.formatted(date: .long, time: .omitted) } ?? "안 고름")
             OkcheFieldError(message: error)
         }
-        .sheet(isPresented: $picking) { DateSheet(title: label, date: $date) }
+        .sheet(isPresented: $picking) { DateSheet(title: label, date: $date, clearable: clearable) }
     }
 }
 
@@ -175,6 +177,7 @@ struct DateField: View {
 private struct DateSheet: View {
     let title: String
     @Binding var date: Date?
+    let clearable: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var picked = Date.now
 
@@ -183,7 +186,7 @@ private struct DateSheet: View {
             HStack {
                 Button("취소") { dismiss() }
                 Spacer()
-                if date != nil { Button("지우기") { date = nil; dismiss() } }
+                if clearable, date != nil { Button("지우기") { date = nil; dismiss() } }
             }
             .okcheText(OkcheType.body, weight: .medium)
             .foregroundStyle(OkcheColor.namsaek)

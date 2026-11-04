@@ -181,7 +181,8 @@ internal fun BirthFields(
 
 /** 날짜 칸: 누르면 달력, 오늘 뒤는 고를 수 없음. 비울 수 있다. */
 @Composable
-internal fun DateField(date: LocalDate?, label: String, onDate: (LocalDate?) -> Unit, modifier: Modifier, error: String?, clearLabel: String) {
+/** [clearable]가 거짓이면 지우기 단추 없음(꼭 있어야 하는 날짜 — 사료 먹기 시작한 날). */
+internal fun DateField(date: LocalDate?, label: String, onDate: (LocalDate?) -> Unit, modifier: Modifier, error: String?, clearLabel: String, clearable: Boolean = true) {
     val context = LocalContext.current
     OkchePickerField(
         date?.format(dateFormat), label,
@@ -196,7 +197,7 @@ internal fun DateField(date: LocalDate?, label: String, onDate: (LocalDate?) -> 
         placeholder = "날짜를 골라 주세요",
         icon = Icons.Outlined.CalendarMonth,
         error = error,
-        onClear = { onDate(null) },
+        onClear = if (clearable) ({ onDate(null) }) else null,
         clearLabel = clearLabel,
     )
 }

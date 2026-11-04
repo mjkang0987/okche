@@ -47,7 +47,15 @@ import app.okche.store.OkcheDatabase
 import app.okche.store.lastPetId
 import app.okche.store.setLastPetId
 import app.okche.store.setOnboardingDone
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.okche.ui.food.FoodChangeSheet
+import app.okche.ui.food.MoreMenuRow
 import app.okche.ui.main.MainTab
+import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.pet.MemorialScreen
 import app.okche.ui.pet.PetEditFlow
 import app.okche.ui.pet.PetManageSection
@@ -95,6 +103,7 @@ fun RootTabs() {
     var suraOpen by rememberSaveable { mutableStateOf(false) }
     /** 기록 줄 연필로 연 아이 — 지금 보는 아이가 그 아이로 바뀌기 전엔 '볼 아이 없음'으로 닫지 않게. */
     var suraFor by rememberSaveable { mutableStateOf<String?>(null) }
+    var foodPetId by rememberSaveable { mutableStateOf<String?>(null) }
     val quickState = rememberQuickRecordState()
     // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
     fun saveSetting(block: suspend () -> Unit) {
@@ -248,6 +257,17 @@ fun RootTabs() {
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {
                 if (pets != null) PetManageSection(pets, restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
+                // 더보기 메뉴(보드 More) — 다른 줄(다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
+                // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음).
+                current?.takeIf { it.memorializedAt == null }?.let { pet ->
+                    Column(
+                        Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(horizontal = OkcheSpacing.Space4)
+                            .semantics { contentDescription = "설정 메뉴" },
+                    ) {
+                        MoreMenuRow("사료 · 처방식") { foodPetId = pet.id }
+                    }
+                    if (foodPetId == pet.id) FoodChangeSheet(pet) { foodPetId = null }
+                }
             }
         }
     }

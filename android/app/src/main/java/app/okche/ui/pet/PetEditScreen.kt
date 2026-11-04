@@ -1,5 +1,11 @@
 package app.okche.ui.pet
 
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.collectAsState
+import app.okche.store.OkcheDay
+import app.okche.ui.food.FoodChangeSheet
+import app.okche.ui.food.foodChangeAt
+import app.okche.ui.food.foodLine
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -256,7 +262,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                     errors["insulinPlan"]?.let { OkcheErrorText(it, Modifier.padding(horizontal = OkcheSpacing.Space4)) }
                 }
             }
-            LaterRows(weight)
+            saved?.let { LaterRows(it, weight) }
             // 추억으로 간직한 아이는 휴양 스위치 없음(6-4).
             if (saved?.memorializedAt == null) OkcheSwitchRow(
                 "휴양 중 · 관리 쉬기", "알림을 멈추고, 이 기간은 약·끼니 챙긴 횟수에서 빼요. 휴양 중에도 기록할 수 있어요.",
@@ -282,16 +288,30 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     }
 }
 
-/** 지금 먹는 사료·옥체(체중) — 보기만(사료는 8단계, 체중 화면은 그 단계에서 눌리게). */
+/** 지금 먹는 사료(누르면 사료 바꾸기 — 7-4a, 추억 아이는 보기만)·옥체(체중, 그 단계에서 눌리게). */
 @Composable
-private fun LaterRows(weight: String?) {
+private fun LaterRows(pet: Pet, weight: String?) {
+    val context = LocalContext.current
+    val dao = remember { OkcheDatabase.get(context).dao() }
+    val changes by remember { dao.foodChangesFlow() }.collectAsState(emptyList())
+    val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
+    var changingFood by remember { mutableStateOf(false) }
+    val food = foodChangeAt(OkcheDay.of(System.currentTimeMillis()), pet.id, changes)?.let { c -> foodLine(c, foods.firstOrNull { it.id == c.foodId }) } ?: "아직 없어요"
+    if (changingFood) FoodChangeSheet(pet) { changingFood = false }
     Column(
         Modifier
             .fillMaxWidth()
             .background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg))
             .padding(horizontal = 14.dp),
     ) {
-        LaterRow("지금 먹는 사료", "아직 없어요")
+        if (pet.memorializedAt == null) {
+            Row(Modifier.clickable(role = Role.Button, onClickLabel = "사료 바꾸기") { changingFood = true }, verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { LaterRow("지금 먹는 사료", food) }
+                Text("›", Modifier.clearAndSetSemantics {}, color = OkcheColor.LineStrong, style = OkcheType.Body.toTextStyle())
+            }
+        } else {
+            LaterRow("지금 먹는 사료", food)
+        }
         HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
         LaterRow("옥체 · 체중", weight ?: "아직 없어요")
     }

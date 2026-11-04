@@ -112,6 +112,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
         }
     }
     val today = OkcheDay.of(now)
+    val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
     val plans by remember(petId) { petId?.let { dao.mealPlansFlow(it) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     // 끼니 칸은 차례 키로 짝지어서 6시 전에 미리 남긴 6시대 끼니(전날 day)도 찾는다. '오늘 남긴 수라'는 오늘 것만.
     val meals by remember(petId, today) { petId?.let { dao.recentMealsFlow(it, today, shiftDay(today, -1)) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
@@ -171,7 +172,9 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
                         Text(if (plan.mode == MealMode.feeder) "오늘은 남은 끼니가 없어요. 내일부터 끼니 시간에 기록돼요." else "오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
                     }
                     for (slot in slots) {
-                        MealCard(slot, now, meals.firstOrNull { it.slotKey == slot.key },
+                        val record = meals.firstOrNull { it.slotKey == slot.key }
+                        val foodId = record?.let { runCatching { org.json.JSONObject(it.data).optString("foodId") }.getOrNull() }
+                        MealCard(slot, now, record, foods.firstOrNull { it.id == foodId }?.name,
                             onPick = { result -> run { pickMeal(dao, result, slot, petId) } },
                             // 남은 양은 바로 저장(다른 저장 중이라고 버리지 않게 `run`의 막기를 거치지 않음).
                             onLeft = { record, grams ->
@@ -279,7 +282,7 @@ private fun PillButton(text: String, label: String, onClick: () -> Unit) {
 
 /** 끼니 칸: 이름(급식기는 시각)·준 양 + 상태, 다 먹음·남김·안 먹음(기존 고르기 카드), 남김이면 '남은 양 (g, 선택)'. */
 @Composable
-private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (String) -> Unit, onLeft: suspend (Record, Int?) -> Unit) {
+private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, foodName: String?, onPick: (String) -> Unit, onLeft: suspend (Record, Int?) -> Unit) {
     val feeder = slot.mode == MealMode.feeder
     val waiting = feeder && slot.at > now && record == null
     val result = record?.let(::mealResult)
@@ -296,11 +299,11 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                 },
                 Modifier.weight(1f).semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle(),
             )
+            // '08:10 · 건사료' — 그때 먹던 사료(7-4a).
             val status = when {
                 waiting -> "아직 시간 전"
                 record == null -> "아직 기록 전"
-                record.auto -> "자동 기록됨"
-                else -> recordTime(record)
+                else -> listOfNotNull(if (record.auto) "자동 기록됨" else recordTime(record), foodName).joinToString(" · ")
             }
             Text(status, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }

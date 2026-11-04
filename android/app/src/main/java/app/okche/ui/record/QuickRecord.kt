@@ -60,7 +60,7 @@ suspend fun saveQuickRecord(dao: OkcheDao, row: QuickRow, value: String, petId: 
     if (row.kind == RecordKind.meal) {
         val slot = quickMealSlot(dao, petId, now, zone)
         return Record(id = slot?.let { newMealRecordId(dao, it) } ?: app.okche.store.newId(), createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot?.key,
-            data = mealData(value, slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
+            data = mealData(value, app.okche.ui.food.foodIdAt(dao, petId, OkcheDay.of(now, zone)), slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
     }
     val data = JSONObject().put(row.key, if (row.kind == RecordKind.vomit) JSONArray(listOf(value)) else value).toString()
     val record = Record(createdAt = now, petId = petId, kind = row.kind, occurredAt = now, day = OkcheDay.of(now, zone), data = data)

@@ -8,6 +8,8 @@ import app.okche.store.OkcheDao
 import app.okche.store.OkcheDay
 import app.okche.store.Record
 import app.okche.store.RecordKind
+import app.okche.ui.food.foodChangeAt
+import app.okche.ui.food.foodIdAt
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalTime
@@ -78,9 +80,10 @@ fun mealOccurrences(plan: MealPlan, day: String, zone: ZoneId = ZoneId.systemDef
         .sortedBy { it.at }
 }
 
-/** 수라 기록 `data`: 결과 + 끼니 이름·준 양·남은 양(있을 때만). 칸 이름 순(iOS sortedKeys와 같은 글자). */
-fun mealData(result: String, slotName: String?, givenGrams: Int?, leftGrams: Int?): String {
+/** 수라 기록 `data`: 결과 + 그때 먹던 사료·끼니 이름·준 양·남은 양(있을 때만). 칸 이름 순(iOS sortedKeys와 같은 글자). */
+fun mealData(result: String, foodId: String?, slotName: String?, givenGrams: Int?, leftGrams: Int?): String {
     val json = JSONObject()
+    foodId?.let { json.put("foodId", it) }
     givenGrams?.let { json.put("givenGrams", it) }
     if (result == "some") leftGrams?.let { json.put("leftGrams", it) }
     json.put("result", result)
@@ -89,6 +92,8 @@ fun mealData(result: String, slotName: String?, givenGrams: Int?, leftGrams: Int
 }
 
 private fun JSONObject.intOrNull(key: String) = if (has(key)) optInt(key) else null
+
+private fun JSONObject.foodIdOrNull() = optString("foodId").takeIf { it.isNotEmpty() }
 
 private fun mealJson(record: Record) = runCatching { JSONObject(record.data) }.getOrDefault(JSONObject())
 
@@ -124,11 +129,11 @@ suspend fun pickMeal(dao: OkcheDao, result: String, slot: MealOccurrence, petId:
         // 같은 결과를 다시 고르면 아무것도 안 바꾼다('자동 기록됨' 표시도 그대로).
         if (json.optString("result") == result) return existing
         // 보호자가 고친 기록은 자동 기록이 아니다.
-        existing.copy(data = mealData(result, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now, auto = false)
+        existing.copy(data = mealData(result, json.foodIdOrNull(), json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now, auto = false)
             .also { dao.update(it) }
     } else {
         Record(id = newMealRecordId(dao, slot), createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot.key,
-            data = mealData(result, slot.slot.name, slot.slot.grams, null)).also { dao.insert(it) }
+            data = mealData(result, foodIdAt(dao, petId, OkcheDay.of(now, zone)), slot.slot.name, slot.slot.grams, null)).also { dao.insert(it) }
     }
 }
 
@@ -136,12 +141,12 @@ suspend fun pickMeal(dao: OkcheDao, result: String, slot: MealOccurrence, petId:
 suspend fun setMealResult(dao: OkcheDao, record: Record, result: String, now: Long = System.currentTimeMillis()) {
     val json = mealJson(record)
     if (json.optString("result") == result) return
-    dao.update(record.copy(data = mealData(result, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now, auto = false))
+    dao.update(record.copy(data = mealData(result, json.foodIdOrNull(), json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), json.intOrNull("leftGrams")), updatedAt = now, auto = false))
 }
 
 /** 끼니 없이 '지금 먹은 것': 지금 시각, `slotKey` 없음. */
 suspend fun pickMealNow(dao: OkcheDao, result: String, petId: String, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): Record =
-    Record(createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), data = mealData(result, null, null, null))
+    Record(createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), data = mealData(result, foodIdAt(dao, petId, OkcheDay.of(now, zone)), null, null, null))
         .also { dao.insert(it) }
 
 /** '남은 양 (g, 선택)': 0~2000 정수, 비우면 없음. */
@@ -150,7 +155,7 @@ suspend fun setLeftGrams(dao: OkcheDao, stale: Record, grams: Int?, now: Long = 
     val record = if (stale.slotKey == null) stale else dao.recordBySlot(stale.slotKey) ?: return stale // 그 사이 지워졌으면 되살리지 않음
     val json = mealJson(record)
     return record.copy(
-        data = mealData(json.optString("result").ifEmpty { "some" }, json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), grams),
+        data = mealData(json.optString("result").ifEmpty { "some" }, json.foodIdOrNull(), json.optString("slotName").takeIf { it.isNotEmpty() }, json.intOrNull("givenGrams"), grams),
         updatedAt = now,
     ).also { dao.update(it) }
 }
@@ -186,6 +191,7 @@ suspend fun fillFeeder(dao: OkcheDao, now: Long = System.currentTimeMillis(), zo
     if (plans.isEmpty()) return 0
     val ids = dao.mealRecordIds().toMutableSet()
     val keys = dao.mealSlotKeys().toMutableSet()
+    val changes = dao.foodChanges()
     val made = mutableListOf<Record>()
     for (plan in plans) {
         val until = minOf(plan.activeUntil ?: now, now)
@@ -200,7 +206,7 @@ suspend fun fillFeeder(dao: OkcheDao, now: Long = System.currentTimeMillis(), zo
                 if (id in ids || o.key in keys) continue
                 // `createdAt`은 만든 때, `updatedAt`만 끼니 예정 시각(1-5 — 보호자가 고친 기록이 병합에서 이기게).
                 made += Record(id = id, createdAt = now, updatedAt = o.at, petId = plan.petId, kind = RecordKind.meal, occurredAt = o.at, day = o.day, slotKey = o.key,
-                    data = mealData("all", slot.name, slot.grams, null), auto = true)
+                    data = mealData("all", foodChangeAt(o.day, plan.petId, changes)?.foodId, slot.name, slot.grams, null), auto = true)
                 ids += id
                 keys += o.key
             }

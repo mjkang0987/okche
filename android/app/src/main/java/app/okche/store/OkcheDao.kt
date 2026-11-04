@@ -33,6 +33,20 @@ abstract class OkcheDao {
     @Update abstract suspend fun update(plan: InsulinPlan)
     @Update abstract suspend fun update(setting: Setting)
     @Update abstract suspend fun update(record: Record)
+    @Update abstract suspend fun update(change: FoodChange)
+
+    // 사료 바꾸기(7-4a): 지우지 않은 줄만.
+    @Query("SELECT * FROM food_change WHERE deleted_at IS NULL") abstract suspend fun foodChanges(): List<FoodChange>
+    @Query("SELECT * FROM food_change WHERE deleted_at IS NULL") abstract fun foodChangesFlow(): Flow<List<FoodChange>>
+    @Query("SELECT * FROM food WHERE deleted_at IS NULL") abstract fun foodsFlow(): Flow<List<Food>>
+    @Query("SELECT * FROM food WHERE deleted_at IS NULL AND name = :name LIMIT 1") protected abstract suspend fun foodNamed(name: String): Food?
+
+    /** 사료 바꾸기 저장: 같은 이름 사료가 있으면 그 사료, 없으면 새 사료 + 바꾸기 줄(한 번에). */
+    @Transaction
+    open suspend fun saveFoodChange(petId: String, name: String, startedOn: String, method: FoodChangeMethod, now: Long): FoodChange {
+        val food = foodNamed(name) ?: Food(createdAt = now, name = name).also { insert(it) }
+        return FoodChange(createdAt = now, petId = petId, foodId = food.id, startedOn = startedOn, method = method).also { insert(it) }
+    }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE) protected abstract suspend fun insertIfAbsent(setting: Setting)
 

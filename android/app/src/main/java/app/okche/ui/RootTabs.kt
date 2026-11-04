@@ -47,6 +47,7 @@ import app.okche.store.OkcheDatabase
 import app.okche.store.lastPetId
 import app.okche.store.setLastPetId
 import app.okche.store.setOnboardingDone
+import app.okche.ui.main.MainTab
 import app.okche.ui.pet.MemorialScreen
 import app.okche.ui.pet.PetEditFlow
 import app.okche.ui.pet.PetManageSection
@@ -233,7 +234,16 @@ fun RootTabs() {
                 },
                 state = quickState,
             )
-            Tab.Main -> if (current?.memorializedAt != null) MemorialScreen(current, modifier, seal) else MainTab(modifier, seal)
+            Tab.Main -> if (current?.memorializedAt != null) {
+                MemorialScreen(current, modifier, seal)
+            } else {
+                MainTab(
+                    pets, current, modifier, seal,
+                    onRecord = { selected = Tab.Record.ordinal },
+                    onRegister = { registering = true },
+                    onOpenSura = { id -> suraFor = id; suraOpen = true },
+                )
+            }
             Tab.Sillok -> SillokTab(modifier, current?.name, seal)
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {

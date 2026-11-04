@@ -143,11 +143,14 @@ private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String
         Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, itemVerticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.heightIn(min = 44.dp).semantics(mergeDescendants = true) { heading() }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // 설명이 길면 글이 줄을 넘기고 스위치는 오른쪽 그대로(보드). 아주 큰 글자에선 스위치를 아래로.
+        val title = @Composable { m: Modifier ->
+            Column(m.heightIn(min = 44.dp).semantics(mergeDescendants = true) { heading() }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(med.name, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle())
                 Text(cardDetail(s, pet.name), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
+        }
+        val toggle = @Composable {
             if (s.frequency != MedFrequency.asNeeded) {
                 Row(
                     Modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) { contentDescription = "${med.name} ${pet.name} 알림" },
@@ -156,6 +159,14 @@ private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String
                     Text("알림", Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
                     Switch(s.reminder, onReminder, colors = okcheSwitchColors())
                 }
+            }
+        }
+        if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { title(Modifier); toggle() }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                title(Modifier.weight(1f))
+                toggle()
             }
         }
         val pill = @Composable { text: String ->

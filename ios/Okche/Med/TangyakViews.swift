@@ -65,13 +65,16 @@ struct TangyakCard: View {
     let med: Medication
     let stock: String
     let onReminder: (Bool) -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let detail = MedSchedules.cardDetail(schedule, petName: pet.name)
         VStack(alignment: .leading, spacing: 10) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center) { title(detail); Spacer(minLength: 8); reminderToggle }
+            // 설명이 길면 글이 줄을 넘기고 스위치는 오른쪽 그대로(보드). 아주 큰 글자에선 스위치를 아래로.
+            if typeSize >= .xxxLarge {
                 VStack(alignment: .leading, spacing: 4) { title(detail); reminderToggle }
+            } else {
+                HStack(alignment: .center, spacing: 8) { title(detail).frame(maxWidth: .infinity, alignment: .leading); reminderToggle }
             }
             times
             (Text("약방") + Text(" · \(stock)").font(.footnote).foregroundColor(OkcheColor.inkMuted))

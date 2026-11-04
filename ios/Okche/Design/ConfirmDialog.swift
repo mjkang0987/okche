@@ -9,6 +9,8 @@ struct OkcheConfirmDialog<Extra: View>: View {
     var bullets: [String] = []
     let confirm: String
     var confirmLook: OkchePrimaryButtonStyle.Look = .filled
+    /// 거짓이면 '그냥 둘게요' 없이 버튼 하나(안내 창 — '지금은 뺄 수 없어요', 8-1).
+    var showsCancel = true
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @ViewBuilder var extra: Extra
@@ -66,16 +68,19 @@ struct OkcheConfirmDialog<Extra: View>: View {
     }
 
     @ViewBuilder private var buttons: some View {
-        Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
+        if showsCancel {
+            Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
+        }
         Button(confirm, action: onConfirm).buttonStyle(.okchePrimary(confirmLook))
     }
 }
 
 extension OkcheConfirmDialog where Extra == EmptyView {
     init(title: String, destructive: Bool = false, message: String? = nil, bullets: [String] = [], confirm: String,
-         confirmLook: OkchePrimaryButtonStyle.Look = .filled, onCancel: @escaping () -> Void, onConfirm: @escaping () -> Void) {
+         confirmLook: OkchePrimaryButtonStyle.Look = .filled, showsCancel: Bool = true, onCancel: @escaping () -> Void,
+         onConfirm: @escaping () -> Void) {
         self.init(title: title, destructive: destructive, message: message, bullets: bullets, confirm: confirm,
-                  confirmLook: confirmLook, onCancel: onCancel, onConfirm: onConfirm) { EmptyView() }
+                  confirmLook: confirmLook, showsCancel: showsCancel, onCancel: onCancel, onConfirm: onConfirm) { EmptyView() }
     }
 }
 

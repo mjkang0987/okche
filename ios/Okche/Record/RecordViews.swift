@@ -15,7 +15,7 @@ struct RecordTab: View {
     /// 일기 탭 안 화면 쌓기(수라 화면 — 7-3). `navigationDestination(isPresented:)`는 이 탭에서 화면을 끝없이 다시 그려 멈춰서(2026-11-04 확인) 경로로.
     @State private var path: [RecordRoute] = []
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 아이·날 조건을 넣는다.
-    @Query private var schedules: [MedSchedule]
+    @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     @Query private var meds: [Medication]
     @Query(filter: #Predicate<Record> { $0.kind == "med" && $0.deletedAt == nil }) private var medRecords: [Record]
     /// 방금 누른 탕약 버튼 — 약 1초 '✓ 프레드'로 보였다가 빠짐.

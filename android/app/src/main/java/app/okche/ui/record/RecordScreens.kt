@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -77,6 +78,14 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.okche.R
+import app.okche.ui.UndoToast
+import app.okche.ui.med.MedSlot
+import app.okche.ui.med.hasOpenSchedule
+import app.okche.ui.med.medButtons
+import app.okche.ui.med.medShortName
+import app.okche.ui.med.recordSlot
+import app.okche.ui.med.remainingSlots
+import app.okche.ui.med.spokenTime
 import app.okche.store.OkcheDao
 import app.okche.store.OkcheDatabase
 import app.okche.store.OkcheDay
@@ -102,7 +111,7 @@ import kotlinx.coroutines.launch
 // 일기 탭 화면(plan.md 7-1, 보드 Record·Log·LogEmpty·Assign·DeleteConfirm). iOS `RecordViews.swift`와 같은 짜임.
 
 /**
- * 일기 탭 첫 화면: '누구 기록인가요?' 칩, 바로 기록 줄, 방금 남긴 기록. 탕약·옥체·사진·⋯ 자세히는 그 단계에서.
+ * 일기 탭 첫 화면: '누구 기록인가요?' 칩, 바로 기록 줄(탕약 — 8-3a), 방금 남긴 기록, 탭 바 위 되돌리기 알림. 옥체·사진은 그 단계에서.
  * [pets]가 null이면 아직 못 읽음(칩을 비워 둔다).
  */
 @Composable
@@ -127,7 +136,28 @@ fun RecordTab(
     var detail by remember { mutableStateOf<DetailTarget?>(null) }
     // 지금 보는 아이가 칩에 없으면(추억·아이 없음) '누군지 몰라요'(2026-11-03 사용자).
     val who = current?.takeIf { !unknownPicked && it.memorializedAt == null }?.id
-    TabScreen(stringResource(R.string.record_title), modifier, stringResource(R.string.record_subtitle), trailing = seal) {
+    // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 쿼리에 아이·날 조건을 넣는다.
+    val schedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
+    val medRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
+    val meds = rememberMeds()
+    /** 방금 누른 탕약 버튼(차례 키, 약 id, '✓ 프레드') — 약 1초 보였다가 빠짐. */
+    var checked by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+    var toast by remember { mutableStateOf<String?>(null) }
+    var undoRecord by remember { mutableStateOf<Record?>(null) }
+    // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
+    val medLine = who?.let { id ->
+        val all = schedules ?: return@let null
+        val recs = medRecords ?: return@let null
+        if (!hasOpenSchedule(all, id)) return@let null
+        val buttons = medButtons(remainingSlots(all, recs, id, OkcheDay.of(System.currentTimeMillis())).filter { it.schedule.medicationId != checked?.second })
+            .map { slot ->
+                val med = meds.firstOrNull { it.id == slot.schedule.medicationId }
+                MedLineButton(slot, medShortName(med), "탕약 ${med?.name.orEmpty()} ${spokenTime(slot.due)} · 줬어요 · 바로 기록")
+            }
+        MedLine(checked?.let { it.first to it.third }, buttons.take(if (checked == null) 3 else 2))
+    }
+    Box(modifier) {
+    TabScreen(stringResource(R.string.record_title), Modifier.fillMaxSize(), stringResource(R.string.record_subtitle), trailing = seal) {
         if (pets != null) {
             OkcheChoiceChips(
                 "누구 기록인가요?",
@@ -144,7 +174,27 @@ fun RecordTab(
         if (pets != null) {
             // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
             val mealMore = current != null && current.memorializedAt == null
-            QuickRecordCard(mealMore, onDetail = { if (it == RecordKind.meal) onOpenSura(null) else detail = DetailTarget(it, petId = who) }) { row, value ->
+            QuickRecordCard(mealMore, medLine, onGive = { slot ->
+                if (checked != null) return@QuickRecordCard // '✓'가 보이는 동안 두 번 누르지 않게
+                val med = meds.firstOrNull { it.id == slot.schedule.medicationId }
+                checked = Triple(slot.key, slot.schedule.medicationId, "✓ ${medShortName(med)}")
+                scope.launch {
+                    runCatching { recordSlot(dao, slot) }
+                        .onSuccess {
+                            failed = false
+                            justSaved = it.id
+                            undoRecord = it
+                            toast = "${med?.name ?: "약"} 줌 · ${recordTime(it)}"
+                            kotlinx.coroutines.delay(1_000)
+                            checked = null
+                        }
+                        .onFailure {
+                            checked = null
+                            failed = true
+                            @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+                        }
+                }
+            }, onDetail = { if (it == RecordKind.meal) onOpenSura(null) else detail = DetailTarget(it, petId = who) }) { row, value ->
                 scope.launch {
                     runCatching { saveQuickRecord(dao, row, value, who) }
                         .onSuccess {
@@ -155,11 +205,30 @@ fun RecordTab(
                         .onFailure { failed = true }
                 }
             }
-            Text("누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+            Text(if (medLine == null) "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
+                else "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
         if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
         if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
+    }
+    // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
+    UndoToast(toast, onDismiss = { toast = null }, modifier = Modifier.align(Alignment.BottomCenter), onUndo = {
+        toast = null
+        val record = undoRecord ?: return@UndoToast
+        scope.launch {
+            runCatching { deleteRecord(dao, record) }
+                .onSuccess {
+                    undoRecord = null
+                    checked = null
+                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
+                }
+                .onFailure {
+                    failed = true
+                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌리지 못했어요. 다시 해 주세요.")
+                }
+        }
+    })
     }
     detail?.let { target ->
         RecordDetailSheet(target, pets.orEmpty(), onSaved = { record, isNew ->
@@ -192,9 +261,15 @@ private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
     else -> Icons.Outlined.Restaurant
 }
 
+/** 탕약 줄 버튼 하나. */
+class MedLineButton(val slot: MedSlot, val title: String, val label: String)
+
+/** 탕약 줄 내용: 방금 누른 '✓' 버튼(차례 키, 글자)과 남은 차례 버튼(같은 약 하나·최대 3). 둘 다 없으면 '오늘 줄 약을 다 줬어요'. */
+class MedLine(val checked: Pair<String, String>?, val buttons: List<MedLineButton>)
+
 /** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 수라 화면), 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
 @Composable
-private fun QuickRecordCard(mealMore: Boolean, onDetail: (RecordKind) -> Unit, onTap: (QuickRow, String) -> Unit) {
+private fun QuickRecordCard(mealMore: Boolean, med: MedLine?, onGive: (MedSlot) -> Unit, onDetail: (RecordKind) -> Unit, onTap: (QuickRow, String) -> Unit) {
     // 큰 글자에선 이름 아래로 버튼. 그보다 작아도 폭이 모자라면 버튼이 다음 줄로(FlowRow).
     val large = LocalDensity.current.fontScale >= 1.3f
     Column(
@@ -205,6 +280,10 @@ private fun QuickRecordCard(mealMore: Boolean, onDetail: (RecordKind) -> Unit, o
     ) {
         quickRows.forEachIndexed { i, row ->
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
+            if (row.kind == RecordKind.meal && med != null) {
+                MedRow(med, large, onGive)
+                HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
+            }
             val label = @Composable {
                 Row(
                     Modifier.then(if (large) Modifier else Modifier.width(62.dp)).semantics(mergeDescendants = true) { heading() },
@@ -234,6 +313,53 @@ private fun QuickRecordCard(mealMore: Boolean, onDetail: (RecordKind) -> Unit, o
                     more()
                 }
             }
+        }
+    }
+}
+
+/** 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음, 한 줄만). ⋯ 오늘 먹일 약 시트는 8-3b. */
+@Composable
+private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit) {
+    val label = @Composable {
+        Row(
+            Modifier.then(if (large) Modifier else Modifier.width(62.dp)).semantics(mergeDescendants = true) { heading() },
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Medication, null, Modifier.size(22.dp), tint = OkcheColor.NamsaekDeep)
+            Text("탕약", color = OkcheColor.NamsaekDeep, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
+        }
+    }
+    val content = @Composable { modifier: Modifier ->
+        if (line.checked == null && line.buttons.isEmpty()) {
+            Box(modifier.heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
+                Text("오늘 줄 약을 다 줬어요", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(FontWeight.Normal))
+            }
+        } else {
+            FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), maxLines = 1) {
+                line.checked?.let { (_, title) ->
+                    val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
+                    Box(
+                        Modifier.widthIn(min = 52.dp).heightIn(min = 56.dp).background(OkcheColor.Namsaek, shape)
+                            .semantics { contentDescription = "탕약 ${title.removePrefix("✓ ")} 줬어요 · 기록됨" }.padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(title, color = androidx.compose.ui.graphics.Color.White, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
+                    }
+                }
+                for (b in line.buttons) QuickButton(b.title, b.label) { onGive(b.slot) }
+            }
+        }
+    }
+    if (large) {
+        Column(Modifier.padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            label()
+            content(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            label()
+            content(Modifier.weight(1f))
         }
     }
 }
@@ -296,6 +422,7 @@ private fun recordSpeech(record: Record, pets: List<Pet>) =
 @Composable
 private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onOpenLog: () -> Unit, onOpenSura: (String?) -> Unit) {
     val snacks = rememberSnacks()
+    val meds = rememberMeds()
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제가 오늘로 보임, 문안 탭(7-0)에서 날 바뀜을 함께 다룬다.
     val today = remember { OkcheDay.of(System.currentTimeMillis()) }
     val latest by remember(today) { dao.latestRecordFlow(today) }.collectAsState(null)
@@ -325,7 +452,7 @@ private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onO
                 Text(
                     buildAnnotatedString {
                         withStyle(SpanStyle(color = OkcheColor.InkMuted)) { append(recordTime(record)) }
-                        append("  ${recordTitle(record, pets)} ${recordValue(record, snacks)}")
+                        append("  ${recordTitle(record, pets)} ${recordValue(record, snacks, meds)}")
                     },
                     color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
                 )
@@ -368,6 +495,7 @@ private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.
 @Composable
 private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, onClose: () -> Unit) {
     val snacks = rememberSnacks()
+    val meds = rememberMeds()
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
@@ -387,7 +515,7 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
         destructive = true, confirmLook = ButtonLook.Danger,
     ) {
         Text(
-            "${recordTime(record)} · ${recordTitle(record, pets)} ${recordValue(record, snacks)}",
+            "${recordTime(record)} · ${recordTitle(record, pets)} ${recordValue(record, snacks, meds)}",
             Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 14.dp, vertical = 12.dp),
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
@@ -466,6 +594,7 @@ private fun DateBar(day: String, today: String, onDay: (String) -> Unit) {
 @Composable
 private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssign: () -> Unit, onEdit: (DetailTarget) -> Unit, onOpenSura: (String) -> Unit) {
     val snacks = rememberSnacks()
+    val meds = rememberMeds()
     val unknown = record.petId == null
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
@@ -489,7 +618,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
                     color = OkcheColor.Namsaek, style = OkcheType.Label.toTextStyle(),
                 )
             } else {
-                recordValue(record, snacks).takeIf { it.isNotEmpty() }?.let {
+                recordValue(record, snacks, meds).takeIf { it.isNotEmpty() }?.let {
                     Text(it, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
                 }
             }
@@ -504,6 +633,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
 @Composable
 private fun AssignSheet(dao: OkcheDao, record: Record, pets: List<Pet>, current: Pet?, onClose: () -> Unit) {
     val snacks = rememberSnacks()
+    val meds = rememberMeds()
     val scope = rememberCoroutineScope()
     val choices = pets.filter { it.memorializedAt == null }
     var picked by rememberSaveable(record.id) {
@@ -525,7 +655,7 @@ private fun AssignSheet(dao: OkcheDao, record: Record, pets: List<Pet>, current:
             // '오늘 02:14 · 구토 · 사료'
             val dayText = if (record.day == OkcheDay.of(System.currentTimeMillis())) "오늘" else dayTitle(record.day, "")
             Text(
-                listOf("$dayText ${recordTime(record)}", kindName(record.kind), recordValue(record, snacks)).filter { it.isNotEmpty() }.joinToString(" · "),
+                listOf("$dayText ${recordTime(record)}", kindName(record.kind), recordValue(record, snacks, meds)).filter { it.isNotEmpty() }.joinToString(" · "),
                 color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(),
             )
             Column(

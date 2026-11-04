@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.HorizontalDivider
@@ -146,7 +148,13 @@ private fun PetCard(pet: Pet, day: String, today: java.time.LocalDate) {
                 .semantics { contentDescription = "${pet.name} 프로필 사진"; role = Role.Image },
             contentAlignment = Alignment.Center,
         ) {
-            Text("프로필 사진", Modifier.clearAndSetSemantics {}, color = OkcheColor.GeumLight, style = OkcheType.Caption.toTextStyle())
+            // 자리는 96 그대로라 큰 글자에선 글자를 줄여 넣는다.
+            val caption = OkcheType.Caption.toTextStyle()
+            Text(
+                "프로필 사진", Modifier.padding(horizontal = 4.dp).clearAndSetSemantics {}, color = OkcheColor.GeumLight, style = caption,
+                maxLines = 1, softWrap = false,
+                autoSize = TextAutoSize.StepBased(minFontSize = caption.fontSize * 0.4f, maxFontSize = caption.fontSize),
+            )
         }
     }
     val texts = @Composable {
@@ -188,12 +196,17 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(Modifier.semantics(mergeDescendants = true) { heading() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // 큰 글자에서 한 줄에 안 들어가면 '오늘 기록'을 아래로, 제목은 낱말 가운데서 끊지 않고 글자를 줄인다.
+        FlowRow(Modifier.semantics(mergeDescendants = true) { heading() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val title = OkcheType.Display.toTextStyle().copy(fontSize = 18.sp, lineHeight = 26.sp)
             Text(
                 "오늘의 승정원일기",
                 Modifier.alignByBaseline(),
                 color = OkcheColor.Ink,
-                style = OkcheType.Display.toTextStyle().copy(fontSize = 18.sp, lineHeight = 26.sp),
+                style = title,
+                maxLines = 1,
+                softWrap = false,
+                autoSize = TextAutoSize.StepBased(minFontSize = title.fontSize / 2, maxFontSize = title.fontSize),
             )
             Text("오늘 기록", Modifier.alignByBaseline(), color = OkcheColor.InkMuted, style = OkcheType.Caption.toTextStyle())
         }

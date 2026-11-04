@@ -36,6 +36,13 @@ abstract class OkcheDao {
     @Update abstract suspend fun update(change: FoodChange)
     @Update abstract suspend fun update(snack: Snack)
     @Update abstract suspend fun update(medication: Medication)
+    @Update abstract suspend fun update(schedule: MedSchedule)
+
+    /** 약 추가: 고른 아이마다 한 줄(한 번에 — 8-2a). */
+    @Transaction
+    open suspend fun insertSchedules(rows: List<MedSchedule>) {
+        rows.forEach { insert(it) }
+    }
 
     // 약방(8-1): 뺀 약도 이름은 지난 기록 글자에 쓰여서 모두 읽는다.
     @Query("SELECT * FROM medication") abstract fun medicationsFlow(): Flow<List<Medication>>

@@ -319,6 +319,8 @@ struct TimeSheet: View {
     @Binding var time: Date
     var components: DatePickerComponents = .hourAndMinute
     var notAfterNow = false
+    /// 있으면 '이 시간 빼기'(탕약 먹일 시간 — 8-2).
+    var onRemove: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var picked = Date.now
 
@@ -327,6 +329,7 @@ struct TimeSheet: View {
             HStack {
                 Button("취소") { dismiss() }
                 Spacer()
+                if let onRemove { Button("이 시간 빼기") { onRemove(); dismiss() } }
             }
             .okcheText(OkcheType.body, weight: .medium)
             .foregroundStyle(OkcheColor.namsaek)

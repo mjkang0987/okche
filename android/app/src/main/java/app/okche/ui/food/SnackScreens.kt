@@ -351,7 +351,7 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
 
 /** 다과 고르기 줄(다과 기록 시트): 라디오 + 이름 + 아래 줄, 고르면 남색 테두리·연한 남색 바탕. */
 @Composable
-private fun SnackPickCard(name: String, detail: String, isOn: Boolean, onClick: () -> Unit) {
+internal fun SnackPickCard(name: String, detail: String, isOn: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 52.dp)

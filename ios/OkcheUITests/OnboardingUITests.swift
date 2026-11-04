@@ -467,6 +467,32 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 들인 약이 없어요."].waitForExistence(timeout: 3))
     }
 
+    /// 더보기 → 탕약(약 없음) → 약 추가(오류 → 새 약 들이고 고르기 → 며칠마다) → 저장 → 카드 (8-2a).
+    func testTangyakAddMed() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["탕약 · 약 알림"], in: app)
+        XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
+        app.buttons["+ 약 추가"].tap()
+        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertTrue(app.staticTexts["약을 골라 주세요"].waitForExistence(timeout: 3))
+        tapBelow(app.buttons["+ 약방에 새 약 들이기"], in: app)
+        let name = app.textFields["약 이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.tap()
+        name.typeText("프레드니솔론")
+        app.buttons["약방에 들이고 고르기"].tap()
+        let picked = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '프레드니솔론'")).firstMatch
+        XCTAssertTrue(picked.waitForExistence(timeout: 3))
+        XCTAssertTrue(picked.isSelected) // 들이면 골라짐
+        tapBelow(app.buttons["며칠마다"], in: app)
+        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertTrue(app.staticTexts["먹고 있는 약"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 이틀에 한 번 · 1알'")).firstMatch.exists)
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

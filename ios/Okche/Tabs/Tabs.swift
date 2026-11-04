@@ -18,14 +18,28 @@ struct AlbumTab: View {
 }
 
 struct MoreTab: View {
+    /// 더보기 안 화면은 경로로 쌓는다 — 탕약 안에서 `NavigationLink { MedAddView() }`로 약 추가를 열면 두 화면이 끝없이 다시 그려져 멈춰서(2026-11-04 확인).
+    @State private var path: [MoreRoute] = []
+
     var body: some View {
-        NavigationStack {
-            // 더보기의 다른 줄(다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
+        NavigationStack(path: $path) {
+            // 더보기의 다른 줄(등사·백업·의서·기별·결제)은 각 단계에서.
             TabScreen(title: "더보기", content: { PetManageSection(); MoreMenu() })
                 .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: MoreRoute.self) { route in
+                    switch route {
+                    case .snacks: SnackListView()
+                    case .tangyak: TangyakView()
+                    case .medAdd: MedAddView()
+                    case .yakbang: YakbangView()
+                    }
+                }
         }
     }
 }
+
+/// 더보기 안 화면.
+enum MoreRoute: Hashable { case snacks, tangyak, medAdd, yakbang }
 
 /// 더보기 메뉴(보드 `More`): 흰 칸 안 52 줄, 이름 + 쉬운 말 + ›. 사료 · 처방식은 지금 보는 아이의 사료 바꾸기 시트.
 private struct MoreMenu: View {
@@ -45,11 +59,13 @@ private struct MoreMenu: View {
                 MoreMenuRow(title: "사료 · 처방식", detail: food) { foodPet = pet }
                 Rectangle().fill(OkcheColor.line).frame(height: 1)
             }
-            NavigationLink { SnackListView() } label: { MoreMenuLabel(title: "다과", note: "간식 목록") }
+            NavigationLink(value: MoreRoute.snacks) { MoreMenuLabel(title: "다과", note: "간식 목록") }
                 .buttonStyle(.plain)
             Rectangle().fill(OkcheColor.line).frame(height: 1)
-            // 탕약 · 약 알림은 8-2에서(보드 순서는 다과 다음 탕약, 그다음 약방).
-            NavigationLink { YakbangView() } label: { MoreMenuLabel(title: "약방", note: "약 목록") }
+            NavigationLink(value: MoreRoute.tangyak) { MoreMenuLabel(title: "탕약", note: "약 알림") }
+                .buttonStyle(.plain)
+            Rectangle().fill(OkcheColor.line).frame(height: 1)
+            NavigationLink(value: MoreRoute.yakbang) { MoreMenuLabel(title: "약방", note: "약 목록") }
                 .buttonStyle(.plain)
         }
         .padding(.horizontal, OkcheSpacing.space4)

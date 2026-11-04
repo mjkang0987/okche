@@ -4,6 +4,8 @@ import SwiftUI
 /// 수라 화면(보드 `Sura`·`SuraNoPlan`·`Feeder`): 급여 방식, 끼니 시간, 끼니 칸(또는 끼니 없이 '지금 먹은 것'). 지금 보는 아이를 따른다.
 /// 사료 이름·다과는 7-4.
 struct SuraScreen: View {
+    /// 기록 줄 연필에서 연 아이(열 때 지금 보는 아이로 바꿈). 없으면 지금 보는 아이.
+    var petId: UUID?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
@@ -13,6 +15,8 @@ struct SuraScreen: View {
     /// '괜찮아요'를 누른 아이 ID들(이 기기만의 설정 `mealHintDismissed`, 쉼표로 이음).
     @AppStorage("mealHintDismissed") private var hintDismissed = ""
     @State private var editing: MealMode?
+    /// '오늘 남긴 수라' 줄을 눌러 결과를 바꿀 기록(끼니 없이 남긴 수라 고치기 — 2026-11-04 사용자).
+    @State private var changing: Record?
     @State private var failed = false
     /// 1분마다 — 켜 둔 채 시간이 지나도 '아직 시간 전'·오늘(6시 기준)·급식기 자동 기록이 따라가게.
     @State private var now = Date.now
@@ -38,14 +42,27 @@ struct SuraScreen: View {
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .onAppear { try? MealRules.fillFeeder(in: context) }
+        .onAppear {
+            if let petId { lastPetId = petId.uuidString }
+            try? MealRules.fillFeeder(in: context)
+        }
+        // 볼 아이가 없어지면(추억으로 간직·지우기·추억 아이 고름) 빈 화면 대신 닫는다.
+        .onChange(of: pet == nil) { if pet == nil { dismiss() } }
         .onChange(of: scenePhase) { if scenePhase == .active { now = .now } } // 돌아오자마자 지금 시각으로
         .task {
             // 화면이 떠 있는 동안 1분마다(다시 그려도 처음부터 세지 않게 task로).
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                do { try await Task.sleep(for: .seconds(60)) } catch { break } // 화면이 사라지면 바로 멈춤
                 now = .now
                 try? MealRules.fillFeeder(now: now, in: context)
+            }
+        }
+        .confirmationDialog("결과 바꾸기", isPresented: Binding(get: { changing != nil }, set: { if !$0 { changing = nil } }), titleVisibility: .visible) {
+            ForEach(MealRules.results, id: \.value) { result in
+                Button(result.title) {
+                    if let record = changing { run { try MealRules.setResult(result.value, on: record, in: context) } }
+                    changing = nil
+                }
             }
         }
         .sheet(item: $editing) { mode in
@@ -123,7 +140,7 @@ struct SuraScreen: View {
     }
 
     @ViewBuilder private func nowButtons(_ pet: Pet) -> some View {
-                ForEach(MealCard.results, id: \.value) { result in
+                ForEach(MealRules.results, id: \.value) { result in
                     Button(result.title) { run { try MealRules.pickNow(result.value, petId: pet.id, in: context) } }
                         .okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -141,13 +158,18 @@ struct SuraScreen: View {
                     .padding(.top, 10).padding(.bottom, 4).accessibilityAddTraits(.isHeader)
                 ForEach(Array(today.enumerated()), id: \.element.id) { index, record in
                     if index > 0 { OkcheColor.line.frame(height: 1) }
-                    HStack {
-                        Text(QuickRecord.time(record)).okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
-                        Spacer(minLength: 8)
-                        Text(QuickRecord.value(record)).okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink)
+                    Button { changing = record } label: {
+                        HStack {
+                            Text(QuickRecord.time(record)).okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
+                            Spacer(minLength: 8)
+                            Text(QuickRecord.value(record)).okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.ink)
+                        }
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
-                    .frame(minHeight: 44)
+                    .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
+                    .accessibilityHint("결과 바꾸기")
                 }
             }
             .padding(.horizontal, 16).padding(.bottom, 6)
@@ -251,8 +273,6 @@ private struct PlanRow: View {
 
 /// 끼니 칸: 이름(급식기는 시각)·준 양 + 상태, 다 먹음·남김·안 먹음(기존 고르기 카드), 남김이면 '남은 양 (g, 선택)'.
 private struct MealCard: View {
-    static let results: [(value: String, title: String)] = [("all", "다 먹음"), ("some", "남김"), ("none", "안 먹음")]
-
     let slot: MealRules.Occurrence
     let now: Date
     let record: Record?
@@ -275,7 +295,8 @@ private struct MealCard: View {
                 Text(status(feeder: feeder, waiting: waiting)).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
             }
             if !waiting {
-                OkcheChoiceCards(options: Self.results, isOn: { $0 == result }, onTap: onPick)
+                // 고른 결과를 다시 눌러 풀지 않는다(끼니는 결과를 바꾸기만 — '선택 해제' 동작 없음).
+                OkcheChoiceCards(options: MealRules.results, deselectable: false, isOn: { $0 == result }, onTap: onPick)
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel("\(slot.slot.name) 식사량")
                 if result == "some", let record {
@@ -346,6 +367,7 @@ struct MealTimeSheet: View {
     @State private var rows: [Row] = []
     @State private var pickingTime: UUID?
     @State private var error: String?
+    @State private var saving = false
 
     struct Row: Identifiable {
         let id = UUID()
@@ -384,7 +406,7 @@ struct MealTimeSheet: View {
                 }
                 Button("+ 끼니 시간 추가") {
                     rows.append(Row(time: nextFreeTime(), grams: ""))
-                    rows.sort { $0.time < $1.time }
+                    rows.sort { MealRules.dayOrder($0.time) < MealRules.dayOrder($1.time) }
                 }
                 .okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.namsaek).frame(minHeight: 44)
                 Text(feeder ? "바꾼 시간은 아직 지나지 않은 끼니부터 바로 적용돼요. 지난 기록은 그대로예요."
@@ -404,7 +426,7 @@ struct MealTimeSheet: View {
         .presentationDragIndicator(.visible)
         .onAppear {
             rows = (plan?.slots ?? [MealSlot(name: "", time: "08:00"), MealSlot(name: "", time: "18:00")])
-                .sorted { $0.time < $1.time }
+                .sorted { MealRules.dayOrder($0.time) < MealRules.dayOrder($1.time) }
                 .map { Row(time: $0.time, grams: $0.grams.map(String.init) ?? "") }
         }
         .sheet(item: $pickingTime) { id in
@@ -479,12 +501,13 @@ struct MealTimeSheet: View {
         } set: { date in
             let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)
             rows[index].time = String(format: "%02d:%02d", c.hour!, c.minute!)
-            rows.sort { $0.time < $1.time }
+            rows.sort { MealRules.dayOrder($0.time) < MealRules.dayOrder($1.time) }
         }
     }
 
     /// 시간 겹침 안 됨, 준 양은 0~2000 정수(비우면 없음), 급식기는 끼니 1개 이상.
     private func save() {
+        guard !saving else { return } // 두 번 눌러 계획 줄이 하나 더 생기지 않게
         if Set(rows.map(\.time)).count != rows.count {
             return fail("같은 시간의 끼니가 있어요. 시간을 바꿔 주세요.")
         }
@@ -500,12 +523,14 @@ struct MealTimeSheet: View {
             }
             slots.append(MealSlot(name: "", time: row.time, grams: grams))
         }
+        saving = true
         do {
             try MealRules.savePlan(petId: petId, mode: mode, slots: slots, in: context)
-            try MealRules.fillFeeder(in: context)
+            try? MealRules.fillFeeder(in: context) // 채우기가 실패해도 계획은 저장됐다(다음에 앱을 열 때 다시 채움)
             AccessibilityNotification.Announcement("끼니 시간을 저장했어요").post()
             dismiss()
         } catch {
+            saving = false
             fail("저장하지 못했어요. 다시 해 주세요.")
         }
     }

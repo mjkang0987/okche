@@ -1,5 +1,6 @@
 package app.okche.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -92,23 +93,54 @@ fun RootTabs() {
     var logOpen by rememberSaveable { mutableStateOf(false) }
     var suraOpen by rememberSaveable { mutableStateOf(false) }
     val quickState = rememberQuickRecordState()
+    // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
+    fun saveSetting(block: suspend () -> Unit) {
+        scope.launch {
+            runCatching { block() }.onFailure { Toast.makeText(context, "저장하지 못했어요. 다시 해 주세요.", Toast.LENGTH_SHORT).show() }
+        }
+    }
+    val switchSheet: @Composable () -> Unit = {
+        if (switching && pets != null) {
+            PetSwitchSheet(
+                pets, current, restingIds,
+                onPick = { id ->
+                    switching = false
+                    saveSetting { context.setLastPetId(id) }
+                },
+                onEdit = {
+                    switching = false
+                    editPetId = current?.id
+                },
+                onRegister = {
+                    switching = false
+                    registering = true
+                },
+                onDismiss = { switching = false },
+            )
+        }
+    }
     editPetId?.let { id ->
         PetEditFlow(
             id,
             onClose = { editPetId = null },
             // 간직하면 문안의 추억 화면(지금 보는 아이로), 지우면 더보기 — 마지막 아이를 지워도 시작하기로 돌아가지 않게(6-4).
+            // 수라·기록 목록 위에서 열었으면 그 화면도 닫는다(볼 아이가 없는 빈 화면으로 돌아가지 않게).
             onKept = {
                 // 지금 보는 아이를 먼저 바꾼 뒤 문안으로(다른 아이의 문안이 잠깐 보이지 않게).
                 scope.launch {
-                    context.setLastPetId(id)
+                    runCatching { context.setLastPetId(id) }
                     editPetId = null
+                    suraOpen = false
+                    logOpen = false
                     selected = Tab.Main.ordinal
                 }
             },
             onDeleted = {
                 editPetId = null
+                suraOpen = false
+                logOpen = false
                 selected = Tab.More.ordinal
-                scope.launch { context.setOnboardingDone(true) }
+                saveSetting { context.setOnboardingDone(true) }
             },
         )
         return
@@ -119,34 +151,15 @@ fun RootTabs() {
     }
     if (suraOpen) {
         SuraScreen(current, seal = { if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }, onBack = { suraOpen = false })
-        if (switching && pets != null) {
-            PetSwitchSheet(pets, current, restingIds, onPick = { id -> switching = false; scope.launch { context.setLastPetId(id) } },
-                onEdit = { switching = false; editPetId = current?.id }, onRegister = { switching = false; registering = true }, onDismiss = { switching = false })
-        }
+        switchSheet()
         return
     }
-    if (logOpen) {
-        RecordLogScreen(pets.orEmpty(), current, onBack = { logOpen = false })
+    // 아이 목록을 읽은 뒤에 그린다(다시 살아난 직후 '누군지 모름'이 스치지 않게).
+    if (logOpen && pets != null) {
+        RecordLogScreen(pets, current, onBack = { logOpen = false }, onOpenSura = { id -> saveSetting { context.setLastPetId(id) }; suraOpen = true })
         return
     }
-    if (switching && pets != null) {
-        PetSwitchSheet(
-            pets, current, restingIds,
-            onPick = { id ->
-                switching = false
-                scope.launch { context.setLastPetId(id) }
-            },
-            onEdit = {
-                switching = false
-                editPetId = current?.id
-            },
-            onRegister = {
-                switching = false
-                registering = true
-            },
-            onDismiss = { switching = false },
-        )
-    }
+    switchSheet()
     val seal: @Composable () -> Unit = {
         if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true })
     }
@@ -209,9 +222,12 @@ fun RootTabs() {
         when (Tab.entries[selected]) {
             Tab.Record -> RecordTab(
                 modifier, seal, pets, current,
-                onPickPet = { id -> scope.launch { context.setLastPetId(id) } },
+                onPickPet = { id -> saveSetting { context.setLastPetId(id) } },
                 onOpenLog = { logOpen = true },
-                onOpenSura = { suraOpen = true },
+                onOpenSura = { id ->
+                    if (id != null) saveSetting { context.setLastPetId(id) }
+                    suraOpen = true
+                },
                 state = quickState,
             )
             Tab.Main -> if (current?.memorializedAt != null) MemorialScreen(current, modifier, seal) else MainTab(modifier, seal)

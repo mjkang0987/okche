@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,8 +90,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val mealResults = listOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")
-
 /**
  * 수라 화면(보드 Sura·SuraNoPlan·Feeder): 급여 방식, 끼니 시간, 끼니 칸(또는 끼니 없이 '지금 먹은 것'). 지금 보는 아이를 따른다.
  * 사료 이름·다과는 7-4. 하단 탭 없음. iOS `SuraScreen`과 같은 짜임.
@@ -112,13 +112,20 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
     }
     val today = OkcheDay.of(now)
     val plans by remember(petId) { petId?.let { dao.mealPlansFlow(it) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
-    val meals by remember(petId, today) { petId?.let { dao.dayMealsFlow(it, today) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
+    // 끼니 칸은 차례 키로 짝지어서 6시 전에 미리 남긴 6시대 끼니(전날 day)도 찾는다. '오늘 남긴 수라'는 오늘 것만.
+    val meals by remember(petId, today) { petId?.let { dao.recentMealsFlow(it, today, shiftDay(today, -1)) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     val dismissed by remember { context.mealHintDismissed }.collectAsState(null)
     var editing by remember { mutableStateOf<MealMode?>(null) }
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { runCatching { fillFeeder(dao) } }
+    // 볼 아이가 없어지면(추억으로 간직·지우기·추억 아이 고름) 빈 화면 대신 닫는다.
+    LaunchedEffect(pet, petId) { if (pet != null && petId == null) onBack() }
+    var busy by remember { mutableStateOf(false) }
 
+    // 저장 하나가 끝나기 전엔 다음 누름을 받지 않는다(빨리 두 번 눌러 한 차례에 기록이 둘 생기지 않게).
     fun run(action: suspend () -> Unit) {
+        if (busy) return
+        busy = true
         scope.launch {
             runCatching { action() }
                 .onSuccess { failed = false }
@@ -126,6 +133,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
                     failed = true
                     @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
                 }
+            busy = false
         }
     }
 
@@ -167,7 +175,8 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
                         })
                     }
                     NowCard { result -> run { pickMealNow(dao, result, petId) } }
-                    if (meals.isNotEmpty()) TodayMeals(meals)
+                    val todays = meals.filter { it.day == today }
+                    if (todays.isNotEmpty()) TodayMeals(todays) { record, result -> run { setMealResult(dao, record, result) } }
                     Text(
                         "끼니 시간 정하기 ›",
                         Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) { editing = MealMode.direct }.wrapContentHeight(Alignment.CenterVertically),
@@ -291,12 +300,13 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                         },
                         Modifier.weight(1f), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(),
                     )
-                    OkcheTextField(
-                        left,
-                        { v ->
-                            left = v
-                            val grams = v.trim().toIntOrNull()
-                            when {
+                    // 치는 대로 저장하지 않고 멈춘 뒤 한 번(글자마다 따로 도는 저장이 순서가 바뀌어 앞 숫자가 남지 않게).
+                    LaunchedEffect(left) {
+                        if (left == leftGrams(record)?.toString().orEmpty()) return@LaunchedEffect
+                        delay(400)
+                        val v = left
+                        val grams = v.trim().toIntOrNull()
+                        when {
                                 v.isBlank() -> { error = null; onLeft(record, null) }
                                 grams != null && grams in 0..(given ?: 2000) -> { error = null; onLeft(record, grams) }
                                 else -> {
@@ -305,7 +315,10 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                                     if (leftGrams(record) != null) onLeft(record, null)
                                 }
                             }
-                        },
+                    }
+                    OkcheTextField(
+                        left,
+                        { left = it },
                         "${slot.slot.name} 남은 양 (그램, 선택)",
                         Modifier.width(120.dp),
                         showLabel = false, suffix = "g", suffixStyle = OkcheType.Label, error = error, showError = false,
@@ -362,16 +375,28 @@ private fun NowCard(onPick: (String) -> Unit) {
     }
 }
 
-/** '오늘 남긴 수라' 목록(시각 · 결과). */
+/** '오늘 남긴 수라' 목록(시각 · 결과). 줄을 누르면 결과 바꾸기(끼니 없이 남긴 수라 고치기 — 2026-11-04 사용자). */
 @Composable
-private fun TodayMeals(meals: List<Record>) {
+private fun TodayMeals(meals: List<Record>, onChange: (Record, String) -> Unit) {
     Column(Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(start = 16.dp, end = 16.dp, bottom = 6.dp)) {
         Text("오늘 남긴 수라", Modifier.padding(top = 10.dp, bottom = 4.dp).semantics { heading() }, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle())
         meals.forEachIndexed { i, record ->
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
-            Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
-                Text(recordTime(record), Modifier.weight(1f), color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
-                Text(recordValue(record), color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Medium))
+            var open by remember(record.id) { mutableStateOf(false) }
+            Box {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button, onClickLabel = "결과 바꾸기") { open = true }
+                        .semantics(mergeDescendants = true) {},
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(recordTime(record), Modifier.weight(1f), color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
+                    Text(recordValue(record), color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Medium))
+                }
+                DropdownMenu(open, { open = false }) {
+                    for ((value, title) in mealResults) {
+                        DropdownMenuItem({ Text(title, style = OkcheType.Body.toTextStyle()) }, { open = false; onChange(record, value) })
+                    }
+                }
             }
         }
     }
@@ -389,7 +414,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
     // 줄: 시간·준 양 글자. 처음 값은 지금 계획, 없으면 08:00·18:00.
     val rows = remember {
         mutableStateListOf<Pair<String, String>>().apply {
-            addAll((plan?.slots ?: listOf(MealSlot("", "08:00"), MealSlot("", "18:00"))).sortedBy { it.time }.map { it.time to (it.grams?.toString().orEmpty()) })
+            addAll((plan?.slots ?: listOf(MealSlot("", "08:00"), MealSlot("", "18:00"))).sortedBy { dayOrder(it.time) }.map { it.time to (it.grams?.toString().orEmpty()) })
         }
     }
     var error by remember { mutableStateOf<String?>(null) }
@@ -414,7 +439,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
         scope.launch {
             runCatching {
                 saveMealPlan(dao, petId, mode, slots)
-                fillFeeder(dao)
+                runCatching { fillFeeder(dao) } // 채우기가 실패해도 계획은 저장됐다(다음에 앱을 열 때 다시 채움)
             }.onSuccess {
                 @Suppress("DEPRECATION") view.announceForAccessibility("끼니 시간을 저장했어요")
                 onClose()
@@ -457,7 +482,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
                                 val t = runCatching { java.time.LocalTime.parse(time) }.getOrDefault(java.time.LocalTime.NOON) // 다른 기기에서 온 틀린 글자
                                 TimePickerDialog(context, { _, h, min ->
                                     rows[i] = "%02d:%02d".format(h, min) to rows[i].second
-                                    rows.sortBy { it.first }
+                                    rows.sortBy { dayOrder(it.first) }
                                     error = null
                                 }, t.hour, t.minute, DateFormat.is24HourFormat(context)).show()
                             }, m, showLabel = false, icon = Icons.Outlined.Schedule)
@@ -498,7 +523,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
                 Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) {
                     val used = rows.map { it.first }.toSet()
                     rows.add(((0 until 24).map { "%02d:00".format((12 + it) % 24) }.firstOrNull { it !in used } ?: "12:00") to "")
-                    rows.sortBy { it.first }
+                    rows.sortBy { dayOrder(it.first) }
                 }.wrapContentHeight(Alignment.CenterVertically),
                 color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
             )

@@ -35,14 +35,18 @@ struct RecordTab: View {
                 // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
                 let suraPet = PetTitle.current(pets, lastPetId: lastPetId).map { $0.memorializedAt == nil } ?? false
                 QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
-                    if kind == .meal { path.append(.sura) } else { detail = DetailTarget(kind: kind, petId: who) }
+                    if kind == .meal { path.append(.sura(nil)) } else { detail = DetailTarget(kind: kind, petId: who) }
                 }, mealMore: suraPet)
                 Text("누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: RecordRoute.self) { _ in SuraScreen() }
+            .navigationDestination(for: RecordRoute.self) { route in
+                switch route {
+                case .sura(let petId): SuraScreen(petId: petId)
+                }
+            }
         }
         .sheet(item: $detail) { target in
             RecordDetailSheet(target: target) { record, isNew in
@@ -75,7 +79,8 @@ struct RecordTab: View {
     }
 }
 
-enum RecordRoute: Hashable { case sura }
+/// 일기 탭 안 화면. 수라 화면은 그 아이로(없으면 지금 보는 아이) — 기록 줄 연필에서 다른 아이 수라도 연다.
+enum RecordRoute: Hashable { case sura(UUID?) }
 
 /// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선(보드 `Record`).
 /// 큰 글자·좁은 폭에선 이름 아래로 버튼.
@@ -246,7 +251,7 @@ struct RowIconButton: View {
     }
 }
 
-/// 고치기(연필) — 자세히 시트가 있는 종류만(수라는 7-3).
+/// 고치기(연필) — 자세히 시트가 있는 종류, 수라는 그 아이 수라 화면(2026-11-04 사용자 — 누군지 모르는 수라는 먼저 누구였는지 정하기).
 struct EditRecordButton: View {
     let record: Record
     let pets: [Pet]
@@ -254,7 +259,14 @@ struct EditRecordButton: View {
     let onEdit: (DetailTarget) -> Void
 
     var body: some View {
-        if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
+        if record.kind == RecordKind.meal.rawValue, let petId = record.petId,
+           pets.first(where: { $0.id == petId })?.memorializedAt == nil {
+            NavigationLink(value: RecordRoute.sura(petId)) {
+                Image(systemName: "pencil").font(.body).foregroundStyle(color)
+                    .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
+        } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
             RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
                 onEdit(DetailTarget(kind: kind, editing: record))
             }

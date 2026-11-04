@@ -54,6 +54,7 @@ import app.okche.ui.pet.PetSeal
 import app.okche.ui.pet.PetSwitchSheet
 import app.okche.ui.record.RecordLogScreen
 import app.okche.ui.record.RecordTab
+import app.okche.ui.record.SuraScreen
 import app.okche.ui.record.rememberQuickRecordState
 import app.okche.ui.pet.currentPet
 import kotlinx.coroutines.flow.combine
@@ -89,6 +90,7 @@ fun RootTabs() {
     var registering by rememberSaveable { mutableStateOf(false) }
     var switching by rememberSaveable { mutableStateOf(false) }
     var logOpen by rememberSaveable { mutableStateOf(false) }
+    var suraOpen by rememberSaveable { mutableStateOf(false) }
     val quickState = rememberQuickRecordState()
     editPetId?.let { id ->
         PetEditFlow(
@@ -111,12 +113,20 @@ fun RootTabs() {
         )
         return
     }
-    if (logOpen) {
-        RecordLogScreen(pets.orEmpty(), current, onBack = { logOpen = false })
-        return
-    }
     if (registering) {
         PetRegisterScreen(onClose = { registering = false }, onSaved = { registering = false })
+        return
+    }
+    if (suraOpen) {
+        SuraScreen(current, seal = { if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }, onBack = { suraOpen = false })
+        if (switching && pets != null) {
+            PetSwitchSheet(pets, current, restingIds, onPick = { id -> switching = false; scope.launch { context.setLastPetId(id) } },
+                onEdit = { switching = false; editPetId = current?.id }, onRegister = { switching = false; registering = true }, onDismiss = { switching = false })
+        }
+        return
+    }
+    if (logOpen) {
+        RecordLogScreen(pets.orEmpty(), current, onBack = { logOpen = false })
         return
     }
     if (switching && pets != null) {
@@ -201,6 +211,7 @@ fun RootTabs() {
                 modifier, seal, pets, current,
                 onPickPet = { id -> scope.launch { context.setLastPetId(id) } },
                 onOpenLog = { logOpen = true },
+                onOpenSura = { suraOpen = true },
                 state = quickState,
             )
             Tab.Main -> if (current?.memorializedAt != null) MemorialScreen(current, modifier, seal) else MainTab(modifier, seal)

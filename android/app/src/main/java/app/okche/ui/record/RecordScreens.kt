@@ -114,6 +114,7 @@ fun RecordTab(
     onPickPet: (String) -> Unit,
     onOpenLog: () -> Unit,
     state: QuickRecordState,
+    onOpenSura: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -140,7 +141,9 @@ fun RecordTab(
         }
         // 아이를 읽기 전에 누르면 '누군지 모름'으로 저장되니 읽은 뒤에 그린다.
         if (pets != null) {
-            QuickRecordCard(onDetail = { detail = DetailTarget(it, petId = who) }) { row, value ->
+            // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
+            val mealMore = current != null && current.memorializedAt == null
+            QuickRecordCard(mealMore, onDetail = { if (it == RecordKind.meal) onOpenSura() else detail = DetailTarget(it, petId = who) }) { row, value ->
                 scope.launch {
                     runCatching { saveQuickRecord(dao, row, value, who) }
                         .onSuccess {
@@ -190,7 +193,7 @@ private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
 
 /** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
 @Composable
-private fun QuickRecordCard(onDetail: (RecordKind) -> Unit, onTap: (QuickRow, String) -> Unit) {
+private fun QuickRecordCard(mealMore: Boolean, onDetail: (RecordKind) -> Unit, onTap: (QuickRow, String) -> Unit) {
     // 큰 글자에선 이름 아래로 버튼. 그보다 작아도 폭이 모자라면 버튼이 다음 줄로(FlowRow).
     val large = LocalDensity.current.fontScale >= 1.3f
     Column(
@@ -214,7 +217,7 @@ private fun QuickRecordCard(onDetail: (RecordKind) -> Unit, onTap: (QuickRow, St
             val buttons = @Composable {
                 for ((value, title) in row.choices) QuickButton(title, "${kindName(row.kind)} $title · 바로 기록") { onTap(row, value) }
             }
-            val more = @Composable { MoreButton(row.kind, onDetail) }
+            val more = @Composable { if (row.kind != RecordKind.meal || mealMore) MoreButton(row.kind, onDetail) }
             if (large) {
                 Column(Modifier.padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -256,7 +259,7 @@ private fun QuickButton(title: String, label: String, onClick: () -> Unit) {
 /** ⋯ 자세히 남기기(점선 44) — 자세히 시트가 있는 종류만. */
 @Composable
 private fun MoreButton(kind: RecordKind, onDetail: (RecordKind) -> Unit) {
-    if (detailFields(kind).isEmpty()) return
+    if (detailFields(kind).isEmpty() && kind != RecordKind.meal) return
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     val dash = with(LocalDensity.current) { PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())) }
     Box(

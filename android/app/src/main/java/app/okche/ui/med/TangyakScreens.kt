@@ -345,10 +345,13 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, anchors: a
                 Note("이틀에 한 번이면 2, 일주일에 한 번이면 7. 먹는 날에만 일기 탕약 줄과 알림에 나와요.")
             }
             MedFrequency.weekdays -> {
-                OkcheMultiChips("먹는 요일", (1..7).map { it to weekdayNames[it - 1] }, f.weekdays, { d ->
-                    edit("weekdays") { copy(weekdays = if (d in weekdays) weekdays - d else weekdays + d) }
-                })
-                errors["weekdays"]?.let { OkcheErrorText(it, anchors.of("weekdays")) }
+                // 스크롤 표시는 늘 있는 칸에(오류 글자는 오류가 날 때 생겨 바로 옮겨 갈 수 없음).
+                Column(anchors.of("weekdays"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OkcheMultiChips("먹는 요일", (1..7).map { it to weekdayNames[it - 1] }, f.weekdays, { d ->
+                        edit("weekdays") { copy(weekdays = if (d in weekdays) weekdays - d else weekdays + d) }
+                    })
+                    errors["weekdays"]?.let { OkcheErrorText(it) }
+                }
                 val picked = f.weekdays.sorted().map { weekdayNames[it - 1] }
                 val counts = listOf("", "한", "두", "세", "네", "다섯", "여섯", "일곱")
                 Note("고른 요일에만 일기 탕약 줄과 알림에 나와요." + if (picked.isEmpty()) "" else " 지금은 ${picked.joinToString("·")}, 일주일에 ${counts[picked.size]} 번.")
@@ -389,6 +392,7 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, anchors: a
         if (f.frequency != MedFrequency.everyNHours) {
             OkcheFieldLabel(if (f.frequency == MedFrequency.daily) "먹일 시간" else "먹는 날 먹일 시간", Modifier.semantics { heading() })
             TimeFieldsRow(
+                anchors.of("times"),
                 f.times,
                 onPick = { index, time ->
                     // 칸이 사라지는 게 보이고, TalkBack에도 알린다.
@@ -405,7 +409,7 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, anchors: a
                 },
                 onRemove = { index -> if (f.times.size > 1) edit("times") { copy(times = times.filterIndexed { i, _ -> i != index }) } },
             )
-            errors["times"]?.let { OkcheErrorText(it, anchors.of("times")) }
+            errors["times"]?.let { OkcheErrorText(it) }
         }
         OkcheSwitchRow(
             if (f.frequency == MedFrequency.everyNHours) "차례마다 알림 보내기" else "시간마다 알림 보내기", "", f.reminder,
@@ -417,9 +421,9 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, anchors: a
 
 /** 먹일 시간 칸 줄: 시간 칸 여러 개 옆으로(넘치면 다음 줄) + 점선 '+'. 칸을 누르면 시각 고르기, 길게 누르면 빼기(둘 이상일 때). */
 @Composable
-private fun TimeFieldsRow(times: List<String>, onPick: (Int, String) -> Unit, onAdd: () -> Unit, onRemove: (Int) -> Unit) {
+private fun TimeFieldsRow(modifier: Modifier, times: List<String>, onPick: (Int, String) -> Unit, onAdd: () -> Unit, onRemove: (Int) -> Unit) {
     val context = LocalContext.current
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         times.forEachIndexed { index, time ->
             val p = time.split(":").mapNotNull { it.toIntOrNull() }
             Box(Modifier.widthIn(min = 120.dp)) {

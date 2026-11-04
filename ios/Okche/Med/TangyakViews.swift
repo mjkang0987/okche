@@ -262,14 +262,16 @@ struct MedAddView: View {
                 .id(MedSchedules.Field.everyDays)
                 note("이틀에 한 번이면 2, 일주일에 한 번이면 7. 먹는 날에만 일기 탕약 줄과 알림에 나와요.")
             case .weekdays:
+                // 스크롤 표시는 늘 있는 칸에(오류 글자는 오류가 날 때 생겨 같은 순간 옮겨 갈 수 없음).
                 FieldGroup(title: "먹는 요일") {
                     OkcheChoiceChips(options: (1...7).map { ($0, MedSchedules.weekdayNames[$0 - 1]) }, multiple: true,
                                      isOn: { form.weekdays.contains($0) }) { d in
                         if let i = form.weekdays.firstIndex(of: d) { form.weekdays.remove(at: i) } else { form.weekdays.append(d) }
                         errors[.weekdays] = nil
                     }
+                    .id(MedSchedules.Field.weekdays)
                 }
-                OkcheFieldError(message: errors[.weekdays]).id(MedSchedules.Field.weekdays)
+                OkcheFieldError(message: errors[.weekdays])
                 note(weekdayNote)
             case .everyNHours:
                 pair {
@@ -297,7 +299,8 @@ struct MedAddView: View {
                 if form.frequency != .everyNHours {
                     OkcheFieldLabel(title: form.frequency == .daily ? "먹일 시간" : "먹는 날 먹일 시간").accessibilityAddTraits(.isHeader)
                     TimeFieldsRow(times: form.times, onTap: { editingTime = TimeIndex(id: $0) }, onAdd: addTime)
-                    OkcheFieldError(message: errors[.times]).id(MedSchedules.Field.times)
+                        .id(MedSchedules.Field.times)
+                    OkcheFieldError(message: errors[.times])
                 }
                 OkcheSwitchRow(title: form.frequency == .everyNHours ? "차례마다 알림 보내기" : "시간마다 알림 보내기", isOn: $form.reminder)
                 OkcheMenuPicker(label: "알림 보낼 때", options: MedSchedules.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)

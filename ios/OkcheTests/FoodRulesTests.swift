@@ -73,7 +73,10 @@ final class FoodRulesTests: XCTestCase {
         XCTAssertEqual(MealRules.json(after)["foodId"] as? String, new.foodId.uuidString.lowercased())
         try MealRules.setResult("all", on: after, in: context)
         XCTAssertEqual(MealRules.json(after)["foodId"] as? String, new.foodId.uuidString.lowercased()) // 고쳐도 그대로
-        let noFood = try QuickRecord.save(row, value: "all", petId: UUID(), now: at(2026, 10, 14, 9), timeZone: seoul, in: context)
+        let noFood = try QuickRecord.save(row, value: "all", petId: nil, now: at(2026, 10, 14, 9), timeZone: seoul, in: context)
         XCTAssertNil(MealRules.json(noFood)["foodId"])
+        try QuickRecord.assign(noFood, to: pet, in: context) // 누구였는지 정하면 그 아이가 그날 먹던 사료
+        XCTAssertEqual(MealRules.json(noFood)["foodId"] as? String, new.foodId.uuidString.lowercased())
+        XCTAssertEqual(MealRules.json(noFood)["result"] as? String, "all")
     }
 }

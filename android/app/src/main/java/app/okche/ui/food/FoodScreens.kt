@@ -107,7 +107,8 @@ fun FoodChangeSheet(pet: Pet, onClose: () -> Unit) {
     val changes by remember { dao.foodChangesFlow() }.collectAsState(emptyList())
     val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
     var name by remember { mutableStateOf("") }
-    var startedOn by remember { mutableStateOf(LocalDate.now()) }
+    // 처음 값은 6시 기준 오늘(자정~6시에 바꿔도 바로 '지금 먹는 사료'가 되게).
+    var startedOn by remember { mutableStateOf(LocalDate.parse(OkcheDay.of(System.currentTimeMillis()))) }
     var method by remember { mutableStateOf(FoodChangeMethod.gradual) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var guiding by remember { mutableStateOf(false) }
@@ -123,7 +124,9 @@ fun FoodChangeSheet(pet: Pet, onClose: () -> Unit) {
         }
         busy = true
         scope.launch {
-            failed = runCatching { saveFoodChange(dao, pet.id, name, startedOn.toString(), method) }.isFailure
+            // 오늘 뒤는 안 됨 — 오늘 = 6시 기준(달력에선 자정 뒤 날짜도 고를 수 있어 여기서 맞춤).
+            val today = OkcheDay.of(System.currentTimeMillis())
+            failed = runCatching { saveFoodChange(dao, pet.id, name, minOf(startedOn.toString(), today), method) }.isFailure
             busy = false
             if (failed) {
                 view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
@@ -299,7 +302,8 @@ fun FoodCheckCard(pet: Pet, day: String) {
         busy = true
         scope.launch {
             failed = runCatching { work() }.isFailure
-            busy = false
+            // 성공하면 카드가 사라지니 막아 둔 채로(새 줄이 오기 전 다른 버튼이 옛 값을 덮어쓰지 않게).
+            if (failed) busy = false
             view.announceForAccessibility(if (failed) "저장하지 못했어요. 다시 해 주세요." else announce)
         }
     }
@@ -313,7 +317,7 @@ fun FoodCheckCard(pet: Pet, day: String) {
             Text("사료 다 바꿨나요?", Modifier.semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle())
             Text("${foods.firstOrNull { it.id == change.foodId }?.name.orEmpty()} · 바꾼 지 ${dayNumber}일째", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
-        val done = @Composable { m: Modifier -> OkchePrimaryButton("다 바꿨어요", { run("사료를 다 바꿨다고 남겼어요") { foodFinished(dao, change, day) } }, m, look = ButtonLook.Outlined) }
+        val done = @Composable { m: Modifier -> OkchePrimaryButton("다 바꿨어요", { run("사료를 다 바꿨다고 남겼어요") { foodFinished(dao, change, day) } }, m, look = ButtonLook.Emphasis) }
         val notYet = @Composable { m: Modifier -> OkchePrimaryButton("아직이에요", { run(foodLaterNote(step) ?: "알겠어요") { foodNotYet(dao, change, step) } }, m, look = ButtonLook.Outlined) }
         // 큰 글자에선 버튼을 위아래로.
         if (LocalDensity.current.fontScale >= 1.3f) {
@@ -327,21 +331,34 @@ fun FoodCheckCard(pet: Pet, day: String) {
     }
 }
 
-/** 더보기 메뉴 줄: 이름(+ 쉬운 말) + ›, 52 높이. */
+/** 더보기 '사료 · 처방식' 줄: 아래 줄에 지금 먹는 사료 — 바꾸면 바로 바뀌어 저장한 게 보이게(2026-11-04 사용자). */
 @Composable
-fun MoreMenuRow(title: String, note: String? = null, onClick: () -> Unit) {
+fun FoodMenuRow(pet: Pet, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val dao = remember { OkcheDatabase.get(context).dao() }
+    val changes by remember { dao.foodChangesFlow() }.collectAsState(emptyList())
+    val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
+    val food = foodChangeAt(OkcheDay.of(System.currentTimeMillis()), pet.id, changes)?.let { c -> foodLine(c, foods.firstOrNull { it.id == c.foodId }) }
+    MoreMenuRow("사료 · 처방식", detail = food, onClick = onClick)
+}
+
+/** 더보기 메뉴 줄: 이름(+ 쉬운 말)(+ 아래 줄) + ›, 52 높이. */
+@Composable
+fun MoreMenuRow(title: String, note: String? = null, detail: String? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            buildAnnotatedString {
-                append(title)
-                note?.let { withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 0.85.em, fontWeight = FontWeight.Normal)) { append(" · $it") } }
-            },
-            Modifier.weight(1f).padding(vertical = 12.dp),
-            color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
-        )
+        Column(Modifier.weight(1f).padding(vertical = if (detail == null) 12.dp else 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                buildAnnotatedString {
+                    append(title)
+                    note?.let { withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 0.85.em, fontWeight = FontWeight.Normal)) { append(" · $it") } }
+                },
+                color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
+            )
+            detail?.let { Text(it, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal)) }
+        }
         Text("›", Modifier.clearAndSetSemantics {}, color = OkcheColor.LineStrong, style = OkcheType.Body.toTextStyle())
     }
 }

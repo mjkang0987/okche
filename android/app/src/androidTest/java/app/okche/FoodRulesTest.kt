@@ -26,6 +26,7 @@ import app.okche.ui.food.previousFoodNames
 import app.okche.ui.food.saveFoodChange
 import app.okche.ui.pet.PetForm
 import app.okche.ui.pet.registerPet
+import app.okche.ui.record.assignRecord
 import app.okche.ui.record.pickMealNow
 import app.okche.ui.record.quickRows
 import app.okche.ui.record.saveQuickRecord
@@ -114,8 +115,12 @@ class FoodRulesTest {
         setMealResult(dao, after, "all")
         val edited = dao.dayRecordsFlow("2026-10-14").first().first { it.id == after.id }
         assertEquals(new.foodId, JSONObject(edited.data).getString("foodId")) // 고쳐도 그대로
-        val noFood = saveQuickRecord(dao, row, "all", newId(), at(2026, 10, 14, 9), seoul)
+        val noFood = saveQuickRecord(dao, row, "all", null, at(2026, 10, 14, 9), seoul)
         assertFalse(JSONObject(noFood.data).has("foodId"))
+        assignRecord(dao, noFood, pet) // 누구였는지 정하면 그 아이가 그날 먹던 사료
+        val assigned = JSONObject(dao.dayRecordsFlow("2026-10-14").first().first { it.id == noFood.id }.data)
+        assertEquals(new.foodId, assigned.getString("foodId"))
+        assertEquals("all", assigned.getString("result"))
     }
 }
 

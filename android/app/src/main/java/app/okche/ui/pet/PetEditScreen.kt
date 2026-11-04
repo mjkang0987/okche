@@ -306,7 +306,7 @@ private fun LaterRows(pet: Pet, weight: String?) {
     ) {
         if (pet.memorializedAt == null) {
             Row(Modifier.clickable(role = Role.Button, onClickLabel = "사료 바꾸기") { changingFood = true }, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { LaterRow("지금 먹는 사료", food) }
+                Box(Modifier.weight(1f)) { LaterRow("지금 먹는 사료", food, merge = false) }
                 Text("›", Modifier.clearAndSetSemantics {}, color = OkcheColor.LineStrong, style = OkcheType.Body.toTextStyle())
             }
         } else {
@@ -318,9 +318,10 @@ private fun LaterRows(pet: Pet, weight: String?) {
 }
 
 @Composable
-private fun LaterRow(title: String, value: String) {
+/** [merge]가 거짓이면 감싼 눌림 줄이 글자를 함께 읽는다(TalkBack에서 두 번 멈추지 않게). */
+private fun LaterRow(title: String, value: String, merge: Boolean = true) {
     Column(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 12.dp).semantics(mergeDescendants = true) {},
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 12.dp).then(if (merge) Modifier.semantics(mergeDescendants = true) {} else Modifier),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(title, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())

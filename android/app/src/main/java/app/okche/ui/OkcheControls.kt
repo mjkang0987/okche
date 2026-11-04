@@ -462,7 +462,8 @@ internal fun okcheSwitchColors() = SwitchDefaults.colors(
 )
 
 /** 큰 버튼 모양(6-3): 남색 채움, 흰 바탕 테두리·점선 52, 남색 알약 40. 지우기처럼 되돌릴 수 없는 일은 연지색 테두리(Danger, 6-4). */
-enum class ButtonLook { Filled, Outlined, Dashed, Pill, Danger }
+/** Emphasis: 남색 테두리·굵은 남색 글자(둘 중 권하는 답 — '다 바꿨어요', 7-4a). */
+enum class ButtonLook { Filled, Outlined, Dashed, Pill, Danger, Emphasis }
 
 /** 큰 버튼: 52 높이 남색, 모서리 14, 흰 18 굵은 글자. 모양은 [look]. */
 @Composable
@@ -474,7 +475,8 @@ fun OkchePrimaryButton(
     look: ButtonLook = ButtonLook.Filled,
 ) {
     val pill = look == ButtonLook.Pill
-    val plain = look == ButtonLook.Outlined || look == ButtonLook.Dashed || look == ButtonLook.Danger
+    val emphasis = look == ButtonLook.Emphasis
+    val plain = look == ButtonLook.Outlined || look == ButtonLook.Dashed || look == ButtonLook.Danger || emphasis
     val danger = look == ButtonLook.Danger
     val shape = if (pill) CircleShape else RoundedCornerShape(OkcheRadius.RadiusMd)
     Button(
@@ -486,6 +488,7 @@ fun OkchePrimaryButton(
             when (look) {
                 ButtonLook.Outlined -> Modifier.border(1.5.dp, OkcheColor.LineStrong, shape)
                 ButtonLook.Danger -> Modifier.border(1.5.dp, OkcheColor.Yeonji, shape)
+                ButtonLook.Emphasis -> Modifier.border(1.5.dp, OkcheColor.Namsaek, shape)
                 // 버튼 바탕이 테두리를 덮지 않게 위에 그린다.
                 ButtonLook.Dashed -> Modifier.drawWithContent {
                     drawContent()
@@ -503,9 +506,9 @@ fun OkchePrimaryButton(
         shape = shape,
         colors = ButtonDefaults.buttonColors(
             containerColor = if (plain) OkcheColor.Paper else OkcheColor.Namsaek,
-            contentColor = if (danger) OkcheColor.Yeonji else if (plain) OkcheColor.Ink else OkcheColor.Paper,
+            contentColor = if (danger) OkcheColor.Yeonji else if (emphasis) OkcheColor.NamsaekDeep else if (plain) OkcheColor.Ink else OkcheColor.Paper,
             disabledContainerColor = if (plain) OkcheColor.Paper else OkcheColor.Namsaek,
-            disabledContentColor = if (danger) OkcheColor.Yeonji else if (plain) OkcheColor.Ink else OkcheColor.Paper,
+            disabledContentColor = if (danger) OkcheColor.Yeonji else if (emphasis) OkcheColor.NamsaekDeep else if (plain) OkcheColor.Ink else OkcheColor.Paper,
         ),
         contentPadding = when {
             pill -> PaddingValues(horizontal = 14.dp)
@@ -516,7 +519,7 @@ fun OkchePrimaryButton(
         val style = when (look) {
             ButtonLook.Filled -> OkcheType.Heading.toTextStyle()
             ButtonLook.Pill -> OkcheType.Label.toTextStyle(FontWeight.Bold)
-            ButtonLook.Danger -> OkcheType.Body.toTextStyle(FontWeight.Bold)
+            ButtonLook.Danger, ButtonLook.Emphasis -> OkcheType.Body.toTextStyle(FontWeight.Bold)
             else -> OkcheType.Body.toTextStyle()
         }
         Text(text, style = style, textAlign = TextAlign.Center)

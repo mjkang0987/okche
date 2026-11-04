@@ -10,7 +10,9 @@ struct FoodChangeSheet: View {
     @Query(filter: #Predicate<FoodChange> { $0.deletedAt == nil }) private var changes: [FoodChange]
     @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
     @State private var name = ""
-    @State private var startedOn: Date? = .now
+    /// 처음 값은 6시 기준 오늘(자정~6시에 바꿔도 바로 '지금 먹는 사료'가 되게).
+    @State private var startedOn: Date? = PetRegistration.date(OkcheDay.of(.now), .okcheDevice)
+    @State private var saving = false
     @State private var method = FoodChangeMethod.gradual
     @State private var nameError: String?
     @State private var guiding = false
@@ -36,7 +38,6 @@ struct FoodChangeSheet: View {
                     if !previous.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("전에 먹던 사료").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                                .accessibilityAddTraits(.isHeader)
                             // 누르면 이름 칸을 채운다.
                             OkcheChoiceChips(options: previous.map { ($0, $0) }, isOn: { $0 == name.trimmingCharacters(in: .whitespaces) },
                                              onTap: { name = $0 })
@@ -76,14 +77,18 @@ struct FoodChangeSheet: View {
     }
 
     private func save() {
+        guard !saving else { return }
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             nameError = "사료 이름을 넣어 주세요"
             AccessibilityNotification.Announcement("사료 이름을 넣어 주세요").post()
             return
         }
         do {
-            try FoodRules.save(petId: pet.id, name: name, startedOn: PetRegistration.day(startedOn ?? .now, .okcheDevice),
-                               method: method, in: context)
+            // 오늘 뒤는 안 됨 — 오늘 = 6시 기준(달력에선 자정 뒤 날짜도 고를 수 있어 여기서 맞춤).
+            let today = OkcheDay.of(.now)
+            let picked = startedOn.map { PetRegistration.day($0, .okcheDevice) } ?? today
+            try FoodRules.save(petId: pet.id, name: name, startedOn: min(picked, today), method: method, in: context)
+            saving = true
             AccessibilityNotification.Announcement("사료를 바꿨어요").post()
             dismiss()
         } catch {
@@ -109,7 +114,7 @@ struct FoodGuideSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    (Text("사료 바꾸는 법") + Text(" · \(Self.speciesName(species))").font(.subheadline).fontWeight(.medium)
+                    (Text("사료 바꾸는 법") + Text(" · \(Self.speciesName(species))").font(.system(size: 14, weight: .medium))
                         .foregroundColor(OkcheColor.inkMuted))
                         .okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink)
                         .accessibilityAddTraits(.isHeader)
@@ -246,7 +251,7 @@ struct FoodCheckCard: View {
 
     @ViewBuilder private func buttons(_ change: FoodChange, step: Int) -> some View {
         Button("다 바꿨어요") { run("사료를 다 바꿨다고 남겼어요") { try FoodRules.finished(change, today: day, in: context) } }
-            .buttonStyle(.okchePrimary(.outlined))
+            .buttonStyle(.okchePrimary(.emphasis))
         Button("아직이에요") { run(FoodRules.laterNote(step: step) ?? "알겠어요") { try FoodRules.notYet(change, step: step, in: context) } }
             .buttonStyle(.okchePrimary(.outlined))
     }

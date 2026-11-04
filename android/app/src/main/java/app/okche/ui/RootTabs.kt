@@ -50,10 +50,10 @@ import app.okche.store.setOnboardingDone
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import app.okche.ui.food.FoodChangeSheet
-import app.okche.ui.food.MoreMenuRow
+import app.okche.ui.food.FoodMenuRow
 import app.okche.ui.main.MainTab
 import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.pet.MemorialScreen
@@ -262,9 +262,9 @@ fun RootTabs() {
                 current?.takeIf { it.memorializedAt == null }?.let { pet ->
                     Column(
                         Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(horizontal = OkcheSpacing.Space4)
-                            .semantics { contentDescription = "설정 메뉴" },
+                            .semantics { isTraversalGroup = true },
                     ) {
-                        MoreMenuRow("사료 · 처방식") { foodPetId = pet.id }
+                        FoodMenuRow(pet) { foodPetId = pet.id }
                     }
                     if (foodPetId == pet.id) FoodChangeSheet(pet) { foodPetId = null }
                 }

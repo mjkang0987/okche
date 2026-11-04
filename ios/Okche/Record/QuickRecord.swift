@@ -97,6 +97,12 @@ enum QuickRecord {
         guard record.petId != petId else { return }
         record.petId = petId
         record.updatedAt = now
+        // 수라는 정한 아이가 그날 먹던 사료로(7-4a).
+        if record.kind == RecordKind.meal.rawValue {
+            var json = MealRules.json(record)
+            json["foodId"] = try FoodRules.foodId(petId: petId, day: record.day, in: context)?.uuidString.lowercased()
+            record.data = String(decoding: try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]), as: UTF8.self)
+        }
         try save(context)
     }
 

@@ -15,6 +15,7 @@ struct MedTodaySheet: View {
     @State private var picks: [String: String] = [:]
     @State private var extra = false
     @State private var failed = false
+    @State private var noPick = false
     @State private var saving = false
 
     static let statuses: [(value: String, title: String)] = [("given", "줬어요"), ("skipped", "건너뜀"), ("vomited", "먹고 토함")]
@@ -42,9 +43,10 @@ struct MedTodaySheet: View {
                     Text("'먹고 토함'은 실록에 따로 세요. 다시 먹여도 되는지는 병원에 물어보길 권해요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 }
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                if !groups.isEmpty {
-                    Button("기록하기") { save(entries) }.buttonStyle(.okchePrimary).disabled(picks.isEmpty)
+                OkcheFieldError(message: noPick ? "먹인 약을 하나 이상 골라 주세요" : failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+                // 남은 차례가 없으면 버튼도 없음(모두 기록함).
+                if entries.contains(where: { $0.record == nil }) {
+                    Button("기록하기") { save(entries) }.buttonStyle(.okchePrimary)
                 }
             }
             .padding(.horizontal, OkcheSpacing.space4)
@@ -76,27 +78,33 @@ struct MedTodaySheet: View {
             .accessibilityAddTraits(.isHeader)
             ForEach(Array(list.enumerated()), id: \.element.slot.key) { index, entry in
                 if index > 0 { OkcheColor.line.frame(height: 1) }
-                row(entry)
+                row(entry, due: due)
             }
         }
         .padding(.horizontal, 14).padding(.bottom, 6)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
-        .opacity(done ? 0.7 : 1)
     }
 
-    private func row(_ entry: MedSlots.Entry) -> some View {
+    /// 약 줄. 이미 기록한 차례는 칩만 흐리게(글자는 대비 그대로) + '08:05에 기록함' 줄.
+    private func row(_ entry: MedSlots.Entry, due: Date) -> some View {
         let med = meds.first { $0.id == entry.slot.schedule.medicationId }
         let recorded = entry.record.flatMap { MedSlots.json($0)["status"] as? String }
         return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(med?.name ?? "약").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
                 Text(MedSlots.slotDetail(entry.slot.schedule, med: med)).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                if let record = entry.record {
+                    Text("\(MedSlots.hhmm(record.occurredAt))에 기록함 · 고치기는 기록 목록에서").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                }
             }
             .accessibilityElement(children: .combine)
             OkcheChoiceChips(options: Self.statuses,
-                             selection: Binding(get: { recorded ?? picks[entry.slot.key] }, set: { picks[entry.slot.key] = $0 }))
+                             selection: Binding(get: { recorded ?? picks[entry.slot.key] }, set: { picks[entry.slot.key] = $0; noPick = false }))
                 .disabled(recorded != nil)
-                .accessibilityHint(recorded != nil ? "이미 기록했어요. 고치려면 기록 목록에서" : "")
+                .opacity(recorded != nil ? 0.7 : 1)
+                // 칩이 어느 약·몇 시 것인지(보드 legend).
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("\(MedSlots.clockText(due)) \(med?.name ?? "약")\(recorded != nil ? ", 기록함" : "")")
         }
         .padding(.vertical, 12)
     }
@@ -104,7 +112,11 @@ struct MedTodaySheet: View {
     private func save(_ entries: [MedSlots.Entry]) {
         guard !saving else { return }
         let chosen = entries.filter { $0.record == nil }.compactMap { e in picks[e.slot.key].map { (slot: e.slot, status: $0) } }
-        guard !chosen.isEmpty else { return }
+        guard !chosen.isEmpty else {
+            noPick = true
+            AccessibilityNotification.Announcement("먹인 약을 하나 이상 골라 주세요").post()
+            return
+        }
         saving = true
         do {
             onSaved(try MedSlots.record(chosen, in: context))
@@ -230,6 +242,8 @@ struct MedExtraSheet: View {
         let at = editing == nil && !timeChanged ? Date.now : occurredAt
         do {
             onSaved(try MedSlots.saveExtra(petId: pet.id, medication: med, amount: value, status: status, occurredAt: at, editing: editing, in: context))
+            // 새 기록은 부른 화면이 알리고(방금 남긴 기록), 고치기는 여기서.
+            if editing != nil { AccessibilityNotification.Announcement("고쳤어요").post() }
             dismiss()
         } catch {
             saving = false

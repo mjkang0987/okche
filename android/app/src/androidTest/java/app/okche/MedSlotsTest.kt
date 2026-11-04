@@ -7,7 +7,6 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -128,6 +127,8 @@ class MedSlotsTest {
         assertEquals(listOf(at(27, 17), at(28, 1)), remaining(listOf(late), listOf(given(late, "${late.id}|#0", at(27, 9)))))
         // 처음 먹일 때가 저장한 순간보다 조금 앞이어도(분 올림) 0번 차례는 남음.
         assertEquals(at(27, 8), remaining(listOf(row(MedFrequency.everyNHours, hours = 8, firstAt = at(27, 8), from = at(27, 8) + 30_000)), emptyList()).first())
+        // 옛 firstAt으로 다시 연 줄(추억 되돌리기)은 연 때 뒤 차례만.
+        assertEquals(listOf(at(28, 0)), remaining(listOf(row(MedFrequency.everyNHours, hours = 8, firstAt = at(13, 8), from = at(27, 20))), emptyList()))
         // 처음 정한 시간대로: 16:00, 00:00.
         val fixed = row(MedFrequency.everyNHours, hours = 8, firstAt = at(27, 8), shift = false, from = at(27, 7))
         assertEquals(listOf(at(27, 16), at(28, 0)), remaining(listOf(fixed), listOf(given(fixed, "${fixed.id}|#0", at(27, 9)))))
@@ -266,7 +267,8 @@ class RecordMedFlowTest {
         waitFor(hasContentDescription("탕약 자세히 남기기"))
         rule.onNode(hasContentDescription("탕약 자세히 남기기")).performClick()
         waitFor(hasText("다음 차례"))
-        rule.onNode(hasText("기록하기").and(hasClickAction())).assertIsNotEnabled() // 고른 게 없으면 눌리지 않음
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick() // 고른 게 없으면 안내
+        waitFor(hasText("먹인 약을 하나 이상 골라 주세요"))
         rule.onAllNodes(hasText("줬어요").and(hasClickAction()))[0].performClick()
         rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
         waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))

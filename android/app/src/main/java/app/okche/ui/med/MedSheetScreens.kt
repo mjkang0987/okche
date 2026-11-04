@@ -110,6 +110,7 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
     val picks = remember { mutableStateMapOf<String, String>() }
     var extra by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var noPick by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제 차례가 보임, 일기 탭과 같이 날 바뀜을 다룰 때 함께.
     val entries = if (schedules != null && records != null) todaySlots(schedules!!, records!!, pet.id, OkcheDay.of(System.currentTimeMillis())) else null
@@ -118,13 +119,18 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
 
     fun save() {
         val chosen = entries.orEmpty().filter { it.record == null }.mapNotNull { e -> picks[e.slot.key]?.let { e.slot to it } }
-        if (chosen.isEmpty() || busy) return
+        if (busy) return
+        if (chosen.isEmpty()) {
+            noPick = true
+            @Suppress("DEPRECATION") view.announceForAccessibility("먹인 약을 하나 이상 골라 주세요")
+            return
+        }
         busy = true
         scope.launch {
             val saved = runCatching { recordSlots(dao, chosen) }
-            busy = false
             failed = saved.isFailure
             if (failed) {
+                busy = false // 성공이면 닫힐 때까지 두 번 저장되지 않게 그대로
                 @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
             } else {
                 onSaved(saved.getOrThrow())
@@ -147,7 +153,7 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
                 val done = list.all { it.record != null }
                 val right = if (done) list.mapNotNull { it.record?.occurredAt }.maxOrNull()?.let { "${hhmm(it)}에 기록함" } else if (due == next) "다음 차례" else null
                 Column(
-                    Modifier.fillMaxWidth().alpha(if (done) 0.7f else 1f)
+                    Modifier.fillMaxWidth()
                         .background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(start = 14.dp, end = 14.dp, bottom = 6.dp),
                 ) {
                     Row(Modifier.padding(top = 10.dp).semantics(mergeDescendants = true) { heading() }, verticalAlignment = Alignment.CenterVertically) {
@@ -162,12 +168,15 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
                             Column(Modifier.semantics(mergeDescendants = true) {}) {
                                 Text(med?.name ?: "약", color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
                                 Text(slotDetail(entry.slot.schedule, med), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+                                entry.record?.let {
+                                    Text("${hhmm(it.occurredAt)}에 기록함 · 고치기는 기록 목록에서", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+                                }
                             }
-                            // 묶음 이름(legend)은 화면 읽기만 — '오후 9:00 프레드니솔론'.
+                            // 묶음 이름(legend)은 화면 읽기만 — '오후 9:00 프레드니솔론'. 이미 기록한 차례는 칩만 흐리게(글자는 대비 그대로).
                             OkcheChoiceChips(
-                                "${clockText(due)} ${med?.name ?: "약"}", medStatuses, recorded ?: picks[entry.slot.key],
-                                { picks[entry.slot.key] = it }, onDeselect = { picks.remove(entry.slot.key) }, hideLabel = true,
-                                hint = if (recorded != null) "이미 기록했어요. 고치려면 기록 목록에서" else null, enabled = recorded == null,
+                                "${clockText(due)} ${med?.name ?: "약"}${if (recorded != null) ", 기록함" else ""}", medStatuses, recorded ?: picks[entry.slot.key],
+                                { picks[entry.slot.key] = it; noPick = false }, Modifier.alpha(if (recorded != null) 0.7f else 1f),
+                                onDeselect = { picks.remove(entry.slot.key) }, hideLabel = true, enabled = recorded == null,
                             )
                         }
                     }
@@ -177,8 +186,9 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
             if (groups.isNotEmpty()) {
                 Text("'먹고 토함'은 실록에 따로 세요. 다시 먹여도 되는지는 병원에 물어보길 권해요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
-            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            if (groups.isNotEmpty()) OkchePrimaryButton("기록하기", ::save, enabled = picks.isNotEmpty())
+            if (noPick) OkcheErrorText("먹인 약을 하나 이상 골라 주세요") else if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+            // 남은 차례가 없으면 버튼도 없음(모두 기록함).
+            if (entries.orEmpty().any { it.record == null }) OkchePrimaryButton("기록하기", ::save)
         }
     }
 }
@@ -191,7 +201,9 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val scope = rememberCoroutineScope()
-    val schedules by remember { dao.medSchedulesFlow() }.collectAsState(emptyList())
+    // 둘 다 읽은 뒤에 순서를 정한다(약만 먼저 오면 엉뚱한 약이 골라짐).
+    val schedulesLoaded by remember { dao.medSchedulesFlow() }.collectAsState(null)
+    val schedules = schedulesLoaded.orEmpty()
     val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
     val records by remember { dao.medRecordsFlow() }.collectAsState(emptyList())
     val start = remember { editing?.let(::medJson) }
@@ -231,12 +243,13 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
         val at = if (editing == null && !timeChanged) System.currentTimeMillis() else occurredAt
         scope.launch {
             val saved = runCatching { saveExtraMed(dao, pet.id, med, value, status, at, editing) }
-            busy = false
             failed = saved.isFailure
             if (failed) {
+                busy = false // 성공이면 닫힐 때까지 두 번 저장되지 않게 그대로
                 @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
             } else {
-                @Suppress("DEPRECATION") view.announceForAccessibility("아뢰었사옵니다")
+                // 새 기록은 부른 화면이 알리고(방금 남긴 기록), 고치기는 여기서.
+                if (editing != null) @Suppress("DEPRECATION") view.announceForAccessibility("고쳤어요")
                 onSaved(saved.getOrThrow())
                 onClose()
             }
@@ -244,8 +257,8 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     }
 
     // 새로 남길 땐 맨 위 약(이 아이의 필요할 때만 약)을 골라 둔다(보드 MedExtra).
-    androidx.compose.runtime.LaunchedEffect(options.firstOrNull()?.first?.id) {
-        if (editing == null && picked == null) options.firstOrNull()?.let { pick(it.first) }
+    androidx.compose.runtime.LaunchedEffect(options.firstOrNull()?.first?.id, schedulesLoaded != null) {
+        if (editing == null && picked == null && schedulesLoaded != null) options.firstOrNull()?.let { pick(it.first) }
     }
     if (adding) MedFormSheet(null, listOf(pet), records, picking = true, onAdded = { pick(it) }) { adding = false }
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
@@ -258,7 +271,7 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
                 OkcheFieldLabel("어떤 약", Modifier.semantics { heading() })
                 for ((m, detail) in options) {
                     if (editing == null) SnackPickCard(m.name, detail, picked == m.id) { pick(m) }
-                    else SnackPickCard(m.name, detail, true) {} // 고정
+                    else SnackPickCard(m.name, detail, true, enabled = false) {} // 고정
                 }
                 if (editing == null) LinkText("+ 약방에 새 약 들이기") { adding = true }
                 pickError?.let { OkcheErrorText(it) }

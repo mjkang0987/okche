@@ -546,7 +546,8 @@ final class OnboardingUITests: XCTestCase {
         addHoursMedAndOpenRecord(app)
         tapBelow(app.buttons["탕약 자세히 남기기"], in: app)
         XCTAssertTrue(app.staticTexts["다음 차례"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["기록하기"].isEnabled) // 고른 게 없으면 눌리지 않음
+        app.buttons["기록하기"].tap() // 고른 게 없으면 안내
+        XCTAssertTrue(app.staticTexts["먹인 약을 하나 이상 골라 주세요"].waitForExistence(timeout: 3))
         app.buttons["줬어요"].firstMatch.tap()
         app.buttons["기록하기"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 탕약 프레드니솔론 1알'")).firstMatch.waitForExistence(timeout: 3))

@@ -47,8 +47,8 @@ enum MedSlots {
             if day > through { break }
             if let until = row.activeUntil, due >= until { break }
             let key = "\(id(row))|#\(n)"
-            // `firstAt`은 보호자가 정한 0번 차례 — 분 올림 때문에 저장한 순간(`activeFrom`)보다 조금 앞이어도 남긴다.
-            if due >= min(row.activeFrom, first) { slots.append(Slot(schedule: row, key: key, due: due, day: day)) }
+            // `firstAt`은 보호자가 정한 0번 차례 — 분 올림 때문에 저장한 순간(`activeFrom`)보다 1분 안에서 앞이면 남긴다(추억 되돌리기의 옛 `firstAt`은 거름).
+            if due >= min(row.activeFrom, max(first, row.activeFrom.addingTimeInterval(-60))) { slots.append(Slot(schedule: row, key: key, due: due, day: day)) }
             due = row.shiftOnLate ? (given[key] ?? due).addingTimeInterval(step) : first.addingTimeInterval(Double(n + 1) * step)
         }
         return slots

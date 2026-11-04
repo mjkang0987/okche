@@ -123,6 +123,7 @@ struct TodayRecordSection: View {
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }, sort: \Record.occurredAt) private var records: [Record]
     @State private var editing: DetailTarget?
     @State private var snackEditing: Record?
+    @State private var medEditing: Record?
     @ScaledMetric(relativeTo: .body) private var plainSize: CGFloat = 13.6
     @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 52
     private let titleStyle = OkcheTextStyle(family: .display, size: 18, lineHeight: 26, weight: .bold)
@@ -156,6 +157,9 @@ struct TodayRecordSection: View {
         .sheet(item: $snackEditing) { record in
             if let pet = pets.first(where: { $0.id == petId }) { SnackRecordSheet(pet: pet, editing: record) }
         }
+        .sheet(item: $medEditing) { record in
+            if let pet = pets.first(where: { $0.id == petId }) { MedExtraSheet(pet: pet, editing: record) }
+        }
     }
 
     private var title: some View {
@@ -171,6 +175,11 @@ struct TodayRecordSection: View {
         let label = "\(QuickRecord.time(record)) \(QuickRecord.name(record.kind))\(value.isEmpty ? "" : " \(value)") · 고치기"
         if record.kind == RecordKind.snack.rawValue, pets.contains(where: { $0.id == petId }) {
             Button { snackEditing = record } label: { rowContent(record, value) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+        } else if record.kind == RecordKind.med.rawValue, pets.contains(where: { $0.id == petId }) {
+            // 탕약은 기록 하나 고치기 시트(8-3b).
+            Button { medEditing = record } label: { rowContent(record, value) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)
         } else if record.kind == RecordKind.meal.rawValue {

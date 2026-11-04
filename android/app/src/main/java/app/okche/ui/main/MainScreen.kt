@@ -203,6 +203,8 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
     var editing by remember { mutableStateOf<DetailTarget?>(null) }
     var snackEditing by remember { mutableStateOf<Record?>(null) }
     snackEditing?.let { app.okche.ui.food.SnackRecordSheet(pet, it) { snackEditing = null } }
+    var medEditing by remember { mutableStateOf<Record?>(null) }
+    medEditing?.let { app.okche.ui.med.MedExtraSheet(pet, it) { medEditing = null } } // 탕약은 기록 하나 고치기 시트(8-3b)
     editing?.let { RecordDetailSheet(it, pets, onSaved = { _, _ -> }, onClose = { editing = null }) }
     val rows = records?.let { mainTodayRecords(it, pet.id, day) }
     Column(
@@ -238,6 +240,7 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
                     when (record.kind) {
                         RecordKind.meal -> onOpenSura(pet.id)
                         RecordKind.snack -> snackEditing = record
+                        RecordKind.med -> medEditing = record
                         else -> editing = DetailTarget(record.kind, editing = record)
                     }
                 }

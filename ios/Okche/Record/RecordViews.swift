@@ -12,6 +12,8 @@ struct RecordTab: View {
     @State private var justSaved: UUID?
     @State private var failed = false
     @State private var detail: DetailTarget?
+    /// 탕약 ⋯ 오늘 먹일 약 시트(지금 보는 아이).
+    @State private var medSheet: Pet?
     /// 일기 탭 안 화면 쌓기(수라 화면 — 7-3). `navigationDestination(isPresented:)`는 이 탭에서 화면을 끝없이 다시 그려 멈춰서(2026-11-04 확인) 경로로.
     @State private var path: [RecordRoute] = []
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 아이·날 조건을 넣는다.
@@ -45,7 +47,9 @@ struct RecordTab: View {
                 // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
                 let suraPet = PetTitle.current(pets, lastPetId: lastPetId).map { $0.memorializedAt == nil } ?? false
                 QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
-                    if kind == .meal { path.append(.sura(nil)) } else { detail = DetailTarget(kind: kind, petId: who) }
+                    if kind == .meal { path.append(.sura(nil)) }
+                    else if kind == .med { medSheet = pets.first { $0.id == who } }
+                    else { detail = DetailTarget(kind: kind, petId: who) }
                 }, mealMore: suraPet, med: medLine, onGive: give)
                 Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                      : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
@@ -61,6 +65,13 @@ struct RecordTab: View {
                 case .sura(let petId): SuraScreen(petId: petId)
                 case .log: RecordLogView()
                 }
+            }
+        }
+        .sheet(item: $medSheet) { pet in
+            MedTodaySheet(pet: pet) { saved in
+                guard let last = saved.last else { return }
+                justSaved = last.id
+                AccessibilityNotification.Announcement("아뢰었사옵니다").post()
             }
         }
         .sheet(item: $detail) { target in
@@ -193,13 +204,13 @@ struct QuickRecordCard: View {
                         label(row).frame(width: labelWidth, alignment: .leading)
                         HStack(spacing: 6) { buttons(row) }
                         Spacer(minLength: 0)
-                        more(row)
+                        more(row.kind)
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             label(row)
                             Spacer(minLength: 6)
-                            more(row)
+                            more(row.kind)
                         }
                         ViewThatFits(in: .horizontal) {
                             HStack(spacing: 6) { buttons(row) }
@@ -226,9 +237,9 @@ struct QuickRecordCard: View {
     }
 
     /// ⋯ 자세히 남기기(점선 44) — 자세히 시트가 있는 종류만.
-    @ViewBuilder private func more(_ row: QuickRecord.Row) -> some View {
-        if !RecordDetail.fields(row.kind).isEmpty || (row.kind == .meal && mealMore) {
-            Button { onDetail(row.kind) } label: {
+    @ViewBuilder private func more(_ kind: RecordKind) -> some View {
+        if !RecordDetail.fields(kind).isEmpty || (kind == .meal && mealMore) || kind == .med {
+            Button { onDetail(kind) } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
                     .frame(width: min(moreSize, 72), height: min(moreSize, 72)) // 큰 글자에서 지나치게 커지지 않게
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
@@ -237,11 +248,11 @@ struct QuickRecordCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(QuickRecord.name(row.kind.rawValue)) 자세히 남기기")
+            .accessibilityLabel("\(QuickRecord.name(kind.rawValue)) 자세히 남기기")
         }
     }
 
-    /// 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음). ⋯ 오늘 먹일 약 시트는 8-3b.
+    /// 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음) + ⋯ 오늘 먹일 약 시트(8-3b).
     private func medRow(_ line: MedLine) -> some View {
         let label = HStack(spacing: 4) {
             Image(systemName: "pill").font(.body).frame(minWidth: 22).accessibilityHidden(true)
@@ -255,9 +266,14 @@ struct QuickRecordCard: View {
                 label.frame(width: labelWidth, alignment: .leading)
                 medContent(line)
                 Spacer(minLength: 0)
+                more(.med)
             }
             VStack(alignment: .leading, spacing: 8) {
-                label
+                HStack {
+                    label
+                    Spacer(minLength: 6)
+                    more(.med)
+                }
                 medContent(line)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -423,6 +439,11 @@ struct EditRecordButton: View {
             // 다과는 다과 기록 시트(7-4b).
             SnackEditButton(record: record, pet: pet, color: color,
                             label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
+        } else if record.kind == RecordKind.med.rawValue, let petId = record.petId,
+                  let pet = pets.first(where: { $0.id == petId && $0.memorializedAt == nil }) {
+            // 탕약은 기록 하나 고치기 시트(8-3b — 약은 고정).
+            MedEditButton(record: record, pet: pet, color: color,
+                          label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
         } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
             RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
                 onEdit(DetailTarget(kind: kind, editing: record))
@@ -642,6 +663,19 @@ struct AssignSheet: View {
 }
 
 /// 다과 기록 연필 → 같은 다과 기록 시트(값이 채워진 채).
+private struct MedEditButton: View {
+    let record: Record
+    let pet: Pet
+    let color: Color
+    let label: String
+    @State private var editing = false
+
+    var body: some View {
+        RowIconButton(icon: "pencil", label: label, color: color) { editing = true }
+            .sheet(isPresented: $editing) { MedExtraSheet(pet: pet, editing: record) }
+    }
+}
+
 private struct SnackEditButton: View {
     let record: Record
     let pet: Pet

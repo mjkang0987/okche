@@ -47,15 +47,27 @@ enum MedSlots {
             if day > through { break }
             if let until = row.activeUntil, due >= until { break }
             let key = "\(id(row))|#\(n)"
-            if due >= row.activeFrom { slots.append(Slot(schedule: row, key: key, due: due, day: day)) }
+            // `firstAt`은 보호자가 정한 0번 차례 — 분 올림 때문에 저장한 순간(`activeFrom`)보다 1분 안에서 앞이면 남긴다(추억 되돌리기의 옛 `firstAt`은 거름).
+            if due >= min(row.activeFrom, max(first, row.activeFrom.addingTimeInterval(-60))) { slots.append(Slot(schedule: row, key: key, due: due, day: day)) }
             due = row.shiftOnLate ? (given[key] ?? due).addingTimeInterval(step) : first.addingTimeInterval(Double(n + 1) * step)
         }
         return slots
     }
 
+    /// 그날 차례 하나와 그 차례를 처리한 기록(없으면 남은 차례). 짝 없는 기록이 처리한 차례면 그 기록.
+    struct Entry {
+        let slot: Slot
+        let record: Record?
+    }
+
     /// 한 아이의 그날 남은 차례(6-2): 처리한 차례·넘김·버림을 빼고 먹일 시각 순. 시간이 지나도 남는다.
-    /// `schedules`는 그 아이의 닫힌 줄까지 모두(바꾼 날 규칙에 앞 줄이 필요), `records`는 `med` 기록(지운 것은 거름).
     static func remaining(_ schedules: [MedSchedule], records: [Record], petId: UUID, day: String) -> [Slot] {
+        today(schedules, records: records, petId: petId, day: day).filter { $0.record == nil }.map(\.slot)
+    }
+
+    /// 한 아이의 그날 모든 차례(이미 기록한 것 포함, 넘김·버림 빼고) — 오늘 먹일 약 시트(8-3b).
+    /// `schedules`는 그 아이의 닫힌 줄까지 모두(바꾼 날 규칙에 앞 줄이 필요), `records`는 `med` 기록(지운 것은 거름).
+    static func today(_ schedules: [MedSchedule], records: [Record], petId: UUID, day: String) -> [Entry] {
         let recs = records.filter { $0.deletedAt == nil && $0.kind == RecordKind.med.rawValue && $0.petId == petId && $0.slotKey != nil }
         let keyed = Dictionary(grouping: recs, by: { $0.slotKey! })
         let handled = Set(keyed.filter { $0.value.contains { handledStatuses.contains(json($0)["status"] as? String ?? "") } }.keys)
@@ -65,7 +77,7 @@ enum MedSlots {
         }
         // 필요할 때만 줄도 묶음에 넣는다(차례는 없지만 '필요할 때만 → 매일'로 바꾼 날의 바로 앞 줄이 됨).
         let mine = schedules.filter { $0.petId == petId }
-        var result: [Slot] = []
+        var result: [Entry] = []
         for series in Dictionary(grouping: mine, by: \.seriesId).values {
             // 열린 줄이 둘 이상이면(백업 병합) `activeFrom`, 같으면 `updatedAt`이 늦은 것 하나만(5장).
             let open = series.filter { $0.activeUntil == nil }
@@ -107,13 +119,22 @@ enum MedSlots {
             } else {
                 candidates = rows.flatMap { slots($0, day) }
             }
-            var left = candidates.filter { !handled.contains($0.key) }.sorted { $0.due < $1.due }
+            var entries = candidates.sorted { $0.due < $1.due }.map { slot in
+                Entry(slot: slot, record: handled.contains(slot.key)
+                      ? keyed[slot.key]?.filter { handledStatuses.contains(json($0)["status"] as? String ?? "") }.min { $0.occurredAt < $1.occurredAt }
+                      : nil)
+            }
             // 짝 없는 기록은 남은 차례를 앞에서부터 하나씩 처리한 것으로.
-            let extra = unmatched.filter { !spent.contains(ObjectIdentifier($0)) }.count
-            left.removeFirst(min(extra, left.count))
-            result += left
+            var extras = unmatched.filter { !spent.contains(ObjectIdentifier($0)) }.sorted { $0.occurredAt < $1.occurredAt }[...]
+            for i in entries.indices where entries[i].record == nil {
+                guard let r = extras.popFirst() else { break }
+                entries[i] = Entry(slot: entries[i].slot, record: r)
+            }
+            result += entries
         }
-        return result.sorted { ($0.due, $0.schedule.createdAt, id($0.schedule)) < ($1.due, $1.schedule.createdAt, id($1.schedule)) }
+        return result.sorted { a, b in
+            (a.slot.due, a.slot.schedule.createdAt, id(a.slot.schedule)) < (b.slot.due, b.slot.schedule.createdAt, id(b.slot.schedule))
+        }
     }
 
     /// 일기 탕약 줄 버튼: 같은 약은 이른 차례 하나만, 최대 3개(8-3 정한 것 ②).
@@ -134,6 +155,15 @@ enum MedSlots {
         return short.isEmpty ? med.name : short
     }
 
+    /// 'HH:mm'(기기 시간대).
+    static func hhmm(_ date: Date) -> String {
+        let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", c.hour!, c.minute!)
+    }
+
+    /// '오전 8:00'.
+    static func clockText(_ date: Date) -> String { MedSchedules.clock(hhmm(date)) }
+
     /// '오후 9시'·'오전 8시 30분'(화면 읽기).
     static func spokenTime(_ date: Date) -> String {
         let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)
@@ -144,21 +174,80 @@ enum MedSlots {
     /// 차례 기록(바로 기록·'줬어요'): `occurredAt` = 지금, `day` = 그 차례의 날, 양·단위는 그 줄.
     @discardableResult
     static func record(_ slot: Slot, status: String = "given", now: Date = .now, in context: ModelContext) throws -> Record {
-        let s = slot.schedule
-        let data = try JSONSerialization.data(withJSONObject: [
-            "amount": s.amount, "medicationId": s.medicationId.uuidString.lowercased(), "scheduleId": id(s),
-            "status": status, "unit": s.unit.rawValue,
-        ], options: [.sortedKeys])
-        let record = Record(now: now, petId: s.petId, kind: .med, occurredAt: now, day: slot.day, slotKey: slot.key,
-                            data: String(decoding: data, as: UTF8.self))
+        try record([(slot, status)], now: now, in: context)[0]
+    }
+
+    /// 여러 차례를 한 번에(오늘 먹일 약 시트 '기록하기') — 하나라도 안 되면 아무것도 안 남김.
+    @discardableResult
+    static func record(_ picks: [(slot: Slot, status: String)], now: Date = .now, in context: ModelContext) throws -> [Record] {
+        let records = try picks.map { slot, status in
+            let s = slot.schedule
+            return Record(now: now, petId: s.petId, kind: .med, occurredAt: now, day: slot.day, slotKey: slot.key,
+                          data: try data(amount: s.amount, medicationId: s.medicationId, scheduleId: s.id, status: status, unit: s.unit))
+        }
+        records.forEach { context.insert($0) }
+        try save(context)
+        return records
+    }
+
+    private static func data(amount: Double, medicationId: UUID, scheduleId: UUID?, status: String, unit: DoseUnit) throws -> String {
+        var json: [String: Any] = ["amount": amount, "medicationId": medicationId.uuidString.lowercased(), "status": status, "unit": unit.rawValue]
+        json["scheduleId"] = scheduleId?.uuidString.lowercased()
+        return String(decoding: try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]), as: UTF8.self)
+    }
+
+    /// 예정에 없던 약(`scheduleId`·`slotKey` 없음) 새로 남기기, 또는 탕약 기록 하나 고치기(약은 그대로 — 차례 기록은 차례의 날도 그대로).
+    @discardableResult
+    static func saveExtra(petId: UUID, medication: Medication, amount: Double, status: String, occurredAt: Date, editing: Record? = nil,
+                          now: Date = .now, in context: ModelContext) throws -> Record {
+        if let editing {
+            var j = json(editing)
+            j["amount"] = amount
+            j["status"] = status
+            editing.data = String(decoding: try JSONSerialization.data(withJSONObject: j, options: [.sortedKeys]), as: UTF8.self)
+            if editing.occurredAt != occurredAt {
+                if editing.slotKey == nil { editing.setOccurredAt(occurredAt, now: now) } else { editing.occurredAt = occurredAt }
+            }
+            editing.updatedAt = now
+            try save(context)
+            return editing
+        }
+        let record = Record(now: now, petId: petId, kind: .med, occurredAt: occurredAt,
+                            data: try data(amount: amount, medicationId: medication.id, scheduleId: nil, status: status, unit: medication.unit))
         context.insert(record)
+        try save(context)
+        return record
+    }
+
+    private static func save(_ context: ModelContext) throws {
         do {
             try context.save()
         } catch {
             context.rollback()
             throw error
         }
-        return record
+    }
+
+    /// 예정에 없던 약 고르기 순서(8-3): 이 아이의 필요할 때만 약 → 이 아이가 먹는 약 → 나머지(약방 순), 줄 아래 '물약 · 필요할 때만'.
+    static func extraOptions(_ meds: [Medication], schedules: [MedSchedule], pet: Pet) -> [(med: Medication, detail: String)] {
+        let open = schedules.filter { $0.petId == pet.id && $0.activeUntil == nil && $0.deletedAt == nil }
+        func rank(_ m: Medication) -> Int {
+            let mine = open.filter { $0.medicationId == m.id }
+            if mine.contains(where: { $0.frequency == .asNeeded }) { return 0 }
+            return mine.isEmpty ? 2 : 1
+        }
+        return meds.filter { $0.deletedAt == nil }.enumerated()
+            .sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }
+            .map { _, m in
+                let tag = [0: "필요할 때만", 1: "\(MedRules.withSubjectParticle(pet.name)) 먹는 약"][rank(m)]
+                return (m, ([MedRules.formTitle(m.form)] + [tag].compactMap { $0 }).joined(separator: " · "))
+            }
+    }
+
+    /// 시트 약 줄 아래 글자 '가루 · 1포 · 사료에 섞어서'.
+    static func slotDetail(_ s: MedSchedule, med: Medication?) -> String {
+        ([med.map { MedRules.formTitle($0.form) }, MedSchedules.amountText(s.amount, s.unit), MedSchedules.howToText(s.howTo)].compactMap { $0 })
+            .joined(separator: " · ")
     }
 
     /// 기록 값 글자 '프레드니솔론 1알'·'프레드니솔론 건너뜀'·'프레드니솔론 먹고 토함'(약방에서 뺀 약도 이름은 남음).

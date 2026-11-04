@@ -231,7 +231,7 @@ private fun buildRows(f: ScheduleFields, unit: DoseUnit, now: Long): List<MedSch
             everyDays = if (f.frequency == MedFrequency.everyNDays) f.everyDays.toWholeNumber() else null,
             startDate = if (f.frequency == MedFrequency.everyNDays) f.startDate.toString() else null,
             weekdays = if (f.frequency == MedFrequency.weekdays) f.weekdays.sorted() else emptyList(),
-            everyHours = if (hours) f.everyHours.toWholeNumber() else null, firstAt = if (hours) f.firstAt else null,
+            everyHours = if (hours) f.everyHours.toWholeNumber() else null, firstAt = if (hours) maxOf(f.firstAt, roundedUp(now)) else null, // 지금보다 이르면 지금(폼을 오래 열어 둬도 첫 차례가 빠지지 않게)
             shiftOnLate = f.shiftOnLate, howTo = f.howTo, reminder = f.frequency != MedFrequency.asNeeded && f.reminder,
             leadMinutes = f.leadMinutes, activeFrom = now,
         )
@@ -288,7 +288,6 @@ suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFiel
     if (f == original || s.activeUntil != null) return ChangeResult.None // 닫힌 줄은 되살리지 않음
     if (core(f) != core(original)) {
         var next = f.copy(petIds = listOf(s.petId), medicationId = s.medicationId)
-        if (next.frequency == MedFrequency.everyNHours && next.firstAt < now) next = next.copy(firstAt = roundedUp(now)) // 지금보다 이르면 지금
         val row = buildRows(next, s.unit, now).first().copy(seriesId = s.seriesId)
         dao.replaceSchedule(s.copy(activeUntil = now, updatedAt = now), row)
         return ChangeResult.NewRow

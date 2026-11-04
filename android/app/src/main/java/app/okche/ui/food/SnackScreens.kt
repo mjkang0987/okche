@@ -351,13 +351,13 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
 
 /** 다과 고르기 줄(다과 기록 시트): 라디오 + 이름 + 아래 줄, 고르면 남색 테두리·연한 남색 바탕. */
 @Composable
-internal fun SnackPickCard(name: String, detail: String, isOn: Boolean, onClick: () -> Unit) {
+internal fun SnackPickCard(name: String, detail: String, isOn: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 52.dp)
             .background(if (isOn) OkcheColor.NamsaekSoft else OkcheColor.Paper, shape)
             .border(1.5.dp, if (isOn) OkcheColor.Namsaek else OkcheColor.Line, shape)
-            .selectable(isOn, role = Role.RadioButton, onClick = onClick)
+            .selectable(isOn, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,

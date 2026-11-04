@@ -45,6 +45,12 @@ abstract class OkcheDao {
         insert(next)
     }
 
+    /** 오늘 먹일 약 시트 '기록하기': 고른 차례마다 한 줄(한 번에 — 8-3b). */
+    @Transaction
+    open suspend fun insertRecords(rows: List<Record>) {
+        rows.forEach { insert(it) }
+    }
+
     /** 약 추가: 고른 아이마다 한 줄(한 번에 — 8-2a). */
     @Transaction
     open suspend fun insertSchedules(rows: List<MedSchedule>) {

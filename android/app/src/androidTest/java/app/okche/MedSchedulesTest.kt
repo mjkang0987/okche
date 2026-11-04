@@ -276,5 +276,7 @@ class MedChangeTest {
         val original = app.okche.ui.med.scheduleFieldsOf(closed, t0)
         assertEquals(app.okche.ui.med.ChangeResult.None, app.okche.ui.med.changeSchedule(dao, closed, original, original.copy(times = listOf("10:00")), at(2026, 10, 27, 11)))
         assertEquals(1, all().size)
+        // 폼을 오래 열어 둬서 처음 먹일 때(08:00)가 저장한 때(09:00:30)보다 이르면 저장한 때(분 올림)로.
+        assertEquals(at(2026, 10, 27, 9, 1), make(MedFrequency.everyNHours, listOf(newId()), at(2026, 10, 27, 9) + 30_000)[0].firstAt)
     }
 }

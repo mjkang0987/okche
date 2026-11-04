@@ -201,6 +201,8 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
     // 처음 읽기 전(null)엔 줄도 안내도 그리지 않는다('아직 오늘 남긴 기록이 없어요'가 스치지 않게).
     val records by remember(day) { dao.dayRecordsFlow(day) }.collectAsState<List<Record>, List<Record>?>(null)
     var editing by remember { mutableStateOf<DetailTarget?>(null) }
+    var snackEditing by remember { mutableStateOf<Record?>(null) }
+    snackEditing?.let { app.okche.ui.food.SnackRecordSheet(pet, it) { snackEditing = null } }
     editing?.let { RecordDetailSheet(it, pets, onSaved = { _, _ -> }, onClose = { editing = null }) }
     val rows = records?.let { mainTodayRecords(it, pet.id, day) }
     Column(
@@ -233,7 +235,11 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
         } else if (rows != null) {
             rows.forEachIndexed { index, record ->
                 RecordRow(record) {
-                    if (record.kind == RecordKind.meal) onOpenSura(pet.id) else editing = DetailTarget(record.kind, editing = record)
+                    when (record.kind) {
+                        RecordKind.meal -> onOpenSura(pet.id)
+                        RecordKind.snack -> snackEditing = record
+                        else -> editing = DetailTarget(record.kind, editing = record)
+                    }
                 }
                 if (index < rows.lastIndex) HorizontalDivider(color = OkcheColor.Line)
             }
@@ -244,7 +250,7 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
 /** 오늘 기록 줄 52: '07:20  소피 · 소변' · 값 · 연필. 화면 읽기 이름 '07:20 소피 보통 · 고치기'. */
 @Composable
 private fun RecordRow(record: Record, onClick: () -> Unit) {
-    val value = recordValue(record)
+    val value = recordValue(record, app.okche.ui.record.rememberSnacks())
     val label = "${recordTime(record)} ${kindName(record.kind)}${if (value.isEmpty()) "" else " $value"} · 고치기"
     Row(
         Modifier

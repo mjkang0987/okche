@@ -113,6 +113,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
     }
     val today = OkcheDay.of(now)
     val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
+    var snacking by remember { mutableStateOf(false) }
     val plans by remember(petId) { petId?.let { dao.mealPlansFlow(it) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     // 끼니 칸은 차례 키로 짝지어서 6시 전에 미리 남긴 6시대 끼니(전날 day)도 찾는다. '오늘 남긴 수라'는 오늘 것만.
     val meals by remember(petId, today) { petId?.let { dao.recentMealsFlow(it, today, shiftDay(today, -1)) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
@@ -205,6 +206,8 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
                         color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                     )
                 }
+                OkchePrimaryButton("+ 다과 · 간식 남기기", { snacking = true }, look = ButtonLook.Dashed)
+                if (snacking) pet?.let { app.okche.ui.food.SnackRecordSheet(it) { snacking = false } }
                 if (mode == MealMode.direct) {
                     Text(
                         "그램은 넣고 싶을 때만 넣어도 돼요. 평소만큼 먹었는지만 남겨도 실록에서 흐름을 보여 드려요.",

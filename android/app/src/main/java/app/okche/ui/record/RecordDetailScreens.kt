@@ -198,7 +198,7 @@ private val shapeIcons = mapOf(
 private val clock = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
 
 /** '지금 · 오후 2:14', 바꾼 뒤·고치기는 '오늘 · 오후 2:14' / '10월 24일 (토) · 오후 2:14'(6시 기준 날). */
-private fun timeText(at: Long, now: Boolean, zone: ZoneId = ZoneId.systemDefault()): String {
+internal fun timeText(at: Long, now: Boolean, zone: ZoneId = ZoneId.systemDefault()): String {
     val time = Instant.ofEpochMilli(at).atZone(zone).format(clock)
     if (now) return "지금 · $time"
     val day = OkcheDay.of(at, zone)
@@ -207,7 +207,7 @@ private fun timeText(at: Long, now: Boolean, zone: ZoneId = ZoneId.systemDefault
 }
 
 /** 시간 바꾸기: 기기 날짜 고르기(오늘까지) → 시각 고르기. 지금보다 뒤면 지금으로(저장 때도 막음). */
-private fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) {
+internal fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) {
     val zone = ZoneId.systemDefault()
     val current = Instant.ofEpochMilli(at).atZone(zone).toLocalDateTime()
     DatePickerDialog(context, { _, y, m, d ->
@@ -228,7 +228,7 @@ private fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) {
 
 /** '지금 · 오후 2:14' + '시간 바꾸기' 줄. */
 @Composable
-private fun TimeRow(text: String, onChange: () -> Unit) {
+internal fun TimeRow(text: String, onChange: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()

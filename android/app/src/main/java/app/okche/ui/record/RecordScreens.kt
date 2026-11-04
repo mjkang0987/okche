@@ -295,6 +295,7 @@ private fun recordSpeech(record: Record, pets: List<Pet>) =
 /** 방금 남긴 기록: 오늘 이 기기에서 가장 늦게 남긴 기록 하나, 누른 직후에만 '아뢰었사옵니다'. 오늘 기록이 없으면 숨김. */
 @Composable
 private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onOpenLog: () -> Unit, onOpenSura: (String?) -> Unit) {
+    val snacks = rememberSnacks()
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제가 오늘로 보임, 문안 탭(7-0)에서 날 바뀜을 함께 다룬다.
     val today = remember { OkcheDay.of(System.currentTimeMillis()) }
     val latest by remember(today) { dao.latestRecordFlow(today) }.collectAsState(null)
@@ -324,7 +325,7 @@ private fun RecentRecord(dao: OkcheDao, pets: List<Pet>, justSaved: String?, onO
                 Text(
                     buildAnnotatedString {
                         withStyle(SpanStyle(color = OkcheColor.InkMuted)) { append(recordTime(record)) }
-                        append("  ${recordTitle(record, pets)} ${recordValue(record)}")
+                        append("  ${recordTitle(record, pets)} ${recordValue(record, snacks)}")
                     },
                     color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
                 )
@@ -346,6 +347,16 @@ private fun DeleteIcon(label: String, tint: androidx.compose.ui.graphics.Color, 
 /** 고치기(연필) — 자세히 시트가 있는 종류, 수라는 그 아이 수라 화면(2026-11-04 사용자 — 누군지 모르는 수라는 먼저 누구였는지 정하기). */
 @Composable
 private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.graphics.Color, onOpenSura: (String?) -> Unit, onEdit: (DetailTarget) -> Unit) {
+    // 다과는 같은 다과 기록 시트(7-4b).
+    val snackPet = record.petId?.let { id -> pets.firstOrNull { it.id == id && it.memorializedAt == null } }?.takeIf { record.kind == RecordKind.snack }
+    if (snackPet != null) {
+        var editingSnack by remember { mutableStateOf(false) }
+        if (editingSnack) app.okche.ui.food.SnackRecordSheet(snackPet, record) { editingSnack = false }
+        IconButton({ editingSnack = true }, Modifier.size(44.dp)) {
+            Icon(Icons.Outlined.Edit, "${recordTime(record)} ${recordSpeech(record, pets)} 기록 고치기", Modifier.size(22.dp), tint = tint)
+        }
+        return
+    }
     val mealPet = record.petId?.takeIf { id -> record.kind == RecordKind.meal && pets.any { it.id == id && it.memorializedAt == null } }
     if (detailFields(record.kind).isEmpty() && mealPet == null) return
     IconButton({ if (mealPet != null) onOpenSura(mealPet) else onEdit(DetailTarget(record.kind, editing = record)) }, Modifier.size(44.dp)) {
@@ -356,6 +367,7 @@ private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.
 /** 기록 지우기 확인 창(보드 DeleteConfirm): 기록 요약 칸이 안내 글보다 위. 지우면 `deletedAt`·`data` 비움. */
 @Composable
 private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, onClose: () -> Unit) {
+    val snacks = rememberSnacks()
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
@@ -375,7 +387,7 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
         destructive = true, confirmLook = ButtonLook.Danger,
     ) {
         Text(
-            "${recordTime(record)} · ${recordTitle(record, pets)} ${recordValue(record)}",
+            "${recordTime(record)} · ${recordTitle(record, pets)} ${recordValue(record, snacks)}",
             Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 14.dp, vertical = 12.dp),
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
@@ -453,6 +465,7 @@ private fun DateBar(day: String, today: String, onDay: (String) -> Unit) {
 
 @Composable
 private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssign: () -> Unit, onEdit: (DetailTarget) -> Unit, onOpenSura: (String) -> Unit) {
+    val snacks = rememberSnacks()
     val unknown = record.petId == null
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
@@ -476,7 +489,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
                     color = OkcheColor.Namsaek, style = OkcheType.Label.toTextStyle(),
                 )
             } else {
-                recordValue(record).takeIf { it.isNotEmpty() }?.let {
+                recordValue(record, snacks).takeIf { it.isNotEmpty() }?.let {
                     Text(it, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
                 }
             }
@@ -490,6 +503,7 @@ private fun LogRow(record: Record, pets: List<Pet>, onDelete: () -> Unit, onAssi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AssignSheet(dao: OkcheDao, record: Record, pets: List<Pet>, current: Pet?, onClose: () -> Unit) {
+    val snacks = rememberSnacks()
     val scope = rememberCoroutineScope()
     val choices = pets.filter { it.memorializedAt == null }
     var picked by rememberSaveable(record.id) {
@@ -511,7 +525,7 @@ private fun AssignSheet(dao: OkcheDao, record: Record, pets: List<Pet>, current:
             // '오늘 02:14 · 구토 · 사료'
             val dayText = if (record.day == OkcheDay.of(System.currentTimeMillis())) "오늘" else dayTitle(record.day, "")
             Text(
-                listOf("$dayText ${recordTime(record)}", kindName(record.kind), recordValue(record)).filter { it.isNotEmpty() }.joinToString(" · "),
+                listOf("$dayText ${recordTime(record)}", kindName(record.kind), recordValue(record, snacks)).filter { it.isNotEmpty() }.joinToString(" · "),
                 color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(),
             )
             Column(

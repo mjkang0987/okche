@@ -199,6 +199,9 @@ final class OnboardingUITests: XCTestCase {
         let app = launch()
         app.buttons["먼저 둘러볼게요"].tap()
         XCTAssertTrue(app.buttons["+ 새 아기씨 모시기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["문안"].tap()
+        XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요. 아기씨를 모시면 여기에서 날마다 안부를 여쭤요."].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "+ 새 아기씨 모시기").count, 2) // 머리 알약 + 점선 버튼
         app.tabBars.buttons["더보기"].tap()
         XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 3))
         register("콩이", in: app, from: app.buttons["+ 새 아기씨 모시기"])
@@ -344,6 +347,30 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["지금 먹은 것"].waitForExistence(timeout: 5))
         app.buttons["뒤로"].firstMatch.tap()
         XCTAssertTrue(app.buttons["전날"].waitForExistence(timeout: 3)) // 기록 목록
+    }
+
+    /// 문안: 기록 없음 안내 → '기록하기'로 일기 → 바로 기록 → 문안 오늘 기록 줄(소피 → 고치기 시트, 수라 → 수라 화면) (7-0).
+    func testMainTodayRecords() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["문안"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["문안"].tap()
+        XCTAssertTrue(app.staticTexts["콩이 아기씨, 오늘도 강녕하시옵소서"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["아직 오늘 남긴 기록이 없어요."].exists)
+        tapBelow(app.buttons["기록하기"], in: app)
+        let urine = app.buttons["소피 보통 · 바로 기록"]
+        XCTAssertTrue(urine.waitForExistence(timeout: 3)) // 일기 탭
+        urine.tap()
+        app.buttons["수라 다 먹음 · 바로 기록"].tap()
+        app.tabBars.buttons["문안"].tap()
+        let urineRow = app.buttons.matching(NSPredicate(format: "label ENDSWITH '소피 보통 · 고치기'")).firstMatch
+        tapBelow(urineRow, in: app)
+        XCTAssertTrue(app.staticTexts["콩이 · 소피"].waitForExistence(timeout: 3))
+        app.buttons["닫기"].firstMatch.tap()
+        tapBelow(app.buttons.matching(NSPredicate(format: "label ENDSWITH '수라 다 먹음 · 고치기'")).firstMatch, in: app)
+        XCTAssertTrue(app.staticTexts["지금 먹은 것"].waitForExistence(timeout: 5))
+        app.buttons["뒤로"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["콩이 아기씨, 오늘도 강녕하시옵소서"].waitForExistence(timeout: 3))
     }
 
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).

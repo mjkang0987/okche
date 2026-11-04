@@ -154,7 +154,7 @@ struct DateField: View {
             OkcheFieldLabel(title: label).accessibilityHidden(true)
             Button { picking = true } label: {
                 HStack {
-                    Text(date.map { $0.formatted(.dateTime.year().month().day()) } ?? "날짜 고르기")
+                    Text(date.map { $0.formatted(.dateTime.year().month().day()) } ?? "날짜를 골라 주세요")
                         .okcheText(OkcheType.body)
                         .foregroundStyle(date == nil ? OkcheColor.inkMuted : OkcheColor.ink)
                     Spacer(minLength: 8)

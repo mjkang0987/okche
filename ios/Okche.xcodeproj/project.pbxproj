@@ -43,6 +43,7 @@
 		790F42C0FF0254712506CDB9 /* MealRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4237F70768EE44C9E0C8879D /* MealRules.swift */; };
 		7D9121D4C6E74D20EE7FC4D3 /* PetRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AB360783EF98AB5867AB5C /* PetRegistration.swift */; };
 		84084EB3C83C2F0C0A6763E6 /* PetRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF36FD8F3503C35F8BBC51D0 /* PetRegisterView.swift */; };
+		8900F8EC917DF5EEC04483A8 /* MedSheetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD0254E2747998246139247 /* MedSheetViews.swift */; };
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
 		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
 		903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0275EB8CA7B29A763A8B16D3 /* MainCard.swift */; };
@@ -101,6 +102,7 @@
 		0D71692BC49D266CB56DE728 /* MedRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedRules.swift; sourceTree = "<group>"; };
 		13CBF10BF9810FF2FF06E5CF /* Food.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Food.swift; sourceTree = "<group>"; };
 		18DF310D00A7FD3A65417401 /* MedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedViews.swift; sourceTree = "<group>"; };
+		1AD0254E2747998246139247 /* MedSheetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedSheetViews.swift; sourceTree = "<group>"; };
 		1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabScreen.swift; sourceTree = "<group>"; };
 		22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OkcheTokens.swift; path = ../../../design/generated/OkcheTokens.swift; sourceTree = "<group>"; };
 		26D4DB5EBE50D81DD114901B /* PetEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditingTests.swift; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 			children = (
 				0D71692BC49D266CB56DE728 /* MedRules.swift */,
 				D9272A3825D3B69753AFF2C0 /* MedSchedules.swift */,
+				1AD0254E2747998246139247 /* MedSheetViews.swift */,
 				2B822C022AE27D79E8DEE12B /* MedSlots.swift */,
 				18DF310D00A7FD3A65417401 /* MedViews.swift */,
 				AD73C4745840A7FE127FDD83 /* TangyakViews.swift */,
@@ -487,6 +490,7 @@
 				790F42C0FF0254712506CDB9 /* MealRules.swift in Sources */,
 				650F987FDC0C7A0F5D0571FD /* MedRules.swift in Sources */,
 				A490AFA4074C1845E2F45C69 /* MedSchedules.swift in Sources */,
+				8900F8EC917DF5EEC04483A8 /* MedSheetViews.swift in Sources */,
 				0BFD588618B594053620D66E /* MedSlots.swift in Sources */,
 				315C1ED3734DD061FC8932B7 /* MedViews.swift in Sources */,
 				DC4FCDE9A79D8A3AE1C347B1 /* Medication.swift in Sources */,

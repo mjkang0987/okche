@@ -113,4 +113,50 @@ final class MedSlotsTests: XCTestCase {
         XCTAssertEqual(MedSlots.value(given(s, key: "x", at: at(27, 9), status: "vomited"), meds: [med]), "프레드니솔론 먹고 토함")
         XCTAssertEqual(MedSlots.spokenTime(at(27, 21)), "오후 9시")
     }
+
+    /// 8-3b: 오늘 모든 차례(기록한 것 포함)·여러 개 한 번에·예정에 없던 약·기록 고치기·고르기 순서.
+    func testTodaySheetAndExtra() throws {
+        let med = Medication(name: "프레드니솔론", category: .medicine, form: .pill, doseAmount: 1, unit: .pill, stockAmount: 10)
+        let syrup = Medication(name: "위장약 시럽", category: .medicine, form: .liquid, doseAmount: 2, unit: .ml)
+        let other = Medication(name: "유산균", category: .supplement, form: .powder, doseAmount: 1, unit: .pack)
+        [med, syrup, other].forEach { context.insert($0) }
+        let s = row(times: ["08:00", "20:00"], med: med.id, from: at(20, 9))
+        let need = row(.asNeeded, med: syrup.id, from: at(20, 9))
+        [s, need].forEach { context.insert($0) }
+        // 08:00은 줬고 20:00은 남음 — 시트에는 둘 다, 기록한 차례는 그 기록과 함께.
+        let given8 = given(s, key: key(s, "08:00"), at: at(27, 8, 5))
+        let entries = MedSlots.today([s, need], records: [given8], petId: pet, day: day)
+        XCTAssertEqual(entries.map(\.slot.due), [at(27, 8), at(27, 20)])
+        XCTAssertTrue(entries[0].record === given8)
+        XCTAssertNil(entries[1].record)
+        XCTAssertEqual(MedSlots.hhmm(at(27, 8, 5)), "08:05")
+        XCTAssertEqual(MedSlots.clockText(at(27, 20)), "오후 8:00")
+        XCTAssertEqual(MedSlots.slotDetail(s, med: med), "알약 · 1알")
+
+        // 기록하기: 고른 차례마다(건너뜀도) 한 번에.
+        let saved = try MedSlots.record([(entries[1].slot, "skipped")], now: at(27, 21), in: context)
+        XCTAssertEqual(saved.map(\.slotKey), [key(s, "20:00")])
+        XCTAssertEqual(QuickRecord.value(saved[0]), "프레드니솔론 건너뜀")
+        XCTAssertTrue(MedSlots.remaining([s, need], records: [given8] + saved, petId: pet, day: day).isEmpty)
+
+        // 예정에 없던 약: 키 없음, 약방 남은 양에서 빠짐.
+        let extra = try MedSlots.saveExtra(petId: pet, medication: med, amount: 2, status: "given", occurredAt: at(27, 12), in: context)
+        XCTAssertNil(extra.slotKey)
+        XCTAssertNil(MedSlots.json(extra)["scheduleId"])
+        XCTAssertEqual(MedRules.remaining(med, records: [extra]), 8)
+        XCTAssertTrue(MedSlots.remaining([s], records: [extra], petId: pet, day: day).count == 2) // 차례는 그대로
+
+        // 고치기: 양·상태·시간. 차례 기록은 차례의 날 그대로, 예정에 없던 약은 바뀐 시각의 날.
+        let slotRecord = try MedSlots.record(entries[1].slot, now: at(27, 21), in: context)
+        try MedSlots.saveExtra(petId: pet, medication: med, amount: 1, status: "vomited", occurredAt: at(28, 7), editing: slotRecord, in: context)
+        XCTAssertEqual([slotRecord.day, QuickRecord.value(slotRecord)], [day, "프레드니솔론 먹고 토함"])
+        try MedSlots.saveExtra(petId: pet, medication: med, amount: 2, status: "given", occurredAt: at(28, 7), editing: extra, in: context)
+        XCTAssertEqual(extra.day, "2026-10-28")
+
+        // 고르기 순서: 이 아이의 필요할 때만 → 먹는 약 → 나머지.
+        let kong = Pet(id: pet, name: "콩이", species: .cat, breed: "", furColor: "")
+        let options = MedSlots.extraOptions([other, med, syrup], schedules: [s, need], pet: kong)
+        XCTAssertEqual(options.map(\.med.name), ["위장약 시럽", "프레드니솔론", "유산균"])
+        XCTAssertEqual(options.map(\.detail), ["물약 · 필요할 때만", "알약 · 콩이가 먹는 약", "가루"])
+    }
 }

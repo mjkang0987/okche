@@ -504,10 +504,8 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
     }
 
-    /// 8-3a: 몇 시간마다 약(처음 먹일 때 = 지금) → 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴.
-    func testRecordMedGiveUndo() {
-        let app = launch()
-        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+    /// 몇 시간마다 약(처음 먹일 때 = 지금)을 하나 추가하고 일기 탭으로.
+    private func addHoursMedAndOpenRecord(_ app: XCUIApplication) {
         XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
         app.tabBars.buttons["더보기"].tap()
         tapBelow(app.buttons["탕약 · 약 알림"], in: app)
@@ -524,6 +522,13 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["뒤로"].firstMatch.tap() // 더보기 안 화면엔 탭 막대가 없음
         XCTAssertTrue(app.tabBars.buttons["일기"].waitForExistence(timeout: 3))
         app.tabBars.buttons["일기"].tap()
+    }
+
+    /// 8-3a: 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴.
+    func testRecordMedGiveUndo() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        addHoursMedAndOpenRecord(app)
         let give = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '탕약 프레드니솔론' AND label ENDSWITH '바로 기록'")).firstMatch
         XCTAssertTrue(give.waitForExistence(timeout: 3))
         give.tap()
@@ -532,6 +537,33 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["되돌리기"].tap()
         XCTAssertTrue(give.waitForExistence(timeout: 3)) // 차례가 줄에 돌아옴
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '탕약 프레드니솔론'")).firstMatch.exists)
+    }
+
+    /// 8-3b: ⋯ 오늘 먹일 약 시트 → 줬어요 → 기록하기, 예정에 없던 약 → 기록하기, 연필 → 먹고 토함으로 고치기.
+    func testMedSheetExtraEdit() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        addHoursMedAndOpenRecord(app)
+        tapBelow(app.buttons["탕약 자세히 남기기"], in: app)
+        XCTAssertTrue(app.staticTexts["다음 차례"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["기록하기"].isEnabled) // 고른 게 없으면 눌리지 않음
+        app.buttons["줬어요"].firstMatch.tap()
+        app.buttons["기록하기"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 탕약 프레드니솔론 1알'")).firstMatch.waitForExistence(timeout: 3))
+        tapBelow(app.buttons["탕약 자세히 남기기"], in: app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label ENDSWITH '에 기록함'")).firstMatch.waitForExistence(timeout: 3))
+        app.buttons["+ 예정에 없던 약 남기기"].tap()
+        XCTAssertTrue(app.staticTexts["정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요."].waitForExistence(timeout: 3))
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH '프레드니솔론'")).firstMatch.tap()
+        let saves = app.buttons.matching(identifier: "기록하기")
+        saves.element(boundBy: saves.count - 1).tap() // 위에 뜬 시트의 것
+        XCTAssertTrue(app.buttons["탕약 자세히 남기기"].waitForExistence(timeout: 3)) // 두 시트 다 닫힘
+        let edit = app.buttons.matching(NSPredicate(format: "label ENDSWITH '콩이 탕약 기록 고치기'")).firstMatch
+        tapBelow(edit, in: app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '콩이 · 탕약 기록'")).firstMatch.waitForExistence(timeout: 3))
+        app.buttons["먹고 토함"].tap()
+        app.buttons["기록하기"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '탕약 프레드니솔론 먹고 토함'")).firstMatch.waitForExistence(timeout: 3))
     }
 
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).

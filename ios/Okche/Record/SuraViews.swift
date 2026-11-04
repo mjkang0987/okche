@@ -17,6 +17,8 @@ struct SuraScreen: View {
     @State private var editing: MealMode?
     @State private var snacking = false
     @State private var savedSnack: Record?
+    /// 이번에 연 시트에서 저장했는지(저장 없이 닫으면 다시 알리지 않게).
+    @State private var snackJustSaved = false
     @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
     /// '오늘 남긴 수라' 줄을 눌러 결과를 바꿀 기록(끼니 없이 남긴 수라 고치기 — 2026-11-04 사용자).
     @State private var changing: Record?
@@ -110,8 +112,9 @@ struct SuraScreen: View {
         Button("+ 다과 · 간식 남기기") { snacking = true }.buttonStyle(.okchePrimary(.dashed))
             .sheet(isPresented: $snacking, onDismiss: {
                 // 시트가 닫힌 뒤 알려야 화면 읽기가 끊지 않는다.
-                if savedSnack != nil { AccessibilityNotification.Announcement("아뢰었사옵니다").post() }
-            }) { SnackRecordSheet(pet: pet) { savedSnack = $0 } }
+                if snackJustSaved { AccessibilityNotification.Announcement("아뢰었사옵니다").post() }
+                snackJustSaved = false
+            }) { SnackRecordSheet(pet: pet) { savedSnack = $0; snackJustSaved = true } }
         // 방금 남긴 다과 — 수라 화면엔 다과 목록이 없어 저장한 게 보이게(일기 '방금 남긴 기록'과 같은 말).
         if let savedSnack, savedSnack.deletedAt == nil, savedSnack.petId == pet.id {
             (Text("\(QuickRecord.time(savedSnack)) 다과 \(QuickRecord.value(savedSnack))  ").foregroundColor(OkcheColor.ink)

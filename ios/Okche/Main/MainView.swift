@@ -169,7 +169,7 @@ struct TodayRecordSection: View {
     @ViewBuilder private func row(_ record: Record) -> some View {
         let value = QuickRecord.value(record)
         let label = "\(QuickRecord.time(record)) \(QuickRecord.name(record.kind))\(value.isEmpty ? "" : " \(value)") · 고치기"
-        if record.kind == RecordKind.snack.rawValue {
+        if record.kind == RecordKind.snack.rawValue, pets.contains(where: { $0.id == petId }) {
             Button { snackEditing = record } label: { rowContent(record, value) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)

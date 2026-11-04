@@ -63,10 +63,14 @@ enum MedSlots {
         let given = keyed.compactMapValues { list in
             list.filter { ["given", "vomited"].contains(json($0)["status"] as? String ?? "") }.map(\.occurredAt).min()
         }
-        let mine = schedules.filter { $0.petId == petId && $0.frequency != .asNeeded }
+        // 필요할 때만 줄도 묶음에 넣는다(차례는 없지만 '필요할 때만 → 매일'로 바꾼 날의 바로 앞 줄이 됨).
+        let mine = schedules.filter { $0.petId == petId }
         var result: [Slot] = []
         for series in Dictionary(grouping: mine, by: \.seriesId).values {
-            let rows = series.sorted { $0.activeFrom < $1.activeFrom }
+            // 열린 줄이 둘 이상이면(백업 병합) `activeFrom`, 같으면 `updatedAt`이 늦은 것 하나만(5장).
+            let open = series.filter { $0.activeUntil == nil }
+            let keep = open.max { ($0.activeFrom, $0.updatedAt) < ($1.activeFrom, $1.updatedAt) }
+            let rows = series.filter { $0.activeUntil != nil || $0 === keep }.sorted { $0.activeFrom < $1.activeFrom }
             let rowById = Dictionary(rows.map { (id($0), $0) }, uniquingKeysWith: { a, _ in a })
 
             func slots(_ row: MedSchedule, _ d: String) -> [Slot] {

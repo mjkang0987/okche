@@ -68,8 +68,11 @@ fun remainingSlots(schedules: List<MedSchedule>, records: List<Record>, petId: S
     val given = keyed.mapValues { (_, list) -> list.filter { json(it).optString("status") in setOf("given", "vomited") }.minOfOrNull { it.occurredAt } }
         .filterValues { it != null }.mapValues { it.value!! }
     val result = mutableListOf<MedSlot>()
-    for (series in schedules.filter { it.petId == petId && it.frequency != MedFrequency.asNeeded }.groupBy { it.seriesId }.values) {
-        val rows = series.sortedBy { it.activeFrom }
+    // 필요할 때만 줄도 묶음에 넣는다(차례는 없지만 '필요할 때만 → 매일'로 바꾼 날의 바로 앞 줄이 됨).
+    for (series in schedules.filter { it.petId == petId }.groupBy { it.seriesId }.values) {
+        // 열린 줄이 둘 이상이면(백업 병합) `activeFrom`, 같으면 `updatedAt`이 늦은 것 하나만(5장).
+        val keep = series.filter { it.activeUntil == null }.maxWithOrNull(compareBy({ it.activeFrom }, { it.updatedAt }))
+        val rows = series.filter { it.activeUntil != null || it === keep }.sortedBy { it.activeFrom }
         val rowById = rows.associateBy { it.id }
 
         fun slots(row: MedSchedule, d: String) =

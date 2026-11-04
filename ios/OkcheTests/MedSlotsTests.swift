@@ -56,6 +56,14 @@ final class MedSlotsTests: XCTestCase {
         let a2 = row(times: ["09:00", "21:00"], series: a1, from: at(27, 8, 30), until: at(27, 10))
         let a3 = row(times: ["10:30", "22:00"], series: a1, from: at(27, 10))
         XCTAssertEqual(remaining([a3, a1, a2], [given(a1, key: key(a1, "08:00"), at: at(27, 8))]), [at(27, 22)])
+        // 필요할 때만 → 매일로 바꾼 날도 바꾼 날 규칙(k = 0, 지난 08:00도 뜸).
+        let n1 = row(.asNeeded, from: at(20, 9), until: at(27, 10))
+        let n2 = row(times: ["08:00", "20:00"], series: n1, from: at(27, 10))
+        XCTAssertEqual(remaining([n1, n2], []), [at(27, 8), at(27, 20)])
+        // 같은 주기에 열린 줄이 둘(백업 병합)이면 activeFrom이 늦은 것 하나만.
+        let o1 = row(times: ["08:00"], from: at(20, 9))
+        let o2 = row(times: ["09:00"], series: o1, from: at(21, 9))
+        XCTAssertEqual(remaining([o1, o2], []), [at(27, 9)])
         // 바꾼 다음 날은 새 줄 그대로.
         XCTAssertEqual(MedSlots.remaining([s1, s2], records: [g], petId: pet, day: "2026-10-28").map(\.due), [at(28, 9), at(28, 21)])
     }

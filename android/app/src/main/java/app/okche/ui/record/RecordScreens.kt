@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -79,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.okche.R
 import app.okche.ui.UndoToast
+import app.okche.ui.UndoToastItem
 import app.okche.ui.med.MedSlot
 import app.okche.ui.med.hasOpenSchedule
 import app.okche.ui.med.medButtons
@@ -140,21 +143,23 @@ fun RecordTab(
     val schedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
     val medRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
     val meds = rememberMeds()
-    /** 방금 누른 탕약 버튼(차례 키, 약 id, '✓ 프레드') — 약 1초 보였다가 빠짐. */
-    var checked by remember { mutableStateOf<Triple<String, String, String>?>(null) }
-    var toast by remember { mutableStateOf<String?>(null) }
+    /** 방금 누른 탕약 버튼 — 약 1초 보였다가 빠짐. */
+    var checked by remember { mutableStateOf<CheckedMed?>(null) }
+    var toast by remember { mutableStateOf<UndoToastItem?>(null) }
+    var undoFailed by remember { mutableStateOf(false) }
     var undoRecord by remember { mutableStateOf<Record?>(null) }
     // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
     val medLine = who?.let { id ->
         val all = schedules ?: return@let null
         val recs = medRecords ?: return@let null
         if (!hasOpenSchedule(all, id)) return@let null
-        val buttons = medButtons(remainingSlots(all, recs, id, OkcheDay.of(System.currentTimeMillis())).filter { it.schedule.medicationId != checked?.second })
-            .map { slot ->
-                val med = meds.firstOrNull { it.id == slot.schedule.medicationId }
-                MedLineButton(slot, medShortName(med), "탕약 ${med?.name.orEmpty()} ${spokenTime(slot.due)} · 줬어요 · 바로 기록")
+        // 약을 못 찾은 차례(아직 못 읽음)는 버튼으로 만들지 않음 — 빈 글자 버튼 방지.
+        val buttons = medButtons(remainingSlots(all, recs, id, OkcheDay.of(System.currentTimeMillis())).filter { it.schedule.medicationId != checked?.medicationId })
+            .mapNotNull { slot ->
+                val med = meds.firstOrNull { it.id == slot.schedule.medicationId } ?: return@mapNotNull null
+                MedLineButton(slot, medShortName(med), "탕약 ${med.name} ${spokenTime(slot.due)} · 줬어요 · 바로 기록")
             }
-        MedLine(checked?.let { it.first to it.third }, buttons.take(if (checked == null) 3 else 2))
+        MedLine(checked, buttons.take(if (checked == null) 3 else 2))
     }
     Box(modifier) {
     TabScreen(stringResource(R.string.record_title), Modifier.fillMaxSize(), stringResource(R.string.record_subtitle), trailing = seal) {
@@ -175,21 +180,26 @@ fun RecordTab(
             // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
             val mealMore = current != null && current.memorializedAt == null
             QuickRecordCard(mealMore, medLine, onGive = { slot ->
-                if (checked != null) return@QuickRecordCard // '✓'가 보이는 동안 두 번 누르지 않게
+                if (checked?.key == slot.key) return@QuickRecordCard // 저장 중 같은 차례를 두 번 누르지 않게
                 val med = meds.firstOrNull { it.id == slot.schedule.medicationId }
-                checked = Triple(slot.key, slot.schedule.medicationId, "✓ ${medShortName(med)}")
+                // 저장 전에 '✓'로 바꿔 같은 버튼이 다시 눌리지 않게(저장이 비동기라).
+                val mine = CheckedMed(slot.key, slot.schedule.medicationId, "✓ ${medShortName(med)}", med?.name ?: "약")
+                checked = mine
                 scope.launch {
                     runCatching { recordSlot(dao, slot) }
                         .onSuccess {
                             failed = false
+                            undoFailed = false
                             justSaved = it.id
                             undoRecord = it
-                            toast = "${med?.name ?: "약"} 줌 · ${recordTime(it)}"
+                            val text = "${mine.name} 줌 · ${recordTime(it)}"
+                            toast = UndoToastItem(text)
+                            @Suppress("DEPRECATION") view.announceForAccessibility("$text. 되돌리려면 되돌리기")
                             kotlinx.coroutines.delay(1_000)
-                            checked = null
+                            if (checked === mine) checked = null // 그새 다른 약을 눌렀으면 그 '✓'는 남김
                         }
                         .onFailure {
-                            checked = null
+                            if (checked === mine) checked = null
                             failed = true
                             @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
                         }
@@ -208,23 +218,26 @@ fun RecordTab(
             Text(if (medLine == null) "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                 else "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
-        if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+        if (undoFailed) OkcheErrorText("되돌리지 못했어요. 다시 해 주세요.") else if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
         if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
+        // 되돌리기 알림이 맨 아래 내용을 가리지 않게 그만큼 더 내려가게.
+        if (toast != null) Spacer(Modifier.height(76.dp))
     }
     // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
     UndoToast(toast, onDismiss = { toast = null }, modifier = Modifier.align(Alignment.BottomCenter), onUndo = {
-        toast = null
         val record = undoRecord ?: return@UndoToast
         scope.launch {
             runCatching { deleteRecord(dao, record) }
                 .onSuccess {
                     undoRecord = null
                     checked = null
+                    toast = null
+                    undoFailed = false
                     @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
                 }
                 .onFailure {
-                    failed = true
+                    undoFailed = true // 알림은 남겨 다시 누를 수 있게
                     @Suppress("DEPRECATION") view.announceForAccessibility("되돌리지 못했어요. 다시 해 주세요.")
                 }
         }
@@ -261,11 +274,14 @@ private fun kindIcon(kind: RecordKind): ImageVector = when (kind) {
     else -> Icons.Outlined.Restaurant
 }
 
+/** 방금 누른 탕약 차례: 차례 키, 약 id, '✓ 프레드', 약 이름(화면 읽기). */
+class CheckedMed(val key: String, val medicationId: String, val title: String, val name: String)
+
 /** 탕약 줄 버튼 하나. */
 class MedLineButton(val slot: MedSlot, val title: String, val label: String)
 
 /** 탕약 줄 내용: 방금 누른 '✓' 버튼(차례 키, 글자)과 남은 차례 버튼(같은 약 하나·최대 3). 둘 다 없으면 '오늘 줄 약을 다 줬어요'. */
-class MedLine(val checked: Pair<String, String>?, val buttons: List<MedLineButton>)
+class MedLine(val checked: CheckedMed?, val buttons: List<MedLineButton>)
 
 /** 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 수라 화면), 흰 카드 안 줄 사이 선. 큰 글자에선 이름 아래로 버튼. */
 @Composable
@@ -333,21 +349,21 @@ private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit) {
     val content = @Composable { modifier: Modifier ->
         if (line.checked == null && line.buttons.isEmpty()) {
             Box(modifier.heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
-                Text("오늘 줄 약을 다 줬어요", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(FontWeight.Normal))
+                Text("오늘 줄 약을 다 줬어요", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
         } else {
             FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), maxLines = 1) {
-                line.checked?.let { (_, title) ->
+                line.checked?.let { checked ->
                     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
                     Box(
                         Modifier.widthIn(min = 52.dp).heightIn(min = 56.dp).background(OkcheColor.Namsaek, shape)
-                            .semantics { contentDescription = "탕약 ${title.removePrefix("✓ ")} 줬어요 · 기록됨" }.padding(horizontal = 8.dp),
+                            .semantics { contentDescription = "탕약 ${checked.name} 줬어요 · 기록됨" }.padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(title, color = androidx.compose.ui.graphics.Color.White, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
+                        Text(checked.title, color = androidx.compose.ui.graphics.Color.White, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
                     }
                 }
-                for (b in line.buttons) QuickButton(b.title, b.label) { onGive(b.slot) }
+                for (b in line.buttons) QuickButton(b.title, b.label, softWrap = false) { onGive(b.slot) }
             }
         }
     }
@@ -365,7 +381,7 @@ private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit) {
 }
 
 @Composable
-private fun QuickButton(title: String, label: String, onClick: () -> Unit) {
+private fun QuickButton(title: String, label: String, softWrap: Boolean = true, onClick: () -> Unit) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Box(
         Modifier
@@ -379,7 +395,7 @@ private fun QuickButton(title: String, label: String, onClick: () -> Unit) {
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(title, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Medium), textAlign = TextAlign.Center)
+        Text(title, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Medium), textAlign = TextAlign.Center, softWrap = softWrap)
     }
 }
 

@@ -17,11 +17,12 @@ struct RecordTab: View {
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 아이·날 조건을 넣는다.
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     @Query private var meds: [Medication]
+    @State private var undoFailed = false
     @Query(filter: #Predicate<Record> { $0.kind == "med" && $0.deletedAt == nil }) private var medRecords: [Record]
     /// 방금 누른 탕약 버튼 — 약 1초 '✓ 프레드'로 보였다가 빠짐.
-    @State private var checked: (key: String, medicationId: UUID, title: String)?
+    @State private var checked: (key: String, medicationId: UUID, title: String, name: String)?
     /// 탭 바 위 '프레드니솔론 줌 · 21:02 · 되돌리기'와 되돌릴 기록.
-    @State private var toast: String?
+    @State private var toast: UndoToastItem?
     @State private var undoRecord: Record?
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
@@ -48,7 +49,7 @@ struct RecordTab: View {
                 }, mealMore: suraPet, med: medLine, onGive: give)
                 Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                      : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+                OkcheFieldError(message: undoFailed ? "되돌리지 못했어요. 다시 해 주세요." : failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -78,28 +79,29 @@ struct RecordTab: View {
     /// 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
     private var medLine: MedLine? {
         guard let who, MedSlots.hasOpen(schedules, petId: who) else { return nil }
-        let buttons = MedSlots.buttons(slots.filter { $0.schedule.medicationId != checked?.medicationId }).map { slot in
-            let med = meds.first { $0.id == slot.schedule.medicationId }
+        // 약을 못 찾은 차례는 버튼으로 만들지 않음(빈 글자 버튼 방지).
+        let buttons = MedSlots.buttons(slots.filter { $0.schedule.medicationId != checked?.medicationId }).compactMap { slot -> MedLine.Button? in
+            guard let med = meds.first(where: { $0.id == slot.schedule.medicationId }) else { return nil }
             return MedLine.Button(slot: slot, title: MedSlots.shortName(med),
-                                  label: "탕약 \(med?.name ?? "") \(MedSlots.spokenTime(slot.due)) · 줬어요 · 바로 기록")
+                                  label: "탕약 \(med.name) \(MedSlots.spokenTime(slot.due)) · 줬어요 · 바로 기록")
         }
-        return MedLine(checked: checked.map { ($0.key, $0.title) }, buttons: Array(buttons.prefix(checked == nil ? 3 : 2)))
+        return MedLine(checked: checked.map { ($0.key, $0.title, $0.name) }, buttons: Array(buttons.prefix(checked == nil ? 3 : 2)))
     }
 
     /// 탕약 버튼: 바로 `med` 기록 → 약 1초 '✓' → 빠짐, 탭 바 위 되돌리기 알림.
     private func give(_ slot: MedSlots.Slot) {
-        guard checked == nil else { return } // '✓'가 보이는 동안 두 번 누르지 않게
         let med = meds.first { $0.id == slot.schedule.medicationId }
         do {
             let saved = try MedSlots.record(slot, in: context)
             failed = false
+            undoFailed = false
             justSaved = saved.id
             undoRecord = saved
-            checked = (slot.key, slot.schedule.medicationId, "✓ \(MedSlots.shortName(med))")
-            toast = "\(med?.name ?? "약") 줌 · \(QuickRecord.time(saved))"
+            checked = (slot.key, slot.schedule.medicationId, "✓ \(MedSlots.shortName(med))", med?.name ?? "약")
+            toast = UndoToastItem(text: "\(med?.name ?? "약") 줌 · \(QuickRecord.time(saved))")
             Task {
                 try? await Task.sleep(for: .seconds(1))
-                checked = nil
+                if checked?.key == slot.key { checked = nil } // 그새 다른 약을 눌렀으면 그 '✓'는 남김
             }
         } catch {
             failed = true
@@ -114,9 +116,11 @@ struct RecordTab: View {
             try QuickRecord.delete(record, in: context)
             undoRecord = nil
             checked = nil
+            toast = nil
+            undoFailed = false
             AccessibilityNotification.Announcement("되돌렸어요").post()
         } catch {
-            failed = true
+            undoFailed = true // 알림은 남겨 다시 누를 수 있게
             AccessibilityNotification.Announcement("되돌리지 못했어요. 다시 해 주세요.").post()
         }
     }
@@ -154,7 +158,7 @@ struct MedLine {
         let title: String
         let label: String
     }
-    let checked: (key: String, title: String)?
+    let checked: (key: String, title: String, name: String)?
     let buttons: [Button]
 }
 
@@ -235,27 +239,39 @@ struct QuickRecordCard: View {
 
     /// 탕약 줄: 이름 + 버튼(자리가 모자라면 뒤 버튼은 그리지 않음 — 말줄임 없음). ⋯ 오늘 먹일 약 시트는 8-3b.
     private func medRow(_ line: MedLine) -> some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 4) {
-                Image(systemName: "pills").font(.body).frame(minWidth: 22).accessibilityHidden(true)
-                Text("탕약").okcheText(OkcheType.body, weight: .bold).fixedSize()
+        let label = HStack(spacing: 4) {
+            Image(systemName: "pill").font(.body).frame(minWidth: 22).accessibilityHidden(true)
+            Text("탕약").okcheText(OkcheType.body, weight: .bold).fixedSize()
+        }
+        .foregroundStyle(OkcheColor.namsaekDeep)
+        .accessibilityAddTraits(.isHeader)
+        // 큰 글자·좁은 폭에선 다른 줄처럼 이름 아래로 버튼.
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                label.frame(width: labelWidth, alignment: .leading)
+                medContent(line)
+                Spacer(minLength: 0)
             }
-            .foregroundStyle(OkcheColor.namsaekDeep)
-            .accessibilityAddTraits(.isHeader)
-            .frame(minWidth: labelWidth, alignment: .leading)
-            if line.checked == nil && line.buttons.isEmpty {
-                Text("오늘 줄 약을 다 줬어요").okcheText(OkcheType.body, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                    .frame(minHeight: buttonHeight)
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    ForEach((1...max(1, line.buttons.count + (line.checked == nil ? 0 : 1))).reversed(), id: \.self) { n in
-                        HStack(spacing: 6) { medButtons(line, count: n) }
-                    }
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                label
+                medContent(line)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder private func medContent(_ line: MedLine) -> some View {
+        if line.checked == nil && line.buttons.isEmpty {
+            Text("오늘 줄 약을 다 줬어요").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                .frame(minHeight: buttonHeight)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                ForEach((1...max(1, line.buttons.count + (line.checked == nil ? 0 : 1))).reversed(), id: \.self) { n in
+                    HStack(spacing: 6) { medButtons(line, count: n) }
+                }
+            }
+        }
     }
 
     @ViewBuilder private func medButtons(_ line: MedLine, count: Int) -> some View {
@@ -265,7 +281,7 @@ struct QuickRecordCard: View {
                 .padding(.horizontal, 8)
                 .frame(minWidth: 52, minHeight: buttonHeight)
                 .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                .accessibilityLabel("탕약 \(checked.title.dropFirst(2)) 줬어요 · 기록됨")
+                .accessibilityLabel("탕약 \(checked.name) 줬어요 · 기록됨")
         }
         ForEach(Array(line.buttons.prefix(count - (line.checked == nil ? 0 : 1))), id: \.slot.key) { b in
             Button { onGive(b.slot) } label: {

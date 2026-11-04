@@ -96,6 +96,14 @@ class MedSlotsTest {
         val a2 = row(times = listOf("09:00", "21:00"), series = a1, from = at(27, 8, 30), until = at(27, 10))
         val a3 = row(times = listOf("10:30", "22:00"), series = a1, from = at(27, 10))
         assertEquals(listOf(at(27, 22)), remaining(listOf(a3, a1, a2), listOf(given(a1, key(a1, "08:00"), at(27, 8)))))
+        // 필요할 때만 → 매일로 바꾼 날도 바꾼 날 규칙(k = 0, 지난 08:00도 뜸).
+        val n1 = row(MedFrequency.asNeeded, from = at(20, 9), until = at(27, 10))
+        val n2 = row(times = listOf("08:00", "20:00"), series = n1, from = at(27, 10))
+        assertEquals(listOf(at(27, 8), at(27, 20)), remaining(listOf(n1, n2), emptyList()))
+        // 같은 주기에 열린 줄이 둘(백업 병합)이면 activeFrom이 늦은 것 하나만.
+        val o1 = row(times = listOf("08:00"), from = at(20, 9))
+        val o2 = row(times = listOf("09:00"), series = o1, from = at(21, 9))
+        assertEquals(listOf(at(27, 9)), remaining(listOf(o1, o2), emptyList()))
         // 바꾼 다음 날은 새 줄 그대로.
         assertEquals(listOf(at(28, 9), at(28, 21)), remainingSlots(listOf(s1, s2), listOf(g), pet, "2026-10-28").map { it.due })
     }

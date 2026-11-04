@@ -25,23 +25,45 @@ struct UndoToast: View {
     }
 }
 
+/// 알림 하나: 같은 글자가 다시 와도 새 알림으로(읽기·시간 다시).
+struct UndoToastItem: Equatable {
+    let id = UUID()
+    let text: String
+}
+
 extension View {
-    /// 화면 아래(탭 바 위)에 되돌리기 알림. `message`가 nil이면 숨김, 5초 뒤 저절로 닫힘(화면 읽기가 켜져 있으면 더 길게).
-    func undoToast(_ message: Binding<String?>, onUndo: @escaping () -> Void) -> some View {
-        overlay(alignment: .bottom) {
-            if let text = message.wrappedValue {
-                UndoToast(message: text) {
-                    message.wrappedValue = nil
-                    onUndo()
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .task(id: text) {
-                    AccessibilityNotification.Announcement("\(text). 되돌리려면 되돌리기").post()
-                    try? await Task.sleep(for: .seconds(UIAccessibility.isVoiceOverRunning ? 10 : 5))
-                    if !Task.isCancelled, message.wrappedValue == text { message.wrappedValue = nil }
+    /// 화면 아래(탭 바 위)에 되돌리기 알림 — 내용을 가리지 않게 그만큼 아래 여백을 늘린다. `item`이 nil이면 숨김.
+    /// 5초 뒤 저절로 닫히고, VoiceOver·스위치 제어가 켜져 있으면 닫지 않는다(되돌리기에 닿을 시간 — WCAG 2.2.1). 닫는 건 부르는 쪽(`onUndo` 성공 때).
+    func undoToast(_ item: Binding<UndoToastItem?>, onUndo: @escaping () -> Void) -> some View {
+        modifier(UndoToastHost(item: item, onUndo: onUndo))
+    }
+}
+
+private struct UndoToastHost: ViewModifier {
+    @Binding var item: UndoToastItem?
+    let onUndo: () -> Void
+    /// 탭을 다녀와 다시 보일 때 같은 알림을 또 읽지 않게.
+    @State private var announced: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let current = item {
+                    UndoToast(message: current.text, onUndo: onUndo)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task(id: current.id) {
+                            if announced != current.id {
+                                announced = current.id
+                                var speech = AttributedString("\(current.text). 되돌리려면 되돌리기")
+                                speech.accessibilitySpeechAnnouncementPriority = .high // 누른 버튼이 바뀌며 옮기는 초점 읽기에 묻히지 않게
+                                AccessibilityNotification.Announcement(speech).post()
+                            }
+                            guard !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning else { return }
+                            try? await Task.sleep(for: .seconds(5))
+                            if !Task.isCancelled, item?.id == current.id { item = nil }
+                        }
                 }
             }
-        }
-        .animation(.easeOut(duration: 0.2), value: message.wrappedValue)
+            .animation(.easeOut(duration: 0.2), value: item)
     }
 }

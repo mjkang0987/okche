@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -34,24 +36,29 @@ import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheType
 import kotlinx.coroutines.delay
 
+/** 알림 하나: 같은 글자가 다시 와도 새 알림으로(시간 다시). */
+data class UndoToastItem(val text: String, val id: String = app.okche.store.newId())
+
 /**
- * 탭 바 위 되돌리기 알림(보드 `RecordMedGiven`, 2026-11-04 승인): 남색 띠에 글자 + 금색 '되돌리기'.
- * 5초 뒤 사라지고(화면 읽기가 켜져 있으면 10초) 화면 읽기로도 알린다. 9단계 인슐린 건너뜀 알림도 이걸 쓴다. [message]가 null이면 숨김.
+ * 탭 바 위 되돌리기 알림(보드 `RecordMedGiven`, 2026-11-04 승인): 남색 띠에 글자 + 금색 '되돌리기'. 9단계 인슐린 건너뜀 알림도 이걸 쓴다. [item]이 null이면 숨김.
+ * 화면 읽기 알림은 부르는 쪽이 만들 때 한 번(탭을 다녀와도 다시 읽지 않게). 시스템 권장 시간(기본 5초) 뒤 [onDismiss], 터치 탐색 중이면 닫지 않는다(WCAG 2.2.1).
+ * 닫는 건 부르는 쪽 — 되돌리기는 성공했을 때 닫는다. 알림 아래 화면은 눌리지 않는다.
  */
 @Composable
-fun UndoToast(message: String?, onDismiss: () -> Unit, onUndo: () -> Unit, modifier: Modifier = Modifier) {
+fun UndoToast(item: UndoToastItem?, onDismiss: () -> Unit, onUndo: () -> Unit, modifier: Modifier = Modifier) {
     val view = LocalView.current
     // 사라지는 동안에도 글자가 남게 마지막 글자를 쥔다.
-    var shown by remember { mutableStateOf(message) }
-    if (message != null) shown = message
-    LaunchedEffect(message) {
-        if (message == null) return@LaunchedEffect
-        @Suppress("DEPRECATION") view.announceForAccessibility("$message. 되돌리려면 되돌리기")
+    var shown by remember { mutableStateOf(item?.text) }
+    if (item != null) shown = item.text
+    LaunchedEffect(item?.id) {
+        if (item == null) return@LaunchedEffect
         val am = view.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
-        delay(if (am?.isTouchExplorationEnabled == true) 10_000 else 5_000)
+        if (am?.isTouchExplorationEnabled == true) return@LaunchedEffect
+        val flags = android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT or android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS
+        delay((am?.getRecommendedTimeoutMillis(5_000, flags) ?: 5_000).toLong())
         onDismiss()
     }
-    AnimatedVisibility(message != null, modifier, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
+    AnimatedVisibility(item != null, modifier, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
         val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
         Row(
             Modifier
@@ -60,6 +67,7 @@ fun UndoToast(message: String?, onDismiss: () -> Unit, onUndo: () -> Unit, modif
                 .heightIn(min = 52.dp)
                 .shadow(8.dp, shape, ambientColor = OkcheColor.NamsaekDeep, spotColor = OkcheColor.NamsaekDeep)
                 .background(OkcheColor.NamsaekDeep, shape)
+                .pointerInput(Unit) { detectTapGestures { } } // 글자·여백을 눌러도 아래 화면이 눌리지 않게
                 .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -69,7 +77,7 @@ fun UndoToast(message: String?, onDismiss: () -> Unit, onUndo: () -> Unit, modif
                 Modifier
                     .heightIn(min = 44.dp)
                     .clip(RoundedCornerShape(OkcheRadius.RadiusMd))
-                    .clickable(role = Role.Button, onClick = onUndo)
+                    .clickable(role = Role.Button) { if (item != null) onUndo() } // 사라지는 동안은 눌리지 않게
                     .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {

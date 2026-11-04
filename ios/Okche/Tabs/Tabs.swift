@@ -31,6 +31,7 @@ struct MoreTab: View {
                     case .snacks: SnackListView()
                     case .tangyak: TangyakView()
                     case .medAdd: MedAddView()
+                    case .medEdit(let id): MedAddView(scheduleId: id)
                     case .yakbang: YakbangView()
                     }
                 }
@@ -39,7 +40,7 @@ struct MoreTab: View {
 }
 
 /// 더보기 안 화면.
-enum MoreRoute: Hashable { case snacks, tangyak, medAdd, yakbang }
+enum MoreRoute: Hashable { case snacks, tangyak, medAdd, medEdit(UUID), yakbang }
 
 /// 더보기 메뉴(보드 `More`): 흰 칸 안 52 줄, 이름 + 쉬운 말 + ›. 사료 · 처방식은 지금 보는 아이의 사료 바꾸기 시트.
 private struct MoreMenu: View {

@@ -214,6 +214,13 @@ fun scheduleErrors(f: ScheduleFields): Map<String, String> {
 
 /** 저장: 고른 아이마다 한 줄(같은 설정·같은 `activeFrom`, `seriesId` = 자기 `id`). 같은 약이 이미 열려 있어도 막지 않음. */
 suspend fun addSchedules(dao: OkcheDao, f: ScheduleFields, unit: DoseUnit, now: Long = System.currentTimeMillis()): List<MedSchedule> {
+    val rows = buildRows(f, unit, now)
+    dao.insertSchedules(rows)
+    return rows
+}
+
+/** 고른 아이마다 새 줄(넣지는 않음). */
+private fun buildRows(f: ScheduleFields, unit: DoseUnit, now: Long): List<MedSchedule> {
     val medId = f.medicationId ?: return emptyList()
     val hours = f.frequency == MedFrequency.everyNHours
     val rows = f.petIds.map { petId ->
@@ -229,8 +236,70 @@ suspend fun addSchedules(dao: OkcheDao, f: ScheduleFields, unit: DoseUnit, now: 
             leadMinutes = f.leadMinutes, activeFrom = now,
         )
     }
-    dao.insertSchedules(rows)
     return rows
+}
+
+// 고치기·그만 먹이기(8-2b)
+
+/** 고치기 처음 값: 그 줄의 지금 값. '처음 먹일 때'는 미리 채운 값. */
+fun scheduleFieldsOf(s: MedSchedule, firstAt: Long) = ScheduleFields(
+    petIds = listOf(s.petId), medicationId = s.medicationId, dose = medNumber(s.amount), frequency = s.frequency,
+    // 며칠마다가 아니던 줄을 며칠마다로 바꾸면 시작하는 날은 6시 기준 오늘(약 추가와 같음).
+    everyDays = (s.everyDays ?: 2).toString(), startDate = runCatching { LocalDate.parse(s.startDate ?: app.okche.store.OkcheDay.of(System.currentTimeMillis())) }.getOrElse { LocalDate.now() },
+    weekdays = s.weekdays.sorted(), times = s.times.sorted().ifEmpty { listOf("08:00") }, everyHours = (s.everyHours ?: 8).toString(),
+    firstAt = firstAt, shiftOnLate = s.shiftOnLate, reminder = s.reminder, leadMinutes = s.leadMinutes, howTo = s.howTo ?: HowTo.plain,
+)
+
+/**
+ * '처음 먹일 때' 미리 채우는 값(6-1): 새 줄이 '준 시각부터'이거나 옛 줄이 시간 주기면 마지막 준 기록 + 새 간격(없으면 옛 줄 다음 차례),
+ * '처음 정한 시간대로'면 옛 `firstAt` + m × 새 간격 중 지금 이후 첫 시각. 지금보다 이르면 지금(분 올림).
+ */
+fun firstAtPrefill(old: MedSchedule, everyHours: Int, shiftOnLate: Boolean, series: List<MedSchedule>, records: List<Record>, now: Long = System.currentTimeMillis()): Long {
+    val step = maxOf(everyHours, 1) * 3_600_000L
+    val value = if (shiftOnLate || old.frequency != MedFrequency.everyNHours) {
+        val ids = series.filter { it.seriesId == old.seriesId }.map { it.id }.toSet()
+        val last = records.filter { r ->
+            val json = runCatching { org.json.JSONObject(r.data) }.getOrNull() ?: return@filter false
+            r.kind == app.okche.store.RecordKind.med && r.deletedAt == null && json.optString("scheduleId") in ids && json.optString("status") in setOf("given", "vomited")
+        }.maxOfOrNull { it.occurredAt }
+        last?.plus(step) ?: nextDue(old, now)
+    } else {
+        old.firstAt?.let { first -> if (first >= now) first else first + ceil((now - first).toDouble() / step).toLong() * step }
+    }
+    return if (value == null || value < now) roundedUp(now) else value
+}
+
+/** 줄의 셈에 드는 칸(바뀌면 새 줄 — 5장). 주기마다 쓰는 칸만. */
+private fun core(f: ScheduleFields): List<Any?> {
+    val times = f.times.distinct().sorted()
+    return listOf(f.frequency, f.dose.toDecimal()) + when (f.frequency) {
+        MedFrequency.daily -> listOf(times)
+        MedFrequency.everyNDays -> listOf(times, f.everyDays.toWholeNumber(), f.startDate.toString())
+        MedFrequency.weekdays -> listOf(times, f.weekdays.sorted())
+        MedFrequency.everyNHours -> listOf(f.everyHours.toWholeNumber(), f.firstAt, f.shiftOnLate)
+        MedFrequency.asNeeded -> emptyList()
+    }
+}
+
+enum class ChangeResult { None, SameRow, NewRow }
+
+/** 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로. */
+suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFields, f: ScheduleFields, now: Long = System.currentTimeMillis()): ChangeResult {
+    if (f == original || s.activeUntil != null) return ChangeResult.None // 닫힌 줄은 되살리지 않음
+    if (core(f) != core(original)) {
+        var next = f.copy(petIds = listOf(s.petId), medicationId = s.medicationId)
+        if (next.frequency == MedFrequency.everyNHours && next.firstAt < now) next = next.copy(firstAt = roundedUp(now)) // 지금보다 이르면 지금
+        val row = buildRows(next, s.unit, now).first().copy(seriesId = s.seriesId)
+        dao.replaceSchedule(s.copy(activeUntil = now, updatedAt = now), row)
+        return ChangeResult.NewRow
+    }
+    dao.update(s.copy(reminder = f.frequency != MedFrequency.asNeeded && f.reminder, leadMinutes = f.leadMinutes, howTo = f.howTo, updatedAt = now))
+    return ChangeResult.SameRow
+}
+
+/** 이 약 그만 먹이기: 그 줄만 닫음(다른 아이가 먹는 같은 약·약방은 그대로). */
+suspend fun stopSchedule(dao: OkcheDao, s: MedSchedule, now: Long = System.currentTimeMillis()) {
+    if (s.activeUntil == null) dao.update(s.copy(activeUntil = now, updatedAt = now)) // 이미 그만 먹인 때를 덮지 않음
 }
 
 /** 알림 스위치(바로 저장 — 그 줄을 고침, 5장). */

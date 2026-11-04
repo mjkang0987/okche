@@ -88,14 +88,23 @@ struct TangyakCard: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// 이름 부분을 누르면 고치기(화면 읽기 '프레드니솔론 · 콩이 · 이틀에 한 번 · 1알 · 고치기').
     private func title(_ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(med.name).okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink)
-            Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+        NavigationLink(value: MoreRoute.medEdit(schedule.id)) {
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(med.name).okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink)
+                    Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                }
+                .multilineTextAlignment(.leading)
+                Image(systemName: "chevron.right").font(.body).foregroundStyle(OkcheColor.lineStrong).accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .frame(minHeight: 44)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(med.name) · \(detail) · 고치기")
+        .accessibilityAddTraits(.isHeader) // 카드 사이를 제목으로 옮겨 다니게(안드로이드와 같음)
     }
 
     @ViewBuilder private var reminderToggle: some View {
@@ -155,7 +164,14 @@ struct TangyakCard: View {
 /// 약 추가(보드 `MedAdd`·`MedAddWeekday`·`MedAddHours`·`MedAddAsNeeded`): 누가 먹나요(여럿), 약방에서 고르기, 한 번에 얼마나,
 /// 얼마나 자주 5가지(주기마다 칸), 알림, 먹이는 방법, '저장하기' — 고른 아이마다 한 줄.
 struct MedAddView: View {
+    /// 있으면 약 고치기(보드 `MedChange`) — 아이·약은 고정, '이 약 그만 먹이기'(8-2b).
+    var scheduleId: UUID?
     @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
+    /// 고치기 처음 값(바꾼 게 없으면 저장 안 함).
+    @State private var original: MedSchedules.Form?
+    @State private var firstAtTouched = false
+    @State private var stopping = false
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
     @Query private var meds: [Medication]
@@ -177,21 +193,38 @@ struct MedAddView: View {
     @State private var pickedUnit: DoseUnit?
     private var unit: DoseUnit { pickedUnit ?? meds.first { $0.id == form.medicationId }?.unit ?? .pill }
 
+    /// 고칠 줄 — 닫힌 줄은 start()에서 거름(여기서 거르면 그만 먹이고 닫히는 동안 약 추가 화면으로 깜빡임).
+    private var editing: MedSchedule? { scheduleId.flatMap { id in schedules.first { $0.id == id } } }
+
     var body: some View {
         VStack(spacing: 0) {
-            FormHeader(title: "탕약", note: "약 추가", icon: "chevron.left", iconLabel: "탕약으로 돌아가기") { dismiss() }
+            FormHeader(title: "탕약", note: scheduleId == nil ? "약 추가" : "약 고치기", icon: "chevron.left", iconLabel: "탕약으로 돌아가기") { dismiss() }
             ScrollViewReader { scroller in ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    who.id(MedSchedules.Field.pets)
-                    medPicker.id(MedSchedules.Field.med)
+                    if let editing {
+                        fixedWho(editing)
+                    } else {
+                        who.id(MedSchedules.Field.pets)
+                        medPicker.id(MedSchedules.Field.med)
+                    }
                     OkcheTextField(label: "한 번에 얼마나", text: field(\.dose, .dose), unit: MedRules.unitTitle(unit), keyboard: .decimalPad,
                                    error: errors[.dose])
                         .frame(maxWidth: 160, alignment: .leading)
                         .id(MedSchedules.Field.dose)
                     frequency
                     OkcheMenuPicker(label: "먹이는 방법", note: "(선택)", options: MedSchedules.howTos, selection: $form.howTo, inline: false)
+                    if scheduleId != nil { note("횟수·시간·양을 바꾸면 지금부터 새로 세요. 지난 기록은 그대로예요.") }
                     OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                    Button("저장하기") { save(scroller) }.buttonStyle(.okchePrimary)
+                    VStack(spacing: 4) {
+                        Button("저장하기") { save(scroller) }.buttonStyle(.okchePrimary)
+                        if scheduleId != nil {
+                            Button { stopping = true } label: {
+                                Text("이 약 그만 먹이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, 8).padding(.bottom, OkcheSpacing.space6)
@@ -201,6 +234,17 @@ struct MedAddView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear(perform: start)
+        // 고치기에서 '처음 먹일 때'를 손대지 않았으면 간격·늦게 줬을 때를 바꿀 때 다시 채운다(6-1).
+        .onChange(of: [form.everyHours, String(form.shiftOnLate), form.frequency.rawValue]) { refillFirstAt() }
+        .fullScreenCover(isPresented: $stopping) {
+            if let editing, let med = meds.first(where: { $0.id == editing.medicationId }) {
+                OkcheConfirmDialog(title: "\(PetTitle.withObjectParticle(med.name)) 그만 먹일까요?", destructive: true,
+                                   message: "\(pets.first { $0.id == editing.petId }?.name ?? "")의 탕약 줄과 알림에서 빠져요. 지난 기록과 약방의 약은 그대로 남아요.",
+                                   confirm: "그만 먹이기", confirmLook: .danger, onCancel: { stopping = false }, onConfirm: stop)
+                    .presentationBackground(.clear)
+            }
+        }
+        .transaction { $0.disablesAnimations = stopping }
         .sheet(isPresented: $adding) {
             MedFormSheet(mode: .addAndPick) { med in pick(med) }
         }
@@ -211,7 +255,7 @@ struct MedAddView: View {
             TimeSheet(time: $form.startDate, components: .date)
         }
         .sheet(isPresented: $pickingFirst) {
-            TimeSheet(time: $form.firstAt, components: [.date, .hourAndMinute])
+            TimeSheet(time: Binding(get: { form.firstAt }, set: { form.firstAt = $0; firstAtTouched = true }), components: [.date, .hourAndMinute])
         }
     }
 
@@ -354,11 +398,65 @@ struct MedAddView: View {
     private func start() {
         guard !started else { return }
         started = true
-        // 지금 보는 아이는 열 때 한 번만 읽는다 — `@AppStorage`를 두면 앞 화면과 서로 다시 그리며 멈춤(2026-11-04 확인).
+        if let scheduleId {
+            guard let editing, editing.activeUntil == nil else { return dismiss() } // 그 사이 그만 먹였으면 탕약으로
+            pickedUnit = editing.unit
+            // 미리 채우기는 그 줄의 간격·늦게 줬을 때로(폼이 아직 처음 값이라 폼 값을 쓰면 안 됨).
+            form = MedSchedules.form(editing, firstAt: MedSchedules.firstAtPrefill(editing, everyHours: editing.everyHours ?? 8,
+                                                                                  shiftOnLate: editing.shiftOnLate, series: schedules, records: records))
+            original = form
+            return
+        }
+        // 지금 보는 아이는 열 때 한 번만 읽는다(열려 있는 동안 바꿔도 고른 아이는 그대로).
         let current = PetTitle.current(pets, lastPetId: UserDefaults.standard.string(forKey: "lastPetId") ?? "")
         if let id = (current?.memorializedAt == nil ? current : alive.first)?.id { form.petIds = [id] }
         form.startDate = PetRegistration.date(OkcheDay.of(.now), .okcheDevice) ?? .now
         form.firstAt = MedSchedules.roundedUp(.now)
+    }
+
+    private func prefill(_ old: MedSchedule) -> Date {
+        MedSchedules.firstAtPrefill(old, everyHours: PetRegistration.wholeNumber(form.everyHours.trimmingCharacters(in: .whitespaces)) ?? old.everyHours ?? 8,
+                                    shiftOnLate: form.shiftOnLate, series: schedules, records: records)
+    }
+
+    private func refillFirstAt() {
+        guard let editing, let original, !firstAtTouched, form.frequency == .everyNHours else { return }
+        // 간격·늦게 줬을 때·주기가 처음과 같으면 처음 채운 값 그대로(시각이 흘러 값이 바뀌어 새 줄이 생기지 않게).
+        let same = form.everyHours == original.everyHours && form.shiftOnLate == original.shiftOnLate && form.frequency == original.frequency
+        let value = same ? original.firstAt : prefill(editing)
+        if form.firstAt != value { form.firstAt = value }
+    }
+
+    private func stop() {
+        guard let editing else { return }
+        do {
+            try MedSchedules.stop(editing, in: context)
+            stopping = false
+            dismiss()
+        } catch {
+            stopping = false
+            failed = true
+            // 창이 닫히며 화면 읽기 초점이 옮겨 가는 사이 끊기지 않게 조금 뒤에.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+            }
+        }
+    }
+
+    /// 고치기 위: '콩이 · 프레드니솔론 알약'(아이·약은 바꿀 수 없음).
+    private func fixedWho(_ s: MedSchedule) -> some View {
+        let med = meds.first { $0.id == s.medicationId }
+        return VStack(alignment: .leading, spacing: 6) {
+            OkcheFieldLabel(title: "누가 · 어떤 약").accessibilityHidden(true)
+            (Text("\(pets.first { $0.id == s.petId }?.name ?? "") · \(med?.name ?? "")")
+                + Text(med.map { "  \(MedRules.formTitle($0.form))" } ?? "").font(.system(size: 14)).fontWeight(.regular).foregroundColor(OkcheColor.inkMuted))
+                .okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 14).padding(.horizontal, 16)
+                .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                .accessibilityLabel("누가 · 어떤 약, \(pets.first { $0.id == s.petId }?.name ?? "") \(med?.name ?? "") \(med.map { MedRules.formTitle($0.form) } ?? "")")
+            note("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요.")
+        }
     }
 
     private func pick(_ med: Medication) {
@@ -408,7 +506,11 @@ struct MedAddView: View {
         }
         saving = true
         do {
-            try MedSchedules.add(form, unit: unit, in: context)
+            if let editing, let original {
+                try MedSchedules.change(editing, from: original, to: form, in: context)
+            } else {
+                try MedSchedules.add(form, unit: unit, in: context)
+            }
             dismiss()
         } catch {
             saving = false

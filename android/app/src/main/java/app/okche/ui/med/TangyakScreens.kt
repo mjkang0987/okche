@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -97,7 +98,7 @@ import java.util.Locale
 
 /** 탕약(보드 Tangyak·TangyakEmpty): 더보기 '탕약 · 약 알림'. 모든 아이의 먹고 있는 약 카드(아이마다 따로), '+ 약 추가'. '다음 탕약' 띠는 8-3, 카드 고치기는 8-2b. */
 @Composable
-fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Unit, onBack: () -> Unit) {
+fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Unit, onEdit: (String) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val view = LocalView.current
@@ -124,7 +125,7 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
                 Text("먹고 있는 약", Modifier.padding(top = 4.dp).semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
                 for ((s, pet) in cards) {
                     val med = meds.firstOrNull { it.id == s.medicationId } ?: continue
-                    TangyakCard(s, pet, med, stockText(med, schedules, records)) { on ->
+                    TangyakCard(s, pet, med, stockText(med, schedules, records), onEdit = { onEdit(s.id) }) { on ->
                         scope.launch {
                             failed = runCatching { setReminder(dao, s, on) }.isFailure
                             if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
@@ -140,16 +141,24 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
 
 /** 탕약 카드: 약 이름 + '콩이 · 이틀에 한 번 · 1알', 알림 스위치(바로 저장), 시간 알약·먹는 날 글자, 약방 줄. */
 @Composable
-private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String, onReminder: (Boolean) -> Unit) {
+private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String, onEdit: () -> Unit, onReminder: (Boolean) -> Unit) {
     Column(
         Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // 설명이 길면 글이 줄을 넘기고 스위치는 오른쪽 그대로(보드). 아주 큰 글자에선 스위치를 아래로.
+        // 이름 부분을 누르면 고치기(TalkBack '프레드니솔론 · 콩이 · 이틀에 한 번 · 1알 · 고치기').
         val title = @Composable { m: Modifier ->
-            Column(m.heightIn(min = 44.dp).semantics(mergeDescendants = true) { heading() }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(med.name, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle())
-                Text(cardDetail(s, pet.name), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+            Row(
+                m.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onEdit)
+                    .semantics { contentDescription = "${med.name} · ${cardDetail(s, pet.name)} · 고치기"; heading() },
+                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f, fill = false).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(med.name, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle())
+                    Text(cardDetail(s, pet.name), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+                }
+                androidx.compose.material3.Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = OkcheColor.LineStrong)
             }
         }
         val toggle = @Composable {
@@ -208,7 +217,11 @@ private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String
  * 얼마나 자주 5가지(주기마다 칸), 알림, 먹이는 방법, '저장하기' — 고른 아이마다 한 줄.
  */
 @Composable
-fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
+fun MedAddScreen(
+    pets: List<Pet>, current: Pet?, onBack: () -> Unit,
+    /** 있으면 약 고치기(보드 MedChange) — 아이·약은 고정, '이 약 그만 먹이기'(8-2b). [original]은 그 줄의 지금 값. */
+    editing: MedSchedule? = null, original: ScheduleFields? = null, schedules: List<MedSchedule> = emptyList(),
+) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val view = LocalView.current
@@ -220,12 +233,14 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
     // 처음 값: 지금 보는 아이(추억이면 처음 모신 살아 있는 아이), 시작하는 날 오늘(6시 기준).
     var f by remember {
         mutableStateOf(
-            ScheduleFields(
+            original ?: ScheduleFields(
                 petIds = listOfNotNull((current?.takeIf { it.memorializedAt == null } ?: alive.firstOrNull())?.id),
                 startDate = LocalDate.parse(OkcheDay.of(System.currentTimeMillis())),
             ),
         )
     }
+    var firstAtTouched by remember { mutableStateOf(false) }
+    var stopping by remember { mutableStateOf(false) }
     var errors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
@@ -233,12 +248,20 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
     val anchors = remember { app.okche.ui.pet.Anchors() }
     val listed = meds.filter { it.deletedAt == null }.sortedBy { it.createdAt }
     // 고른 약의 단위 — 고를 때 기억해 둔다(방금 들인 약이 목록에 아직 안 떠도 맞게).
-    var pickedUnit by remember { mutableStateOf<app.okche.store.DoseUnit?>(null) }
+    var pickedUnit by remember { mutableStateOf(editing?.unit) }
     // shortcut: 화면을 돌리면 적던 칸이 처음 값으로 돌아감, 불편하다는 말이 나오면 칸을 rememberSaveable로.
     val unit = pickedUnit ?: meds.firstOrNull { it.id == f.medicationId }?.unit ?: app.okche.store.DoseUnit.pill
 
     fun edit(key: String, change: ScheduleFields.() -> ScheduleFields) {
-        f = f.change()
+        if (key == "firstAt") firstAtTouched = true
+        var next = f.change()
+        // 고치기에서 '처음 먹일 때'를 손대지 않았으면 간격·늦게 줬을 때를 바꿀 때 다시 채운다(6-1).
+        // 처음과 같으면 처음 채운 값 그대로(시각이 흘러 값이 바뀌어 새 줄이 생기지 않게).
+        if (editing != null && original != null && !firstAtTouched && next.frequency == MedFrequency.everyNHours && key in setOf("everyHours", "shiftOnLate", "frequency")) {
+            val same = next.everyHours == original.everyHours && next.shiftOnLate == original.shiftOnLate && next.frequency == original.frequency
+            next = next.copy(firstAt = if (same) original.firstAt else firstAtPrefill(editing, next.everyHours.toWholeNumber() ?: editing.everyHours ?: 8, next.shiftOnLate, schedules, records))
+        }
+        f = next
         errors = errors - key
     }
 
@@ -260,27 +283,65 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
         }
         busy = true
         scope.launch {
-            failed = runCatching { addSchedules(dao, f, unit) }.isFailure
+            failed = runCatching { if (editing != null && original != null) changeSchedule(dao, editing, original, f) else addSchedules(dao, f, unit) }.isFailure
             busy = false
             if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.") else onBack()
         }
     }
 
     if (adding) MedFormSheet(null, pets, records, picking = true, onAdded = { pick(it) }) { adding = false }
+    if (stopping && editing != null) {
+        val med = meds.firstOrNull { it.id == editing.medicationId }
+        app.okche.ui.OkcheConfirmDialog(
+            "${app.okche.ui.pet.withObjectParticle(med?.name.orEmpty())} 그만 먹일까요?", "그만 먹이기",
+            onCancel = { stopping = false },
+            onConfirm = {
+                stopping = false
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        failed = runCatching { stopSchedule(dao, editing) }.isFailure
+                        busy = false
+                        if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.") else onBack()
+                    }
+                }
+            },
+            destructive = true,
+            message = "${pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()}의 탕약 줄과 알림에서 빠져요. 지난 기록과 약방의 약은 그대로 남아요.",
+            confirmLook = app.okche.ui.ButtonLook.Danger,
+        )
+    }
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
-        FormHeader("탕약", "약 추가", Icons.AutoMirrored.Outlined.ArrowBack, "탕약으로 돌아가기", onBack)
+        FormHeader("탕약", if (editing == null) "약 추가" else "약 고치기", Icons.AutoMirrored.Outlined.ArrowBack, "탕약으로 돌아가기", onBack)
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Column(anchors.of("pets"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (editing != null) {
+                // 고치기 위: '콩이 · 프레드니솔론 알약'(아이·약은 바꿀 수 없음).
+                val med = meds.firstOrNull { it.id == editing.medicationId }
+                val petName = pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OkcheFieldLabel("누가 · 어떤 약", Modifier.clearAndSetSemantics {})
+                    Text(
+                        buildAnnotatedString {
+                            append("$petName · ${med?.name.orEmpty()}")
+                            med?.let { withStyle(SpanStyle(color = OkcheColor.InkMuted, fontWeight = FontWeight.Normal, fontSize = 0.875.em)) { append("  ${medFormTitle(it.form)}") } }
+                        },
+                        Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 16.dp, vertical = 14.dp)
+                            .semantics { contentDescription = "누가 · 어떤 약, $petName ${med?.name.orEmpty()} ${med?.let { medFormTitle(it.form) }.orEmpty()}" },
+                        color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold),
+                    )
+                    Note("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요.")
+                }
+            } else Column(anchors.of("pets"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OkcheMultiChips("누가 먹나요?", alive.map { it.id to it.name }, f.petIds, { id ->
                     edit("pets") { copy(petIds = if (id in petIds) petIds - id else petIds + id) }
                 }, hint = "(여럿 고를 수 있어요)")
                 Note("여럿 고르면 아이마다 따로 만들어져요. 양·시간은 나중에 아이마다 고칠 수 있어요.")
                 errors["pets"]?.let { OkcheErrorText(it) }
             }
-            Column(anchors.of("med"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (editing == null) Column(anchors.of("med"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OkcheFieldLabel("약방에서 고르기", Modifier.semantics { heading() })
                 for (med in listed) {
                     val left = medRemaining(med, records)?.let { "남은 ${medNumber(maxOf(it, 0.0))}${unitTitle(med.unit)}" }
@@ -299,8 +360,19 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
             )
             Frequency(f, errors, anchors, ::edit)
             OkcheMenuPicker("먹이는 방법", howTos, f.howTo, { v -> edit("howTo") { copy(howTo = v) } }, inline = false, hint = "(선택)")
+            if (editing != null) Note("횟수·시간·양을 바꾸면 지금부터 새로 세요. 지난 기록은 그대로예요.")
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton("저장하기", ::save)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OkchePrimaryButton("저장하기", ::save)
+                if (editing != null) {
+                    Text(
+                        "이 약 그만 먹이기",
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, enabled = !busy) { stopping = true }.padding(vertical = 12.dp),
+                        color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }
@@ -464,4 +536,23 @@ private fun HoursPreview(lines: List<String>) {
         Text("이렇게 돌아가요", Modifier.semantics { heading() }, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle())
         for (line in lines) Text(line, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
     }
+}
+
+/** 약 고치기(보드 MedChange): 그 줄·기록을 다 읽은 뒤 약 추가 화면을 고치기로 연다. 그 사이 그만 먹였으면 탕약으로. */
+@Composable
+fun MedEditScreen(pets: List<Pet>, scheduleId: String, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val context = LocalContext.current
+    val dao = remember { OkcheDatabase.get(context).dao() }
+    val schedules by remember { dao.medSchedulesFlow() }.collectAsState<List<MedSchedule>, List<MedSchedule>?>(null)
+    val records by remember { dao.medRecordsFlow() }.collectAsState<List<app.okche.store.Record>, List<app.okche.store.Record>?>(null)
+    val all = schedules ?: return
+    val recs = records ?: return
+    val editing = remember(all.isNotEmpty()) { all.firstOrNull { it.id == scheduleId && it.activeUntil == null } }
+    if (editing == null) {
+        androidx.compose.runtime.LaunchedEffect(Unit) { onBack() }
+        return
+    }
+    val original = remember { scheduleFieldsOf(editing, firstAtPrefill(editing, editing.everyHours ?: 8, editing.shiftOnLate, all, recs)) }
+    MedAddScreen(pets, null, onBack, editing = editing, original = original, schedules = all)
 }

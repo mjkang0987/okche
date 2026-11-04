@@ -491,6 +491,17 @@ final class OnboardingUITests: XCTestCase {
         tapBelow(app.buttons["저장하기"], in: app)
         XCTAssertTrue(app.staticTexts["먹고 있는 약"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 이틀에 한 번 · 1알'")).firstMatch.exists)
+        // 카드 → 고치기(매일로) → 다시 카드 → 이 약 그만 먹이기 (8-2b)
+        app.buttons.matching(NSPredicate(format: "label ENDSWITH '· 고치기'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요."].waitForExistence(timeout: 3))
+        tapBelow(app.buttons["매일"], in: app)
+        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 하루 1번 · 1알'")).firstMatch.waitForExistence(timeout: 3))
+        app.buttons.matching(NSPredicate(format: "label ENDSWITH '· 고치기'")).firstMatch.tap()
+        tapBelow(app.buttons["이 약 그만 먹이기"], in: app)
+        XCTAssertTrue(app.staticTexts["프레드니솔론을 그만 먹일까요?"].waitForExistence(timeout: 3))
+        app.buttons["그만 먹이기"].tap()
+        XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
     }
 
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).

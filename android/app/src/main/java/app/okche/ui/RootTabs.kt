@@ -108,6 +108,7 @@ fun RootTabs() {
     var yakbangOpen by rememberSaveable { mutableStateOf(false) }
     var tangyakOpen by rememberSaveable { mutableStateOf(false) }
     var medAddOpen by rememberSaveable { mutableStateOf(false) }
+    var medEditId by rememberSaveable { mutableStateOf<String?>(null) }
     val quickState = rememberQuickRecordState()
     // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
     fun saveSetting(block: suspend () -> Unit) {
@@ -165,13 +166,17 @@ fun RootTabs() {
         PetRegisterScreen(onClose = { registering = false }, onSaved = { registering = false })
         return
     }
+    if (medEditId != null && pets != null) {
+        app.okche.ui.med.MedEditScreen(pets, medEditId!!) { medEditId = null }
+        return
+    }
     if (medAddOpen && pets != null) {
-        app.okche.ui.med.MedAddScreen(pets, current) { medAddOpen = false }
+        app.okche.ui.med.MedAddScreen(pets, current, onBack = { medAddOpen = false })
         return
     }
     if (tangyakOpen && pets != null) {
         app.okche.ui.med.TangyakScreen(pets, seal = { PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) },
-            onAdd = { medAddOpen = true }) { tangyakOpen = false }
+            onAdd = { medAddOpen = true }, onEdit = { medEditId = it }) { tangyakOpen = false }
         switchSheet()
         return
     }

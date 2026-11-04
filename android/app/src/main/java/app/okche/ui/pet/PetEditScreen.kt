@@ -481,7 +481,7 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
             }
             OkcheSwitchRow("인슐린 시간 알림", "끄면 모든 아이의 인슐린 알림이 멈춰요", f.notify, { edit { copy(notify = it) } })
             OkcheSwitchRow("밤에도 울리기", "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요", f.ringDuringQuiet, { edit { copy(ringDuringQuiet = it) } })
-            LeadPicker(f.leadMinutes) { edit { copy(leadMinutes = it) } }
+            app.okche.ui.OkcheMenuPicker("알림 보낼 때", insulinLeadChoices, f.leadMinutes, { edit { copy(leadMinutes = it) } })
             SourceNote(DIABETES_SOURCE)
             errors["save"]?.let { OkcheErrorText(it) }
             OkchePrimaryButton("저장하기", enabled = !saver.saving, onClick = { saver.save { saveInsulinSetup(dao, f) } })
@@ -489,34 +489,3 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
     }
 }
 
-/** 알림 보낼 때: 이름표 왼쪽, 고르기 칸(셀렉트) 오른쪽. 큰 글자에서 넘치면 아래로. */
-@Composable
-private fun LeadPicker(minutes: Int, onSelect: (Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val title = insulinLeadChoices.firstOrNull { it.first == minutes }?.second.orEmpty()
-    FlowRow(
-        Modifier.fillMaxWidth().padding(start = OkcheSpacing.Space4),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        itemVerticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 고르기 칸이 같은 이름을 읽으므로 보이는 글은 화면 읽기에서 뺀다(iOS와 같음).
-        Text("알림 보낼 때", Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
-        // 내용 너비(최소 150) — 보드처럼 이름 오른쪽에, 큰 글자에선 다음 줄로.
-        Box(Modifier.widthIn(min = 150.dp).width(IntrinsicSize.Max)) {
-            OkchePickerField(title, "알림 보낼 때", { open = true }, showLabel = false, icon = Icons.Outlined.KeyboardArrowDown, role = Role.DropdownList)
-            DropdownMenu(open, { open = false }, containerColor = OkcheColor.Paper) {
-                for ((value, name) in insulinLeadChoices) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(name, color = OkcheColor.Ink,
-                                style = OkcheType.Body.toTextStyle(if (value == minutes) FontWeight.Bold else FontWeight.Normal))
-                        },
-                        onClick = { onSelect(value); open = false },
-                        modifier = Modifier.semantics { selected = value == minutes },
-                    )
-                }
-            }
-        }
-    }
-}

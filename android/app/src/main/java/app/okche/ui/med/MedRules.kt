@@ -50,10 +50,11 @@ fun medRemaining(med: Medication, records: List<Record>): Double? {
     return stock - used
 }
 
-/** 약 줄 아래 글자 '알약 · 1알씩 · 남은 24알' / '… · 남은 양 안 적음'('○일분'은 8-2). */
-fun medDetail(med: Medication, records: List<Record>): String {
+/** 약 줄 아래 글자 '알약 · 1알씩 · 남은 24알 (48일분)' / '… · 남은 양 안 적음'(일분은 먹고 있는 주기가 있을 때 — 8-2). */
+fun medDetail(med: Medication, records: List<Record>, schedules: List<MedSchedule> = emptyList()): String {
     val unit = unitTitle(med.unit)
-    val left = medRemaining(med, records)?.let { "남은 ${medNumber(maxOf(it, 0.0))}$unit" } ?: "남은 양 안 적음"
+    val days = daysLeft(med, schedules, records)?.let { " (${it}일분)" }.orEmpty()
+    val left = medRemaining(med, records)?.let { "남은 ${medNumber(maxOf(it, 0.0))}$unit$days" } ?: "남은 양 안 적음"
     return "${medFormTitle(med.form)} · ${medNumber(med.doseAmount)}${unit}씩 · $left"
 }
 

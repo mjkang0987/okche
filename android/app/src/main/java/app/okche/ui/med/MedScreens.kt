@@ -73,6 +73,7 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
     // 처음 읽기 전(null)엔 고치기를 열지 않는다(남은 양 칸이 기록을 빼기 전 값으로 채워지지 않게).
     val loaded by remember { dao.medRecordsFlow() }.collectAsState<List<app.okche.store.Record>, List<app.okche.store.Record>?>(null)
     val records = loaded.orEmpty()
+    val schedules by remember { dao.medSchedulesFlow() }.collectAsState(emptyList())
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medication?>(null) }
     if (adding) MedFormSheet(null, pets, records) { adding = false }
@@ -103,7 +104,7 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
                     Text(title, Modifier.padding(top = 12.dp).semantics { heading() }, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle())
                     list.forEachIndexed { index, med ->
                         if (index > 0) HorizontalDivider(color = OkcheColor.Line)
-                        SnackRow(med.name, if (loaded == null) "" else medDetail(med, records), badge = medFormTitle(med.form)) { if (loaded != null) editing = med }
+                        SnackRow(med.name, if (loaded == null) "" else medDetail(med, records, schedules), badge = medFormTitle(med.form)) { if (loaded != null) editing = med }
                     }
                 }
             }
@@ -118,7 +119,11 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.store.Record>, onClose: () -> Unit) {
+fun MedFormSheet(
+    editing: Medication?, pets: List<Pet>, records: List<app.okche.store.Record>,
+    /** 약 추가 중 들이기(보드 MedRegSheet) — 들이면 돌아가 그 약이 골라짐. */
+    picking: Boolean = false, onAdded: (Medication) -> Unit = {}, onClose: () -> Unit,
+) {
     val context = LocalContext.current
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -153,7 +158,7 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
             view.announceForAccessibility(errors.values.first())
             return
         }
-        run { if (editing != null) updateMed(dao, editing, original, f) else addMed(dao, f) }
+        run { if (editing != null) updateMed(dao, editing, original, f) else onAdded(addMed(dao, f)) }
     }
 
     if (editing != null) {
@@ -177,7 +182,7 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
         ) {
             Row {
                 Text(
-                    if (editing == null) "약방에 약 들이기" else "약 고치기",
+                    if (editing != null) "약 고치기" else if (picking) "약방에 새 약 들이기" else "약방에 약 들이기",
                     Modifier.weight(1f).padding(top = 12.dp).semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle(),
                 )
                 IconButton(onClose) { Icon(Icons.Outlined.Close, "닫기", tint = OkcheColor.Ink) }
@@ -213,7 +218,11 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
             }
             OkcheTextField(f.memo, { v -> edit("memo") { copy(memo = v) } }, "메모", hint = "(선택)", placeholder = "예: 공복에 주면 토해요")
             Text(
-                if (editing == null) "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요." else "남은 양을 고치면 지금부터 다시 세요. 약방에서 빼도 지난 기록의 약 이름은 그대로 남아요.",
+                when {
+                    editing != null -> "남은 양을 고치면 지금부터 다시 세요. 약방에서 빼도 지난 기록의 약 이름은 그대로 남아요."
+                    picking -> "들이면 약 추가 화면으로 돌아가 이 약이 바로 골라져 있어요. 약방에도 그대로 남아요."
+                    else -> "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요."
+                },
                 color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
             )
         }
@@ -223,7 +232,7 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton(if (editing == null) "약방에 들이기" else "저장하기", ::save)
+            OkchePrimaryButton(if (editing != null) "저장하기" else if (picking) "약방에 들이고 고르기" else "약방에 들이기", ::save)
             if (editing != null) {
                 Text(
                     "약방에서 빼기",

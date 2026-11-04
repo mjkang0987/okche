@@ -1,5 +1,13 @@
 package app.okche.ui
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
@@ -445,7 +453,7 @@ fun OkcheSwitchRow(
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
             Text(title, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
-            Text(description, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+            if (description.isNotEmpty()) Text(description, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
         Switch(checked, onCheckedChange = null, colors = okcheSwitchColors())
     }
@@ -523,5 +531,44 @@ fun OkchePrimaryButton(
             else -> OkcheType.Body.toTextStyle()
         }
         Text(text, style = style, textAlign = TextAlign.Center)
+    }
+}
+
+/**
+ * 고르는 칸(셀렉트): 이름표 + 펼침 메뉴. [inline]이면 이름표 왼쪽·칸 오른쪽(최소 150, 큰 글자에선 아래로 — 인슐린·탕약 '알림 보낼 때'),
+ * 아니면 이름표 위·칸 꽉 차게(탕약 '먹이는 방법').
+ */
+@Composable
+fun <T> OkcheMenuPicker(label: String, options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, inline: Boolean = true, hint: String? = null) {
+    var open by remember { mutableStateOf(false) }
+    val title = options.firstOrNull { it.first == selected }?.second.orEmpty()
+    val field = @Composable { modifier: Modifier ->
+        Box(modifier) {
+            OkchePickerField(title, label, { open = true }, hint = hint, showLabel = !inline, icon = Icons.Outlined.KeyboardArrowDown, role = Role.DropdownList)
+            DropdownMenu(open, { open = false }, containerColor = OkcheColor.Paper) {
+                for ((value, name) in options) {
+                    DropdownMenuItem(
+                        text = { Text(name, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(if (value == selected) FontWeight.Bold else FontWeight.Normal)) },
+                        onClick = { onSelect(value); open = false },
+                        modifier = Modifier.semantics { this.selected = value == selected },
+                    )
+                }
+            }
+        }
+    }
+    if (!inline) {
+        field(Modifier.fillMaxWidth())
+        return
+    }
+    FlowRow(
+        Modifier.fillMaxWidth().padding(start = OkcheSpacing.Space4),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 고르기 칸이 같은 이름을 읽으므로 보이는 글은 화면 읽기에서 뺀다(iOS와 같음).
+        Text(label, Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
+        // 내용 너비(최소 150) — 보드처럼 이름 오른쪽에, 큰 글자에선 다음 줄로.
+        field(Modifier.widthIn(min = 150.dp).width(IntrinsicSize.Max))
     }
 }

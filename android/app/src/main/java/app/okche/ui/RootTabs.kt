@@ -106,6 +106,8 @@ fun RootTabs() {
     var foodPetId by rememberSaveable { mutableStateOf<String?>(null) }
     var snackListOpen by rememberSaveable { mutableStateOf(false) }
     var yakbangOpen by rememberSaveable { mutableStateOf(false) }
+    var tangyakOpen by rememberSaveable { mutableStateOf(false) }
+    var medAddOpen by rememberSaveable { mutableStateOf(false) }
     val quickState = rememberQuickRecordState()
     // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
     fun saveSetting(block: suspend () -> Unit) {
@@ -161,6 +163,16 @@ fun RootTabs() {
     }
     if (registering) {
         PetRegisterScreen(onClose = { registering = false }, onSaved = { registering = false })
+        return
+    }
+    if (medAddOpen && pets != null) {
+        app.okche.ui.med.MedAddScreen(pets, current) { medAddOpen = false }
+        return
+    }
+    if (tangyakOpen && pets != null) {
+        app.okche.ui.med.TangyakScreen(pets, seal = { PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) },
+            onAdd = { medAddOpen = true }) { tangyakOpen = false }
+        switchSheet()
         return
     }
     if (yakbangOpen && pets != null) {
@@ -281,7 +293,8 @@ fun RootTabs() {
                         androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
                     }
                     app.okche.ui.food.MoreMenuRow("다과", note = "간식 목록") { snackListOpen = true }
-                    // 탕약 · 약 알림은 8-2에서(보드 순서는 다과 다음 탕약, 그다음 약방).
+                    androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
+                    app.okche.ui.food.MoreMenuRow("탕약", note = "약 알림") { tangyakOpen = true }
                     androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
                     app.okche.ui.food.MoreMenuRow("약방", note = "약 목록") { yakbangOpen = true }
                 }

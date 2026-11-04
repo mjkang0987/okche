@@ -244,3 +244,33 @@ class SuraFlowTest {
         waitFor(hasContentDescription("급식기 시간 바꾸기"))
     }
 }
+
+/** 기록 목록의 수라 연필 → 수라 화면 → 뒤로 → 기록 목록으로 돌아옴(전체 리뷰). iOS testMealPencilOpensSuraAndBackToLog와 같은 흐름. */
+class MealPencilFlowTest {
+    @get:Rule val rule = createEmptyComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private var scenario: ActivityScenario<MainActivity>? = null
+
+    @After fun closeScenario() {
+        scenario?.close()
+    }
+
+    private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test fun pencilOpensSuraAndBackToLog() {
+        runBlocking {
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(OkcheDatabase.get(context).dao(), PetForm(name = "콩이"))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(hasContentDescription("수라 다 먹음 · 바로 기록"))
+        rule.onNode(hasContentDescription("수라 다 먹음 · 바로 기록")).performScrollTo().performClick()
+        waitFor(hasText("오늘 일기 전체")) // 저장이 끝나야 '방금 남긴 기록'이 생긴다
+        rule.onNode(hasText("오늘 일기 전체")).performScrollTo().performClick()
+        waitFor(hasContentDescription("콩이 수라 기록 고치기", substring = true))
+        rule.onNode(hasContentDescription("콩이 수라 기록 고치기", substring = true)).performClick()
+        waitFor(hasText("지금 먹은 것"))
+        rule.onNode(hasContentDescription("뒤로")).performClick()
+        waitFor(hasContentDescription("전날")) // 기록 목록
+    }
+}

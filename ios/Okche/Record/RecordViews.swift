@@ -45,6 +45,7 @@ struct RecordTab: View {
             .navigationDestination(for: RecordRoute.self) { route in
                 switch route {
                 case .sura(let petId): SuraScreen(petId: petId)
+                case .log: RecordLogView()
                 }
             }
         }
@@ -80,7 +81,8 @@ struct RecordTab: View {
 }
 
 /// 일기 탭 안 화면. 수라 화면은 그 아이로(없으면 지금 보는 아이) — 기록 줄 연필에서 다른 아이 수라도 연다.
-enum RecordRoute: Hashable { case sura(UUID?) }
+/// 기록 목록도 값으로 쌓는다 — 경로 쌓기와 화면을 직접 넘기는 쌓기를 섞으면 뒤로 갈 때 기록 목록이 빠질 수 있다.
+enum RecordRoute: Hashable { case sura(UUID?), log }
 
 /// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선(보드 `Record`).
 /// 큰 글자·좁은 폭에선 이름 아래로 버튼.
@@ -189,7 +191,7 @@ struct RecentRecordSection: View {
                     Text("방금 남긴 기록").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 8)
-                    NavigationLink { RecordLogView() } label: {
+                    NavigationLink(value: RecordRoute.log) {
                         Text("오늘 일기 전체").okcheText(OkcheType.label).foregroundStyle(OkcheColor.namsaek).frame(minHeight: 44)
                     }
                 }
@@ -260,7 +262,7 @@ struct EditRecordButton: View {
 
     var body: some View {
         if record.kind == RecordKind.meal.rawValue, let petId = record.petId,
-           pets.first(where: { $0.id == petId })?.memorializedAt == nil {
+           pets.contains(where: { $0.id == petId && $0.memorializedAt == nil }) {
             NavigationLink(value: RecordRoute.sura(petId)) {
                 Image(systemName: "pencil").font(.body).foregroundStyle(color)
                     .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())

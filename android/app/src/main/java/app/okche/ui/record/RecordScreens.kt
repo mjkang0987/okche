@@ -346,7 +346,7 @@ private fun DeleteIcon(label: String, tint: androidx.compose.ui.graphics.Color, 
 /** 고치기(연필) — 자세히 시트가 있는 종류, 수라는 그 아이 수라 화면(2026-11-04 사용자 — 누군지 모르는 수라는 먼저 누구였는지 정하기). */
 @Composable
 private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.graphics.Color, onOpenSura: (String?) -> Unit, onEdit: (DetailTarget) -> Unit) {
-    val mealPet = record.petId?.takeIf { id -> record.kind == RecordKind.meal && pets.firstOrNull { it.id == id }?.memorializedAt == null }
+    val mealPet = record.petId?.takeIf { id -> record.kind == RecordKind.meal && pets.any { it.id == id && it.memorializedAt == null } }
     if (detailFields(record.kind).isEmpty() && mealPet == null) return
     IconButton({ if (mealPet != null) onOpenSura(mealPet) else onEdit(DetailTarget(record.kind, editing = record)) }, Modifier.size(44.dp)) {
         Icon(Icons.Outlined.Edit, "${recordTime(record)} ${recordSpeech(record, pets)} 기록 고치기", Modifier.size(22.dp), tint = tint)

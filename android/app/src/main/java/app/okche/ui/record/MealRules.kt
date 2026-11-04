@@ -167,7 +167,7 @@ suspend fun saveMealPlan(dao: OkcheDao, petId: String, mode: MealMode, slots: Li
     val moved = if (old == null || plan == null) emptyList() else dao.petMealsWithSlot(petId).mapNotNull { record ->
         val parts = record.slotKey?.split("|")?.takeIf { it.size == 3 && it[0] == old.id.lowercase() } ?: return@mapNotNull null
         val o = mealOccurrences(plan, parts[1], zone).firstOrNull { it.slot.time == parts[2] } ?: return@mapNotNull null
-        if (o.at < now) null else record.copy(slotKey = o.key)
+        if (o.at < now) null else record.copy(slotKey = o.key, updatedAt = now)
     }
     dao.replaceMealPlan(petId, plan, now, moved)
 }

@@ -95,7 +95,7 @@ import kotlinx.coroutines.launch
  * 사료 이름·다과는 7-4. 하단 탭 없음. iOS `SuraScreen`과 같은 짜임.
  */
 @Composable
-fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
+fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, openedFor: String? = null) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val view = LocalView.current
@@ -119,7 +119,12 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { runCatching { fillFeeder(dao) } }
     // 볼 아이가 없어지면(추억으로 간직·지우기·추억 아이 고름) 빈 화면 대신 닫는다.
-    LaunchedEffect(pet, petId) { if (pet != null && petId == null) onBack() }
+    // 연필로 다른 아이 수라를 열었으면 지금 보는 아이가 그 아이로 바뀐 뒤부터 본다(바뀌기 전 추억 아이로 닫히지 않게).
+    var arrived by remember { mutableStateOf(openedFor == null) }
+    LaunchedEffect(pet, petId) {
+        if (!arrived && pet?.id == openedFor) arrived = true
+        if (arrived && pet != null && petId == null) onBack()
+    }
     var busy by remember { mutableStateOf(false) }
 
     // 저장 하나가 끝나기 전엔 다음 누름을 받지 않는다(빨리 두 번 눌러 한 차례에 기록이 둘 생기지 않게).
@@ -165,7 +170,13 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
                     for (slot in slots) {
                         MealCard(slot, now, meals.firstOrNull { it.slotKey == slot.key },
                             onPick = { result -> run { pickMeal(dao, result, slot, petId) } },
-                            onLeft = { record, grams -> run { setLeftGrams(dao, record, grams) } })
+                            // 남은 양은 바로 저장(다른 저장 중이라고 버리지 않게 `run`의 막기를 거치지 않음).
+                            onLeft = { record, grams ->
+                                runCatching { setLeftGrams(dao, record, grams) }.onFailure {
+                                    failed = true
+                                    @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+                                }
+                            })
                     }
                 } else {
                     if (dismissed != null && petId !in dismissed.orEmpty()) {
@@ -260,7 +271,7 @@ private fun PillButton(text: String, label: String, onClick: () -> Unit) {
 
 /** 끼니 칸: 이름(급식기는 시각)·준 양 + 상태, 다 먹음·남김·안 먹음(기존 고르기 카드), 남김이면 '남은 양 (g, 선택)'. */
 @Composable
-private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (String) -> Unit, onLeft: (Record, Int?) -> Unit) {
+private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (String) -> Unit, onLeft: suspend (Record, Int?) -> Unit) {
     val feeder = slot.mode == MealMode.feeder
     val waiting = feeder && slot.at > now && record == null
     val result = record?.let(::mealResult)
@@ -300,10 +311,12 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                         },
                         Modifier.weight(1f), color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(),
                     )
-                    // 치는 대로 저장하지 않고 멈춘 뒤 한 번(글자마다 따로 도는 저장이 순서가 바뀌어 앞 숫자가 남지 않게).
+                    // 글자가 바뀔 때마다 앞 저장을 취소하고 마지막 값만 저장(따로 도는 저장의 순서가 바뀌어 앞 숫자가 남지 않게).
                     LaunchedEffect(left) {
-                        if (left == leftGrams(record)?.toString().orEmpty()) return@LaunchedEffect
-                        delay(400)
+                        if (left == leftGrams(record)?.toString().orEmpty()) {
+                            error = null
+                            return@LaunchedEffect
+                        }
                         val v = left
                         val grams = v.trim().toIntOrNull()
                         when {

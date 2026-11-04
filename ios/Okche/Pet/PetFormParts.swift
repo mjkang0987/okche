@@ -367,7 +367,7 @@ struct FormHeader: View {
                     leading
                     Spacer(minLength: 0)
                 }
-                trailing.padding(.leading, 48)
+                if let trailing { trailing.padding(.leading, 4) } // 안드로이드 FlowRow 다음 줄과 같은 자리
             }
         }
         .padding(.leading, 8)

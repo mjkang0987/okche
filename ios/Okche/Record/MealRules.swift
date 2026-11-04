@@ -225,6 +225,7 @@ enum MealRules {
                   let o = occurrences(new, day: parts[1], timeZone: timeZone).first(where: { $0.slot.time == slot.time }),
                   o.at >= now else { continue }
             record.slotKey = o.key
+            record.updatedAt = now
         }
     }
 

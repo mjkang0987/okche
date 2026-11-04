@@ -92,6 +92,8 @@ fun RootTabs() {
     var switching by rememberSaveable { mutableStateOf(false) }
     var logOpen by rememberSaveable { mutableStateOf(false) }
     var suraOpen by rememberSaveable { mutableStateOf(false) }
+    /** 기록 줄 연필로 연 아이 — 지금 보는 아이가 그 아이로 바뀌기 전엔 '볼 아이 없음'으로 닫지 않게. */
+    var suraFor by rememberSaveable { mutableStateOf<String?>(null) }
     val quickState = rememberQuickRecordState()
     // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
     fun saveSetting(block: suspend () -> Unit) {
@@ -128,7 +130,7 @@ fun RootTabs() {
             onKept = {
                 // 지금 보는 아이를 먼저 바꾼 뒤 문안으로(다른 아이의 문안이 잠깐 보이지 않게).
                 scope.launch {
-                    runCatching { context.setLastPetId(id) }
+                    runCatching { context.setLastPetId(id) }.onFailure { Toast.makeText(context, "저장하지 못했어요. 다시 해 주세요.", Toast.LENGTH_SHORT).show() }
                     editPetId = null
                     suraOpen = false
                     logOpen = false
@@ -150,13 +152,13 @@ fun RootTabs() {
         return
     }
     if (suraOpen) {
-        SuraScreen(current, seal = { if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }, onBack = { suraOpen = false })
+        SuraScreen(current, openedFor = suraFor, seal = { if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }, onBack = { suraOpen = false })
         switchSheet()
         return
     }
     // 아이 목록을 읽은 뒤에 그린다(다시 살아난 직후 '누군지 모름'이 스치지 않게).
     if (logOpen && pets != null) {
-        RecordLogScreen(pets, current, onBack = { logOpen = false }, onOpenSura = { id -> saveSetting { context.setLastPetId(id) }; suraOpen = true })
+        RecordLogScreen(pets, current, onBack = { logOpen = false }, onOpenSura = { id -> saveSetting { context.setLastPetId(id) }; suraFor = id; suraOpen = true })
         return
     }
     switchSheet()
@@ -226,6 +228,7 @@ fun RootTabs() {
                 onOpenLog = { logOpen = true },
                 onOpenSura = { id ->
                     if (id != null) saveSetting { context.setLastPetId(id) }
+                    suraFor = id
                     suraOpen = true
                 },
                 state = quickState,

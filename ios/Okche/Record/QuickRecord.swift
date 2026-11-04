@@ -23,18 +23,19 @@ enum QuickRecord {
          "med": "탕약", "glucose": "혈당", "insulin": "인슐린"][kind] ?? kind
     }
 
-    /// 수라 값 글자(7-3 전 — 결과만).
+    /// 수라 결과 글자.
     private static let mealTitles = Dictionary(uniqueKeysWithValues: MealRules.results.map { ($0.value, $0.title) })
 
     /// 체중 글자: 그램 → kg 소수 둘째 자리(반올림, 0은 뺌 — 안드로이드 `kgText`와 같음, 기기 지역과 상관없이 '.').
     static func kgText(grams: Int) -> String {
+        guard grams >= 0 else { return "" } // 음수는 보여 주지 않음(안드로이드와 같음)
         var exact = Decimal(grams) / 1000
         var rounded = Decimal()
         NSDecimalRound(&rounded, &exact, 2, .plain)
         return "\(rounded)kg"
     }
 
-    /// 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙(`RecordDetail.line`), 수라는 '다 먹음'. 모르는 값이면 빈 글자.
+    /// 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙(`RecordDetail.line`), 수라는 '다 먹음', 체중은 kg. 모르는 값이면 빈 글자.
     static func value(_ record: Record) -> String {
         if let line = RecordDetail.line(record) { return line }
         if record.kind == RecordKind.weight.rawValue {

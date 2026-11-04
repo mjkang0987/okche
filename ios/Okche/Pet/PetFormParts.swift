@@ -236,7 +236,9 @@ struct InsulinSlotsEditor: View {
         let nth = Self.ordinal(index + 1)
         let error = errors[.insulinUnits(id)]
         // 기본 compact 시간 고르기는 안쪽 버튼 이름이 '시간 선택기'로 고정돼 몇 번째 시간인지 못 읽는다 — 칸 + 시트로.
-        let shown = timeBinding(index).wrappedValue.formatted(date: .omitted, time: .shortened)
+        // 다른 기기에서 온 틀린 글자는 그대로 보여 준다(안드로이드와 같음 — 지금 시각을 정해진 값처럼 보이지 않게).
+        let valid = slots[index].time.split(separator: ":").compactMap { Int($0) }.count == 2
+        let shown = valid ? timeBinding(index).wrappedValue.formatted(date: .omitted, time: .shortened) : slots[index].time
         let time = Button { pickingTime = id } label: {
             HStack {
                 Text(shown).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
@@ -298,7 +300,9 @@ struct InsulinSlotsEditor: View {
     private func timeBinding(_ index: Int) -> Binding<Date> {
         Binding {
             let parts = slots[index].time.split(separator: ":").compactMap { Int($0) }
-            guard parts.count == 2 else { return .now } // 다른 기기에서 온 틀린 글자
+            guard parts.count == 2 else { // 다른 기기에서 온 틀린 글자 — 고르기는 12:00에서(안드로이드와 같음)
+                return Calendar.okcheDevice.date(bySettingHour: 12, minute: 0, second: 0, of: .now) ?? .now
+            }
             return Calendar.okcheDevice.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: .now) ?? .now
         } set: { date in
             let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)

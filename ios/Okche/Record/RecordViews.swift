@@ -84,7 +84,7 @@ struct RecordTab: View {
 /// 기록 목록도 값으로 쌓는다 — 경로 쌓기와 화면을 직접 넘기는 쌓기를 섞으면 뒤로 갈 때 기록 목록이 빠질 수 있다.
 enum RecordRoute: Hashable { case sura(UUID?), log }
 
-/// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선(보드 `Record`).
+/// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 수라 화면), 흰 카드 안 줄 사이 선(보드 `Record`).
 /// 큰 글자·좁은 폭에선 이름 아래로 버튼.
 struct QuickRecordCard: View {
     let onTap: (QuickRecord.Row, String) -> Void

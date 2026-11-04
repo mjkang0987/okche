@@ -38,6 +38,13 @@ abstract class OkcheDao {
     @Update abstract suspend fun update(medication: Medication)
     @Update abstract suspend fun update(schedule: MedSchedule)
 
+    /** 약 고치기: 옛 줄을 닫고 같은 `seriesId` 새 줄(한 번에 — 반쯤 바뀐 채 남지 않게, 8-2b). */
+    @Transaction
+    open suspend fun replaceSchedule(closed: MedSchedule, next: MedSchedule) {
+        update(closed)
+        insert(next)
+    }
+
     /** 약 추가: 고른 아이마다 한 줄(한 번에 — 8-2a). */
     @Transaction
     open suspend fun insertSchedules(rows: List<MedSchedule>) {

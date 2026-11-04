@@ -194,6 +194,80 @@ class TangyakFlowTest {
         rule.onNode(hasText("며칠마다").and(hasClickAction())).performScrollTo().performClick()
         rule.onNode(hasText("저장하기").and(hasClickAction())).performScrollTo().performClick()
         waitFor(hasText("먹고 있는 약"))
-        waitFor(hasText("콩이 · 이틀에 한 번 · 1알"))
+        waitFor(androidx.compose.ui.test.hasContentDescription("콩이 · 이틀에 한 번 · 1알", substring = true))
+        // 카드 → 고치기(매일로) → 다시 카드 → 이 약 그만 먹이기 (8-2b)
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("· 고치기", substring = true)).performClick()
+        waitFor(hasText("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요."))
+        rule.onNode(hasText("매일").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("저장하기").and(hasClickAction())).performScrollTo().performClick()
+        waitFor(androidx.compose.ui.test.hasContentDescription("콩이 · 하루 1번 · 1알", substring = true))
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("· 고치기", substring = true)).performClick()
+        waitFor(hasText("이 약 그만 먹이기"))
+        rule.onNode(hasText("이 약 그만 먹이기")).performScrollTo().performClick()
+        waitFor(hasText("프레드니솔론을 그만 먹일까요?"))
+        rule.onNode(hasText("그만 먹이기").and(hasClickAction())).performClick()
+        waitFor(hasText("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."))
+    }
+}
+
+/** 약 고치기·그만 먹이기(plan.md 8-2b). iOS MedChangeTests와 같은 경우. */
+class MedChangeTest {
+    private lateinit var db: OkcheDatabase
+    private val dao get() = db.dao()
+    private fun at(y: Int, m: Int, d: Int, h: Int, min: Int = 0) = LocalDateTime.of(y, m, d, h, min).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    private suspend fun all() = dao.medSchedules()
+
+    @Before fun open() {
+        db = Room.inMemoryDatabaseBuilder(InstrumentationRegistry.getInstrumentation().targetContext, OkcheDatabase::class.java).build()
+    }
+
+    @After fun close() = db.close()
+
+    private suspend fun make(freq: MedFrequency, pets: List<String>, now: Long) = addSchedules(
+        dao,
+        ScheduleFields(
+            petIds = pets, medicationId = newId(), frequency = freq, everyDays = "2", startDate = LocalDate.of(2026, 10, 27),
+            times = listOf("08:00", "21:00"), everyHours = "8", firstAt = at(2026, 10, 27, 8),
+        ),
+        DoseUnit.pill, now,
+    )
+
+    @Test fun noChangeSameRowAndNewRow() = runBlocking {
+        val t0 = at(2026, 10, 27, 7)
+        val kong = newId()
+        val bori = newId()
+        val rows = make(MedFrequency.everyNDays, listOf(kong, bori), t0)
+        var s = rows[0]
+        val original = app.okche.ui.med.scheduleFieldsOf(s, t0)
+        assertEquals(app.okche.ui.med.ChangeResult.None, app.okche.ui.med.changeSchedule(dao, s, original, original, at(2026, 10, 27, 9)))
+        val reminder = original.copy(reminder = false, howTo = HowTo.inFood, leadMinutes = 30)
+        assertEquals(app.okche.ui.med.ChangeResult.SameRow, app.okche.ui.med.changeSchedule(dao, s, original, reminder, at(2026, 10, 27, 9))) // 그 줄 고침
+        assertEquals(2, all().size)
+        s = all().first { it.id == s.id }
+        assertEquals(listOf(false, true, true), listOf(s.reminder, s.howTo == HowTo.inFood, s.leadMinutes == 30))
+        val times = reminder.copy(times = listOf("09:00", "21:00"))
+        val t1 = at(2026, 10, 27, 10)
+        assertEquals(app.okche.ui.med.ChangeResult.NewRow, app.okche.ui.med.changeSchedule(dao, s, reminder, times, t1))
+        assertEquals(t1, dao.medSchedules().first { it.id == s.id }.activeUntil) // 닫음
+        val next = all().first { it.activeUntil == null && it.petId == kong }
+        assertEquals(s.seriesId, next.seriesId)
+        assertEquals(t1, next.activeFrom)
+        assertEquals(listOf("09:00", "21:00"), next.times)
+        assertEquals("2026-10-27", next.startDate) // 며칠마다 셈 그대로
+        assertNull(all().first { it.id == rows[1].id }.activeUntil) // 다른 아이 줄 그대로
+    }
+
+    @Test fun stopAndFirstAtPrefill() = runBlocking {
+        val t0 = at(2026, 10, 27, 7)
+        val hours = make(MedFrequency.everyNHours, listOf(newId()), t0)[0]
+        // 기록이 없으면 옛 줄 다음 차례, 처음 정한 시간대로면 옛 firstAt + m × 새 간격
+        assertEquals(at(2026, 10, 27, 16), app.okche.ui.med.firstAtPrefill(hours, 8, true, listOf(hours), emptyList(), at(2026, 10, 27, 9)))
+        assertEquals(at(2026, 10, 27, 14), app.okche.ui.med.firstAtPrefill(hours, 6, false, listOf(hours), emptyList(), at(2026, 10, 27, 9)))
+        val given = app.okche.store.Record(petId = hours.petId, kind = app.okche.store.RecordKind.med, occurredAt = at(2026, 10, 27, 8, 30),
+            data = org.json.JSONObject().put("amount", 1).put("medicationId", hours.medicationId).put("scheduleId", hours.id).put("status", "given").put("unit", "pill").toString())
+        assertEquals(at(2026, 10, 27, 12, 30), app.okche.ui.med.firstAtPrefill(hours, 4, true, listOf(hours), listOf(given), at(2026, 10, 27, 9))) // 마지막 준 기록 + 새 간격
+        app.okche.ui.med.stopSchedule(dao, hours, at(2026, 10, 27, 9))
+        assertEquals(at(2026, 10, 27, 9), all().single().activeUntil)
+        assertTrue(app.okche.ui.med.openSeries(all()).isEmpty())
     }
 }

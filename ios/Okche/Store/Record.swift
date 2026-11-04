@@ -26,15 +26,16 @@ final class Record {
     /// 앱이 저절로 만든 기록(급식기).
     var auto: Bool
 
+    /// `day`를 주면 그 날(차례 기록은 기록한 날이 아니라 차례의 날 — 6-1), 아니면 `occurredAt`의 6시 기준 날.
     init(id: UUID = UUID(), now: Date = .now, petId: UUID?, kind: RecordKind, occurredAt: Date, timeZone: TimeZone = .autoupdatingCurrent,
-         slotKey: String? = nil, data: String = "{}", auto: Bool = false) {
+         day: String? = nil, slotKey: String? = nil, data: String = "{}", auto: Bool = false) {
         self.id = id
         createdAt = now
         updatedAt = now
         self.petId = petId
         self.kind = kind.rawValue
         self.occurredAt = occurredAt
-        day = OkcheDay.of(occurredAt, in: timeZone)
+        self.day = day ?? OkcheDay.of(occurredAt, in: timeZone)
         self.slotKey = slotKey
         self.data = data
         self.auto = auto

@@ -192,7 +192,8 @@ abstract class OkcheDao {
     abstract fun dayRecordsFlow(day: String): Flow<List<Record>>
 
     /** 방금 남긴 기록: 그날 이 기기에서 가장 늦게 남긴 지우지 않은 기록(7-1). */
-    @Query("SELECT * FROM record WHERE day = :day AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1")
+    // 급식기 자동 기록은 이 기기에서 '남긴' 기록이 아니라 뺀다.
+    @Query("SELECT * FROM record WHERE day = :day AND deleted_at IS NULL AND auto = 0 ORDER BY created_at DESC LIMIT 1")
     abstract fun latestRecordFlow(day: String): Flow<Record?>
 
     @Query("SELECT MIN(occurred_at) FROM record WHERE pet_id = :petId AND deleted_at IS NULL")
@@ -234,10 +235,6 @@ abstract class OkcheDao {
 
     @Query("SELECT * FROM meal_plan WHERE pet_id = :petId AND deleted_at IS NULL") abstract fun mealPlansFlow(petId: String): Flow<List<MealPlan>>
 
-    /** 그 아이·그날의 지우지 않은 수라 기록, 이른 것 위. */
-    @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = 'meal' AND day = :day AND deleted_at IS NULL ORDER BY occurred_at")
-    abstract fun dayMealsFlow(petId: String, day: String): Flow<List<Record>>
-
     /** 그 차례의 지우지 않은 기록. */
     @Query("SELECT * FROM record WHERE slot_key = :key AND deleted_at IS NULL LIMIT 1") abstract suspend fun recordBySlot(key: String): Record?
 
@@ -251,10 +248,19 @@ abstract class OkcheDao {
 
     /** 끼니 시간 저장·방식 바꾸기: 열린 계획을 닫고 새 줄(끼니가 없으면 닫기만) — 한 번에. */
     @Transaction
-    open suspend fun replaceMealPlan(petId: String, plan: MealPlan?, now: Long) {
+    open suspend fun replaceMealPlan(petId: String, plan: MealPlan?, now: Long, moved: List<Record> = emptyList()) {
         closeMealPlans(petId, now)
         plan?.let { insert(it) }
+        for (r in moved) update(r)
     }
+
+    /** 그 아이의 끼니 차례가 붙은 지우지 않은 수라 기록. */
+    @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = 'meal' AND deleted_at IS NULL AND slot_key IS NOT NULL")
+    abstract suspend fun petMealsWithSlot(petId: String): List<Record>
+
+    /** 그 아이의 수라 기록 중 그날·전날(6시 기준) 것 — 수라 화면은 차례 키로 짝지어서, 6시 전에 미리 남긴 6시대 끼니도 찾게. */
+    @Query("SELECT * FROM record WHERE pet_id = :petId AND kind = 'meal' AND day IN (:day, :prevDay) AND deleted_at IS NULL ORDER BY occurred_at")
+    abstract fun recentMealsFlow(petId: String, day: String, prevDay: String): Flow<List<Record>>
 
     @Transaction
     open suspend fun insertAll(records: List<Record>) {

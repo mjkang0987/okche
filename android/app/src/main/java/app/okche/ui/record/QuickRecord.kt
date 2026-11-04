@@ -15,11 +15,14 @@ import java.time.ZoneId
 /** 바로 기록 줄 하나: 종류, `data`의 칸 이름, (값, 버튼 글자). 구토는 `contents`가 여러 개라 배열로 저장. */
 data class QuickRow(val kind: RecordKind, val key: String, val choices: List<Pair<String, String>>)
 
+/** 수라 결과(값, 화면 글자) — 일기 수라 줄·수라 화면·결과 바꾸기가 같이 쓴다. */
+val mealResults = listOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")
+
 val quickRows = listOf(
     QuickRow(RecordKind.vomit, "contents", listOf("kibble" to "사료", "digested" to "불은 사료", "liquidFoam" to "거품")),
     QuickRow(RecordKind.stool, "shape", listOf("hard" to "단단", "normal" to "정상", "soft" to "무름")),
     QuickRow(RecordKind.urine, "amount", listOf("little" to "찔끔", "normal" to "보통", "much" to "많음")),
-    QuickRow(RecordKind.meal, "result", listOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")),
+    QuickRow(RecordKind.meal, "result", mealResults),
 )
 
 /** 종류 이름(화면 글자). */
@@ -35,12 +38,17 @@ fun kindName(kind: RecordKind) = when (kind) {
     RecordKind.insulin -> "인슐린"
 }
 
-/** 수라 값 글자(7-3 전 — 결과만). */
-private val mealTitles = mapOf("all" to "다 먹음", "some" to "남김", "none" to "안 먹음")
+private val mealTitles = mealResults.toMap()
 
-/** 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙([detailLine]), 수라는 '다 먹음'. 모르는 값이면 빈 글자. */
+/** 체중 글자: 그램 → kg 소수 둘째 자리(반올림, 0은 뺌 — iOS `kgText`와 같음). */
+fun kgText(grams: Long): String = java.math.BigDecimal.valueOf(grams, 3).setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "kg"
+
+/** 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙([detailLine]), 수라는 '다 먹음', 체중은 kg. 모르는 값이면 빈 글자. */
 fun recordValue(record: Record): String {
     detailLine(record)?.let { return it }
+    if (record.kind == RecordKind.weight) {
+        return runCatching { JSONObject(record.data) }.getOrNull()?.optLong("grams", -1)?.takeIf { it >= 0 }?.let(::kgText).orEmpty()
+    }
     if (record.kind != RecordKind.meal) return ""
     val json = runCatching { JSONObject(record.data) }.getOrNull() ?: return ""
     return mealTitles[json.optString("result")].orEmpty()
@@ -51,7 +59,7 @@ suspend fun saveQuickRecord(dao: OkcheDao, row: QuickRow, value: String, petId: 
     // 수라는 끼니가 있으면 지금 끼니 차례로(그 차례에 이미 있으면 추가 식사 — 7-3).
     if (row.kind == RecordKind.meal) {
         val slot = quickMealSlot(dao, petId, now, zone)
-        return Record(createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot?.key,
+        return Record(id = slot?.let { newMealRecordId(dao, it) } ?: app.okche.store.newId(), createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot?.key,
             data = mealData(value, slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
     }
     val data = JSONObject().put(row.key, if (row.kind == RecordKind.vomit) JSONArray(listOf(value)) else value).toString()

@@ -6,6 +6,7 @@ struct YakbangView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var meds: [Medication]
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }) private var records: [Record]
+    @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     @State private var sheet: MedFormSheet.Mode?
 
     var body: some View {
@@ -28,7 +29,7 @@ struct YakbangView: View {
                                 .accessibilityAddTraits(.isHeader)
                                 .padding(.top, 12)
                             ForEach(Array(group.meds.enumerated()), id: \.element.id) { index, med in
-                                SnackRow(badge: MedRules.formTitle(med.form), name: med.name, detail: MedRules.detail(med, records: records)) {
+                                SnackRow(badge: MedRules.formTitle(med.form), name: med.name, detail: MedRules.detail(med, records: records, schedules: schedules)) {
                                     sheet = .edit(med)
                                 }
                                 .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
@@ -56,11 +57,14 @@ struct YakbangView: View {
 struct MedFormSheet: View {
     enum Mode: Identifiable {
         case add
+        /// 약 추가 중 들이기(보드 `MedRegSheet`) — 들이면 돌아가 그 약이 골라짐.
+        case addAndPick
         case edit(Medication)
 
         var id: String {
             switch self {
             case .add: "add"
+            case .addAndPick: "addAndPick"
             case .edit(let med): med.id.uuidString
             }
         }
@@ -69,6 +73,7 @@ struct MedFormSheet: View {
     enum Dialog { case remove, blocked }
 
     let mode: Mode
+    var onAdded: (Medication) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
@@ -81,8 +86,9 @@ struct MedFormSheet: View {
     @State private var dialog: Dialog?
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    init(mode: Mode) {
+    init(mode: Mode, onAdded: @escaping (Medication) -> Void = { _ in }) {
         self.mode = mode
+        self.onAdded = onAdded
         let start: MedRules.Form
         if case .edit(let med) = mode {
             // 남은 양 칸은 계산한 지금 남은 양 — 기록은 시트를 열 때 한 번 읽는다.
@@ -96,6 +102,7 @@ struct MedFormSheet: View {
     }
 
     private var editing: Medication? { if case .edit(let med) = mode { med } else { nil } }
+    private var picking: Bool { if case .addAndPick = mode { true } else { false } }
 
     var body: some View {
         let unit = MedRules.unitTitle(MedRules.unit(form.form))
@@ -103,7 +110,7 @@ struct MedFormSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(editing == nil ? "약방에 약 들이기" : "약 고치기").okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink)
+                        Text(editing != nil ? "약 고치기" : picking ? "약방에 새 약 들이기" : "약방에 약 들이기").okcheText(OkcheType.heading).foregroundStyle(OkcheColor.ink)
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: 0)
                         Button { dismiss() } label: {
@@ -130,8 +137,9 @@ struct MedFormSheet: View {
                         HStack(alignment: .top, spacing: 8) { amountFields(unit) }
                     }
                     OkcheTextField(label: "메모", note: "(선택)", text: $form.memo, placeholder: "예: 공복에 주면 토해요")
-                    Text(editing == nil ? "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요."
-                                        : "남은 양을 고치면 지금부터 다시 세요. 약방에서 빼도 지난 기록의 약 이름은 그대로 남아요.")
+                    Text(editing != nil ? "남은 양을 고치면 지금부터 다시 세요. 약방에서 빼도 지난 기록의 약 이름은 그대로 남아요."
+                         : picking ? "들이면 약 추가 화면으로 돌아가 이 약이 바로 골라져 있어요. 약방에도 그대로 남아요."
+                         : "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
@@ -140,7 +148,7 @@ struct MedFormSheet: View {
             }
             VStack(spacing: 4) {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                Button(editing == nil ? "약방에 들이기" : "저장하기", action: save).buttonStyle(.okchePrimary)
+                Button(editing != nil ? "저장하기" : picking ? "약방에 들이고 고르기" : "약방에 들이기", action: save).buttonStyle(.okchePrimary)
                 if let editing {
                     Button {
                         dialog = MedRules.takers(editing, schedules: schedules, pets: pets).isEmpty ? .remove : .blocked
@@ -203,7 +211,7 @@ struct MedFormSheet: View {
             if let editing {
                 try MedRules.update(editing, from: original, to: form, in: context)
             } else {
-                try MedRules.add(form, in: context)
+                onAdded(try MedRules.add(form, in: context))
             }
             dismiss()
         } catch {

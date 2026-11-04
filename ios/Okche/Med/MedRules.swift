@@ -56,10 +56,11 @@ enum MedRules {
         return stock - used
     }
 
-    /// 약 줄 아래 글자 '알약 · 1알씩 · 남은 24알' / '… · 남은 양 안 적음'('○일분'은 8-2).
-    static func detail(_ med: Medication, records: [Record]) -> String {
+    /// 약 줄 아래 글자 '알약 · 1알씩 · 남은 24알 (48일분)' / '… · 남은 양 안 적음'(일분은 먹고 있는 주기가 있을 때 — 8-2).
+    static func detail(_ med: Medication, records: [Record], schedules: [MedSchedule] = []) -> String {
         let unit = unitTitle(med.unit)
-        let left = remaining(med, records: records).map { "남은 \(number(max($0, 0)))\(unit)" } ?? "남은 양 안 적음"
+        let days = MedSchedules.daysLeft(med, schedules: schedules, records: records).map { " (\($0)일분)" } ?? ""
+        let left = remaining(med, records: records).map { "남은 \(number(max($0, 0)))\(unit)\(days)" } ?? "남은 양 안 적음"
         return "\(formTitle(med.form)) · \(number(med.doseAmount))\(unit)씩 · \(left)"
     }
 

@@ -331,3 +331,50 @@ extension ButtonStyle where Self == OkchePrimaryButtonStyle {
     static var okchePrimary: OkchePrimaryButtonStyle { .init() }
     static func okchePrimary(_ look: OkchePrimaryButtonStyle.Look) -> OkchePrimaryButtonStyle { .init(look: look) }
 }
+
+/// 고르는 칸(셀렉트): 이름표 + 펼침 메뉴. `inline`이면 이름표 왼쪽·칸 오른쪽 150(큰 글자에선 아래로 — 인슐린·탕약 '알림 보낼 때'),
+/// 아니면 이름표 위·칸 꽉 차게(탕약 '먹이는 방법').
+struct OkcheMenuPicker<Value: Hashable>: View {
+    let label: String
+    var note: String?
+    let options: [(value: Value, title: String)]
+    @Binding var selection: Value
+    var inline = true
+
+    var body: some View {
+        let title = options.first { $0.value == selection }?.title ?? ""
+        if inline {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { labelText; Spacer(minLength: 0); menu(title).frame(width: 150) }
+                VStack(alignment: .leading, spacing: 6) { labelText; menu(title) }
+            }
+            .padding(.leading, 16)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                OkcheFieldLabel(title: label, note: note).accessibilityHidden(true)
+                menu(title)
+            }
+        }
+    }
+
+    private var labelText: some View {
+        Text(label).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).accessibilityHidden(true)
+    }
+
+    private func menu(_ title: String) -> some View {
+        Menu {
+            Picker(label, selection: $selection) {
+                ForEach(options, id: \.value) { Text($0.title).tag($0.value) }
+            }
+        } label: {
+            HStack {
+                Text(title).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.down").font(.body.weight(.medium)).foregroundStyle(OkcheColor.inkMuted)
+            }
+            .okcheFieldBox()
+        }
+        .accessibilityLabel([label, note].compactMap { $0 }.joined(separator: " "))
+        .accessibilityValue(title)
+    }
+}

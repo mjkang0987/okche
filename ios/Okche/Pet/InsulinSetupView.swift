@@ -72,33 +72,7 @@ struct InsulinSetupView: View {
 
     /// 알림 보낼 때: 이름표 왼쪽, 고르기 칸 오른쪽.
     private var leadPicker: some View {
-        let title = InsulinSetup.leadChoices.first { $0.minutes == form.leadMinutes }?.title ?? ""
-        return ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) { leadLabel; Spacer(minLength: 0); leadMenu(title).frame(width: 150) }
-            VStack(alignment: .leading, spacing: 6) { leadLabel; leadMenu(title) }
-        }
-        .padding(.leading, 16)
-    }
-
-    private var leadLabel: some View {
-        Text("알림 보낼 때").okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).accessibilityHidden(true)
-    }
-
-    private func leadMenu(_ title: String) -> some View {
-        Menu {
-            Picker("알림 보낼 때", selection: $form.leadMinutes) {
-                ForEach(InsulinSetup.leadChoices, id: \.minutes) { Text($0.title).tag($0.minutes) }
-            }
-        } label: {
-            HStack {
-                Text(title).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.down").font(.body.weight(.medium)).foregroundStyle(OkcheColor.inkMuted)
-            }
-            .okcheFieldBox()
-        }
-        .accessibilityLabel("알림 보낼 때")
-        .accessibilityValue(title)
+        OkcheMenuPicker(label: "알림 보낼 때", options: InsulinSetup.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)
     }
 
     private func note(_ text: String) -> some View {

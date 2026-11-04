@@ -20,7 +20,6 @@ struct RecordDetailSheet: View {
     @State private var values: RecordDetail.Values = [:]
     @State private var occurredAt = Date.now
     @State private var timeChanged = false
-    @State private var pickingTime = false
     @State private var alerting = false
     /// 이 시트에서 레이어가 저절로 떴는지(시트 한 번에 한 번 — 2026-11-03 사용자).
     @State private var alerted = false
@@ -52,7 +51,7 @@ struct RecordDetailSheet: View {
                     }
                     .accessibilityLabel("닫기")
                 }
-                timeRow
+                RecordTimeRow(occurredAt: $occurredAt, changed: $timeChanged, isNew: target.editing == nil)
                 ForEach(RecordDetail.fields(kind), id: \.key) { field in fieldView(field) }
                 warning
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
@@ -64,62 +63,11 @@ struct RecordDetailSheet: View {
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .sheet(isPresented: $pickingTime) {
-            TimeSheet(time: Binding(get: { occurredAt }, set: { occurredAt = $0; timeChanged = true }),
-                      components: [.date, .hourAndMinute], notAfterNow: true)
-        }
         .fullScreenCover(isPresented: $alerting) {
             GuideLayer(kind: kind) { alerting = false }.presentationBackground(.clear)
         }
         .transaction { $0.disablesAnimations = alerting }
     }
-
-    /// '지금 · 오후 2:14' + '시간 바꾸기'.
-    private var timeRow: some View {
-        // 큰 글자에서 한 줄에 안 들어가면 버튼을 아래로.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).fixedSize()
-                Spacer(minLength: 0)
-                timeButton
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
-                timeButton
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 14)
-        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-    }
-
-    private var timeButton: some View {
-        Button("시간 바꾸기") { pickingTime = true }
-            .okcheText(OkcheType.label, weight: .regular)
-            .fixedSize()
-            .foregroundStyle(OkcheColor.ink)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 40)
-            .background(OkcheColor.paper, in: Capsule())
-            .overlay(Capsule().strokeBorder(OkcheColor.lineStrong, lineWidth: 1.5))
-            .frame(minHeight: 44)
-    }
-
-    private var timeText: String {
-        let clock = Self.clock.string(from: occurredAt)
-        if target.editing == nil && !timeChanged { return "지금 · \(clock)" }
-        let day = OkcheDay.of(occurredAt)
-        let today = OkcheDay.of(.now)
-        return "\(day == today ? "오늘" : QuickRecord.dayTitle(day, today: today)) · \(clock)"
-    }
-
-    private static let clock: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "a h:mm"
-        return f
-    }()
 
     @ViewBuilder private func fieldView(_ field: RecordDetail.Field) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -289,4 +237,62 @@ enum GuideText {
             if !opened { openURL(kakao) { opened in if !opened { openURL(web) } } }
         }
     }
+}
+
+/// 기록 시트의 '지금 · 오후 2:14' + '시간 바꾸기'(7-2 자세히 시트·7-4b 다과 시트가 같이 씀).
+struct RecordTimeRow: View {
+    @Binding var occurredAt: Date
+    @Binding var changed: Bool
+    let isNew: Bool
+    @State private var picking = false
+
+    var body: some View {
+        // 큰 글자에서 한 줄에 안 들어가면 버튼을 아래로.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).fixedSize()
+                Spacer(minLength: 0)
+                timeButton
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                timeButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 14)
+        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+        .sheet(isPresented: $picking) {
+            TimeSheet(time: Binding(get: { occurredAt }, set: { occurredAt = $0; changed = true }),
+                      components: [.date, .hourAndMinute], notAfterNow: true)
+        }
+    }
+
+    private var timeButton: some View {
+        Button("시간 바꾸기") { picking = true }
+            .okcheText(OkcheType.label, weight: .regular)
+            .fixedSize()
+            .foregroundStyle(OkcheColor.ink)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 40)
+            .background(OkcheColor.paper, in: Capsule())
+            .overlay(Capsule().strokeBorder(OkcheColor.lineStrong, lineWidth: 1.5))
+            .frame(minHeight: 44)
+    }
+
+    private var timeText: String {
+        let clock = Self.clock.string(from: occurredAt)
+        if isNew && !changed { return "지금 · \(clock)" }
+        let day = OkcheDay.of(occurredAt)
+        let today = OkcheDay.of(.now)
+        return "\(day == today ? "오늘" : QuickRecord.dayTitle(day, today: today)) · \(clock)"
+    }
+
+    private static let clock: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "a h:mm"
+        return f
+    }()
 }

@@ -392,6 +392,48 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '가수분해 처방식 · '")).firstMatch.waitForExistence(timeout: 5))
     }
 
+    /// 수라 '+ 다과 · 간식 남기기' → 새 다과 들이고 고르기 → 기록 → 일기 목록 값 → 더보기 다과 목록 → 고치기 → 목록에서 빼기 (7-4b).
+    func testSnackRecordAndList() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let more = app.buttons["수라 자세히 남기기"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        tapBelow(app.buttons["+ 다과 · 간식 남기기"], in: app)
+        XCTAssertTrue(app.buttons["+ 새 다과 들이기"].waitForExistence(timeout: 3)) // 다과가 없으면 들이기만
+        app.buttons["기록하기"].tap()
+        XCTAssertTrue(app.staticTexts["어떤 다과를 줬는지 골라 주세요"].waitForExistence(timeout: 3))
+        app.buttons["+ 새 다과 들이기"].tap()
+        let name = app.textFields["간식 이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.tap()
+        name.typeText("연어 퓨레")
+        tapBelow(app.buttons["다과에 들이고 고르기"], in: app)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH '연어 퓨레'")).firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH '연어 퓨레'")).firstMatch.isSelected) // 바로 골라짐
+        let amount = app.textFields["얼마나 줬나요? (선택)"]
+        amount.tap()
+        amount.typeText("반 개")
+        tapBelow(app.buttons["기록하기"], in: app)
+        app.buttons["뒤로"].firstMatch.tap()
+        tapBelow(app.buttons["오늘 일기 전체"], in: app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '연어 퓨레 · 반 개'")).firstMatch.waitForExistence(timeout: 3))
+        app.buttons["뒤로"].firstMatch.tap() // 기록 목록엔 탭 막대가 없음
+
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 3))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["다과 · 간식 목록"], in: app)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '연어 퓨레'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        XCTAssertTrue(row.label.contains("이번 달 1번"))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["다과 고치기"].waitForExistence(timeout: 3))
+        tapBelow(app.buttons["목록에서 빼기"], in: app)
+        XCTAssertTrue(app.staticTexts["연어 퓨레를 목록에서 뺄까요?"].waitForExistence(timeout: 3))
+        app.buttons["빼기"].tap()
+        XCTAssertFalse(row.waitForExistence(timeout: 2))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

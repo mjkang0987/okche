@@ -122,6 +122,7 @@ struct TodayRecordSection: View {
     // shortcut: 지우지 않은 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 날 조건을 넣는다.
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }, sort: \Record.occurredAt) private var records: [Record]
     @State private var editing: DetailTarget?
+    @State private var snackEditing: Record?
     @ScaledMetric(relativeTo: .body) private var plainSize: CGFloat = 13.6
     @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 52
     private let titleStyle = OkcheTextStyle(family: .display, size: 18, lineHeight: 26, weight: .bold)
@@ -165,7 +166,12 @@ struct TodayRecordSection: View {
     @ViewBuilder private func row(_ record: Record) -> some View {
         let value = QuickRecord.value(record)
         let label = "\(QuickRecord.time(record)) \(QuickRecord.name(record.kind))\(value.isEmpty ? "" : " \(value)") · 고치기"
-        if record.kind == RecordKind.meal.rawValue {
+        if record.kind == RecordKind.snack.rawValue, let pet = pets.first(where: { $0.id == petId }) {
+            Button { snackEditing = record } label: { rowContent(record, value) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+                .sheet(item: $snackEditing) { SnackRecordSheet(pet: pet, editing: $0) }
+        } else if record.kind == RecordKind.meal.rawValue {
             NavigationLink(value: RecordRoute.sura(petId)) { rowContent(record, value) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)

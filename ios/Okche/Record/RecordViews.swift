@@ -268,6 +268,11 @@ struct EditRecordButton: View {
                     .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
+        } else if record.kind == RecordKind.snack.rawValue, let petId = record.petId,
+                  let pet = pets.first(where: { $0.id == petId && $0.memorializedAt == nil }) {
+            // 다과는 다과 기록 시트(7-4b).
+            SnackEditButton(record: record, pet: pet, color: color,
+                            label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
         } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
             RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
                 onEdit(DetailTarget(kind: kind, editing: record))
@@ -483,5 +488,19 @@ struct AssignSheet: View {
         let day = record.day == OkcheDay.of(.now) ? "오늘" : QuickRecord.dayTitle(record.day, today: "")
         return [ "\(day) \(QuickRecord.time(record))", QuickRecord.name(record.kind), QuickRecord.value(record)]
             .filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+}
+
+/// 다과 기록 연필 → 같은 다과 기록 시트(값이 채워진 채).
+private struct SnackEditButton: View {
+    let record: Record
+    let pet: Pet
+    let color: Color
+    let label: String
+    @State private var editing = false
+
+    var body: some View {
+        RowIconButton(icon: "pencil", label: label, color: color) { editing = true }
+            .sheet(isPresented: $editing) { SnackRecordSheet(pet: pet, editing: record) }
     }
 }

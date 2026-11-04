@@ -38,6 +38,10 @@ enum QuickRecord {
     /// 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙(`RecordDetail.line`), 수라는 '다 먹음', 체중은 kg. 모르는 값이면 빈 글자.
     static func value(_ record: Record) -> String {
         if let line = RecordDetail.line(record) { return line }
+        if record.kind == RecordKind.snack.rawValue {
+            // 목록에서 뺀 다과도 이름은 남음(1-4) — 지운 줄까지 읽는다.
+            return SnackRules.value(record, snacks: (try? record.modelContext?.fetch(FetchDescriptor<Snack>())) ?? [])
+        }
         if record.kind == RecordKind.weight.rawValue {
             let grams = (try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any])?["grams"] as? Int
             return grams.map(kgText) ?? ""

@@ -36,20 +36,23 @@ private struct MoreMenu: View {
     @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
 
     var body: some View {
-        // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음).
-        if let pet = PetTitle.current(pets, lastPetId: lastPetId), pet.memorializedAt == nil {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
+            // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음). 다과는 모든 아이 공통이라 늘 있음.
+            if let pet = PetTitle.current(pets, lastPetId: lastPetId), pet.memorializedAt == nil {
                 // 아래 줄에 지금 먹는 사료 — 바꾸면 바로 바뀌어 저장한 게 보이게(2026-11-04 사용자).
                 let food = FoodRules.change(at: OkcheDay.of(.now), petId: pet.id, in: changes)
                     .map { change in FoodRules.line(change, food: foods.first { $0.id == change.foodId }) }
                 MoreMenuRow(title: "사료 · 처방식", detail: food) { foodPet = pet }
+                Rectangle().fill(OkcheColor.line).frame(height: 1)
             }
-            .padding(.horizontal, OkcheSpacing.space4)
-            .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("설정 메뉴")
-            .sheet(item: $foodPet) { FoodChangeSheet(pet: $0) }
+            NavigationLink { SnackListView() } label: { MoreMenuLabel(title: "다과", note: "간식 목록") }
+                .buttonStyle(.plain)
         }
+        .padding(.horizontal, OkcheSpacing.space4)
+        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("설정 메뉴")
+        .sheet(item: $foodPet) { FoodChangeSheet(pet: $0) }
     }
 }
 
@@ -81,5 +84,24 @@ struct MoreMenuRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// 다른 화면으로 넘어가는 메뉴 줄 글자(`NavigationLink`의 label — `MoreMenuRow`와 같은 모양).
+struct MoreMenuLabel: View {
+    let title: String
+    var note: String?
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 52
+
+    var body: some View {
+        HStack(spacing: 8) {
+            (Text(title) + Text(note.map { " · \($0)" } ?? "").font(.subheadline).foregroundColor(OkcheColor.inkMuted))
+                .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("›").okcheText(OkcheType.body).foregroundStyle(OkcheColor.lineStrong).accessibilityHidden(true)
+        }
+        .multilineTextAlignment(.leading)
+        .frame(minHeight: height)
+        .contentShape(Rectangle())
     }
 }

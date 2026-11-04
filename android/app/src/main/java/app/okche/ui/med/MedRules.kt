@@ -106,7 +106,8 @@ suspend fun addMed(dao: OkcheDao, f: MedFields, now: Long = System.currentTimeMi
 /** 고치기: 바꾼 게 없으면 저장하지 않음(거짓). 남은 양 칸을 바꿨을 때만 다시 셈(비우면 안 적음). */
 suspend fun updateMed(dao: OkcheDao, med: Medication, original: MedFields, f: MedFields, now: Long = System.currentTimeMillis()): Boolean {
     if (f == original) return false
-    val stockChanged = f.stock != original.stock
+    // 모양이 바뀌어 단위가 바뀌면 옛 단위 기록은 더 빼지 않으니, 칸에 보이는 지금 남은 양으로 다시 센다.
+    val stockChanged = f.stock != original.stock || unitOf(f.form) != med.unit
     val stock = if (stockChanged) f.stock.trimmedOrNull()?.toDecimal() else med.stockAmount
     dao.update(
         med.copy(

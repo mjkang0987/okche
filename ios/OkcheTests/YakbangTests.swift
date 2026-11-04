@@ -96,6 +96,18 @@ final class YakbangTests: XCTestCase {
         XCTAssertNil(med.stockCountedAt)
     }
 
+    func testFormChangeRecountsFromShownStock() throws {
+        let med = try MedRules.add(form("약", stock: "30"), now: t0, in: context)
+        _ = medRecord(med, "given", 10, at: t0.addingTimeInterval(60))
+        let original = MedRules.Form(med, records: try context.fetch(FetchDescriptor<Record>()))
+        var liquid = original
+        liquid.form = .liquid // 모양만 바꿈
+        try MedRules.update(med, from: original, to: liquid, now: t0.addingTimeInterval(500), in: context)
+        XCTAssertEqual(med.stockAmount, 20) // 보이던 지금 남은 양으로 다시 셈(옛 단위 기록이 되돌아오지 않게)
+        XCTAssertEqual(med.stockCountedAt, t0.addingTimeInterval(500))
+        XCTAssertEqual(MedRules.remaining(med, records: try context.fetch(FetchDescriptor<Record>())), 20)
+    }
+
     func testRemoveBlockedWhileTakingAndGrouped() throws {
         let kong = Pet(name: "콩이", species: .cat, breed: "", furColor: "")
         kong.createdAt = t0

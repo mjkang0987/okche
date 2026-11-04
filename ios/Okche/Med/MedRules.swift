@@ -52,7 +52,7 @@ enum MedRules {
             return json["medicationId"] as? String == id && json["unit"] as? String == unit
                 && ["given", "vomited"].contains(json["status"] as? String ?? "")
         }
-        .reduce(0) { $0 + ((json($1)["amount"] as? Double) ?? 0) }
+        .reduce(0) { $0 + ((json($1)["amount"] as? NSNumber)?.doubleValue ?? 0) }
         return stock - used
     }
 
@@ -139,11 +139,13 @@ enum MedRules {
         med.name = trimmed(form.name) ?? med.name
         med.shortName = trimmed(form.shortName)
         med.category = form.category
+        let unitChanged = unit(form.form) != med.unit
         med.form = form.form
         med.unit = unit(form.form)
         med.doseAmount = trimmed(form.dose).flatMap(PetRegistration.number) ?? med.doseAmount
         med.memo = trimmed(form.memo)
-        if form.stock != original.stock {
+        // 모양이 바뀌어 단위가 바뀌면 옛 단위 기록은 더 빼지 않으니, 칸에 보이는 지금 남은 양으로 다시 센다.
+        if form.stock != original.stock || unitChanged {
             med.stockAmount = trimmed(form.stock).flatMap(PetRegistration.number)
             med.stockCountedAt = med.stockAmount == nil ? nil : now
         }

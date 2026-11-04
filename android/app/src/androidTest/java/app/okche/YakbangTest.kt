@@ -127,6 +127,17 @@ class YakbangTest {
         assertNull(med.stockCountedAt)
     }
 
+    @Test fun formChangeRecountsFromShownStock() = runBlocking {
+        val med = addMed(dao, fields("약", stock = "30"), t0)
+        val records = listOf(medRecord(med, "given", 10.0, at = t0 + 60_000))
+        val original = medFormOf(med, records)
+        updateMed(dao, med, original, original.copy(form = MedForm.liquid), t0 + 500_000) // 모양만 바꿈
+        val saved = meds().single()
+        assertEquals(20.0, saved.stockAmount!!, 0.0) // 보이던 지금 남은 양으로 다시 셈(옛 단위 기록이 되돌아오지 않게)
+        assertEquals(t0 + 500_000, saved.stockCountedAt)
+        assertEquals(20.0, medRemaining(saved, records)!!, 0.0)
+    }
+
     @Test fun removeBlockedWhileTakingAndGrouped() = runBlocking {
         val kong = Pet(createdAt = t0, name = "콩이", species = Species.cat, breed = "", furColor = "")
         val bori = Pet(createdAt = t0 + 10, name = "보리", species = Species.dog, breed = "", furColor = "")

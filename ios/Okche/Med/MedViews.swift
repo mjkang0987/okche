@@ -79,6 +79,7 @@ struct MedFormSheet: View {
     @State private var failed = false
     @State private var saving = false
     @State private var dialog: Dialog?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(mode: Mode) {
         self.mode = mode
@@ -114,7 +115,6 @@ struct MedFormSheet: View {
                     OkcheTextField(label: "약 이름", text: field(\.name, .name), placeholder: "예: 병원에서 받은 약 이름", error: errors[.name])
                     OkcheTextField(label: "버튼에 보일 짧은 이름", note: "(선택)", text: field(\.shortName, .shortName),
                                    placeholder: "예: 프레드니솔론 → 프레드 · 비우면 원래 이름", error: errors[.shortName])
-                        .onChange(of: form.shortName) { if form.shortName.count > 6 { form.shortName = String(form.shortName.prefix(6)) } }
                     FieldGroup(title: "종류") {
                         OkcheChoiceChips(options: MedRules.categories, selection: Binding(get: { form.category }, set: { form.category = $0 ?? form.category }),
                                          allowsNone: false)
@@ -123,10 +123,11 @@ struct MedFormSheet: View {
                         OkcheChoiceChips(options: MedRules.forms, selection: Binding(get: { form.form }, set: { form.form = $0 ?? form.form }),
                                          allowsNone: false)
                     }
-                    // 큰 글자에선 두 칸을 위아래로.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: 8) { amountFields(unit) }
+                    // 큰 글자에선 두 칸을 위아래로(폭으로 재면 오류 글자가 뜰 때 바뀌어 글자 크기로 정함 — 안드로이드 1.3배와 맞춤).
+                    if typeSize >= .xxxLarge {
                         VStack(alignment: .leading, spacing: 12) { amountFields(unit) }
+                    } else {
+                        HStack(alignment: .top, spacing: 8) { amountFields(unit) }
                     }
                     OkcheTextField(label: "메모", note: "(선택)", text: $form.memo, placeholder: "예: 공복에 주면 토해요")
                     Text(editing == nil ? "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요."
@@ -181,7 +182,7 @@ struct MedFormSheet: View {
                                    message: MedRules.blockedMessage(editing, takers: MedRules.takers(editing, schedules: schedules, pets: pets)),
                                    confirm: "알겠어요", showsCancel: false, onCancel: { dialog = nil }, onConfirm: { dialog = nil })
             default:
-                OkcheConfirmDialog(title: "\(PetTitle.withObjectParticle(editing.name)) 약방에서 뺄까요?",
+                OkcheConfirmDialog(title: "\(PetTitle.withObjectParticle(editing.name)) 약방에서 뺄까요?", destructive: true,
                                    message: "탕약에서 더는 고를 수 없어요. 지난 기록의 약 이름은 그대로 남아요.",
                                    confirm: "빼기", confirmLook: .danger, onCancel: { dialog = nil }, onConfirm: remove)
             }
@@ -192,7 +193,9 @@ struct MedFormSheet: View {
         guard !saving else { return }
         errors = MedRules.errors(form)
         guard errors.isEmpty else {
-            AccessibilityNotification.Announcement(errors.values.sorted().first ?? "").post()
+            // 칸 순서대로 첫 오류(안드로이드와 같음).
+            let first = [MedRules.Field.name, .shortName, .dose, .stock].lazy.compactMap { errors[$0] }.first
+            AccessibilityNotification.Announcement(first ?? "").post()
             return
         }
         saving = true

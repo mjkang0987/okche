@@ -70,7 +70,9 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
-    val records by remember { dao.medRecordsFlow() }.collectAsState(emptyList())
+    // 처음 읽기 전(null)엔 고치기를 열지 않는다(남은 양 칸이 기록을 빼기 전 값으로 채워지지 않게).
+    val loaded by remember { dao.medRecordsFlow() }.collectAsState<List<app.okche.store.Record>, List<app.okche.store.Record>?>(null)
+    val records = loaded.orEmpty()
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medication?>(null) }
     if (adding) MedFormSheet(null, pets, records) { adding = false }
@@ -101,7 +103,7 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
                     Text(title, Modifier.padding(top = 12.dp).semantics { heading() }, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle())
                     list.forEachIndexed { index, med ->
                         if (index > 0) HorizontalDivider(color = OkcheColor.Line)
-                        SnackRow(med.name, medDetail(med, records), badge = medFormTitle(med.form)) { editing = med }
+                        SnackRow(med.name, if (loaded == null) "" else medDetail(med, records), badge = medFormTitle(med.form)) { if (loaded != null) editing = med }
                     }
                 }
             }
@@ -161,7 +163,7 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
                 message = medBlockedMessage(editing, medTakers(editing, schedules, pets)), showsCancel = false,
             )
             "remove" -> OkcheConfirmDialog(
-                "${withObjectParticle(editing.name)} 약방에서 뺄까요?", "빼기",
+                "${withObjectParticle(editing.name)} 약방에서 뺄까요?", "빼기", destructive = true,
                 onCancel = { dialog = null }, onConfirm = { dialog = null; run { removeMed(dao, editing) } },
                 message = "탕약에서 더는 고를 수 없어요. 지난 기록의 약 이름은 그대로 남아요.", confirmLook = ButtonLook.Danger,
             )
@@ -182,20 +184,20 @@ fun MedFormSheet(editing: Medication?, pets: List<Pet>, records: List<app.okche.
             }
             OkcheTextField(f.name, { edit("name") { copy(name = it) } }, "약 이름", placeholder = "예: 병원에서 받은 약 이름", error = errors["name"])
             OkcheTextField(
-                f.shortName, { v -> edit("shortName") { copy(shortName = v.take(6)) } }, "버튼에 보일 짧은 이름", hint = "(선택)",
+                f.shortName, { v -> edit("shortName") { copy(shortName = v) } }, "버튼에 보일 짧은 이름", hint = "(선택)",
                 placeholder = "예: 프레드니솔론 → 프레드 · 비우면 원래 이름", error = errors["shortName"],
             )
             OkcheChoiceChips("종류", medCategories, f.category, { v -> edit("category") { copy(category = v) } })
             OkcheChoiceChips("모양", medForms, f.form, { v -> edit("form") { copy(form = v) } })
             val dose = @Composable { m: Modifier ->
                 OkcheTextField(
-                    f.dose, { v -> edit("dose") { copy(dose = v) } }, "한 번에", m, suffix = unit, error = errors["dose"],
+                    f.dose, { v -> edit("dose") { copy(dose = v) } }, "한 번에", m, suffix = unit, description = unit, error = errors["dose"],
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
             val stock = @Composable { m: Modifier ->
                 OkcheTextField(
-                    f.stock, { v -> edit("stock") { copy(stock = v) } }, "지금 남은 양", m, hint = "(선택)", placeholder = "예: 120", suffix = unit,
+                    f.stock, { v -> edit("stock") { copy(stock = v) } }, "지금 남은 양", m, hint = "(선택)", placeholder = "예: 120", suffix = unit, description = unit,
                     error = errors["stock"], keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }

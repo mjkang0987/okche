@@ -166,7 +166,7 @@ struct SnackFormSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .fullScreenCover(isPresented: $removing) {
-            OkcheConfirmDialog(title: "\(editing.map { PetTitle.withObjectParticle($0.name) } ?? "") 목록에서 뺄까요?",
+            OkcheConfirmDialog(title: "\(editing.map { PetTitle.withObjectParticle($0.name) } ?? "") 목록에서 뺄까요?", destructive: true,
                                message: "다과 기록에서 더는 고를 수 없어요. 지난 기록의 간식 이름은 그대로 남아요.",
                                confirm: "빼기", confirmLook: .danger,
                                onCancel: { removing = false }, onConfirm: remove) { EmptyView() }

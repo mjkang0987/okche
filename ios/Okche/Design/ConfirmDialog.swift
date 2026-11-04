@@ -71,7 +71,12 @@ struct OkcheConfirmDialog<Extra: View>: View {
         if showsCancel {
             Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
         }
-        Button(confirm, action: onConfirm).buttonStyle(.okchePrimary(confirmLook))
+        // 버튼 하나면 그 버튼이 Esc(닫기)도 받는다.
+        if showsCancel {
+            Button(confirm, action: onConfirm).buttonStyle(.okchePrimary(confirmLook))
+        } else {
+            Button(confirm, action: onConfirm).buttonStyle(.okchePrimary(confirmLook)).keyboardShortcut(.cancelAction)
+        }
     }
 }
 

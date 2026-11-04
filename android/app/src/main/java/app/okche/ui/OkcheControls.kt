@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -80,8 +81,8 @@ private val FieldHeight = 52.dp
 private val FieldGap = 6.dp
 private val FieldPadding = 14.dp
 
-/** 화면에서만 숨기고 읽기는 되게(HTML sr-only). */
-private fun Modifier.visuallyHidden() = layout { m, c -> m.measure(c).let { layout(0, 0) {} } }
+/** 화면에서만 숨기고 읽기는 되게(HTML sr-only). 크기는 0이지만 놓기는 한다 — 놓지 않은 노드는 TalkBack 트리에서 빠진다. */
+private fun Modifier.visuallyHidden() = clipToBounds().layout { m, c -> m.measure(c).let { p -> layout(0, 0) { p.place(0, 0) } } }
 
 private fun labelText(label: String, hint: String?) = if (hint == null) label else "$label $hint"
 

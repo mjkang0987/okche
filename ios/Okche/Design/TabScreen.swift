@@ -72,8 +72,3 @@ extension TabScreen where Content == EmptyView {
     }
 }
 
-extension TabScreen where Trailing == EmptyView, Content == EmptyView {
-    init(title: String, subtitle: String? = nil) {
-        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() }, content: { EmptyView() })
-    }
-}

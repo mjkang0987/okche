@@ -344,6 +344,8 @@ struct FormHeader: View {
     /// `xmark`(닫기) 또는 `chevron.left`(뒤로)
     let icon: String
     let iconLabel: String
+    /// 머리 오른쪽(수라 화면의 낙관 — 7-3).
+    var trailing: AnyView? = nil
     let action: () -> Void
 
     var body: some View {
@@ -360,8 +362,10 @@ struct FormHeader: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
+            trailing
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 8)
+        .padding(.trailing, trailing == nil ? 8 : 16) // 오른쪽 낙관은 보드처럼 16
         .frame(minHeight: 56)
     }
 

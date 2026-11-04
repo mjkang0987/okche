@@ -59,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -142,7 +143,11 @@ fun RecordTab(
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 쿼리에 아이·날 조건을 넣는다.
     val schedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
     val medRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
-    val meds = rememberMeds()
+    // 약 목록을 읽기 전엔 탕약 줄을 그리지 않음('다 줬어요'가 잠깐 뜨지 않게).
+    val medsLoaded by remember { dao.medicationsFlow() }.collectAsState(null)
+    val meds = medsLoaded.orEmpty()
+    var toastHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
     /** 방금 누른 탕약 버튼 — 약 1초 보였다가 빠짐. */
     var checked by remember { mutableStateOf<CheckedMed?>(null) }
     var toast by remember { mutableStateOf<UndoToastItem?>(null) }
@@ -152,6 +157,7 @@ fun RecordTab(
     val medLine = who?.let { id ->
         val all = schedules ?: return@let null
         val recs = medRecords ?: return@let null
+        if (medsLoaded == null) return@let null
         if (!hasOpenSchedule(all, id)) return@let null
         // 약을 못 찾은 차례(아직 못 읽음)는 버튼으로 만들지 않음 — 빈 글자 버튼 방지.
         val buttons = medButtons(remainingSlots(all, recs, id, OkcheDay.of(System.currentTimeMillis())).filter { it.schedule.medicationId != checked?.medicationId })
@@ -206,6 +212,7 @@ fun RecordTab(
                 }
             }, onDetail = { if (it == RecordKind.meal) onOpenSura(null) else detail = DetailTarget(it, petId = who) }) { row, value ->
                 scope.launch {
+                    undoFailed = false
                     runCatching { saveQuickRecord(dao, row, value, who) }
                         .onSuccess {
                             justSaved = it.id
@@ -222,10 +229,15 @@ fun RecordTab(
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
         if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
         // 되돌리기 알림이 맨 아래 내용을 가리지 않게 그만큼 더 내려가게.
-        if (toast != null) Spacer(Modifier.height(76.dp))
+        if (toast != null) Spacer(Modifier.height(toastHeight))
     }
     // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
-    UndoToast(toast, onDismiss = { toast = null }, modifier = Modifier.align(Alignment.BottomCenter), onUndo = {
+    // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음.
+    androidx.compose.runtime.LaunchedEffect(who) { toast = null }
+    UndoToast(toast, onDismiss = {
+        toast = null
+        undoFailed = false // 알림이 닫히면 되돌리기 실패 문구도
+    }, modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { toastHeight = with(density) { it.height.toDp() } }, onUndo = {
         val record = undoRecord ?: return@UndoToast
         scope.launch {
             runCatching { deleteRecord(dao, record) }

@@ -54,6 +54,8 @@ struct RecordTab: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .undoToast($toast, onUndo: undo)
+            .onChange(of: toast == nil) { if toast == nil { undoFailed = false } } // 알림이 닫히면 되돌리기 실패 문구도
+            .onChange(of: who) { toast = nil } // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음
             .navigationDestination(for: RecordRoute.self) { route in
                 switch route {
                 case .sura(let petId): SuraScreen(petId: petId)
@@ -104,6 +106,7 @@ struct RecordTab: View {
                 if checked?.key == slot.key { checked = nil } // 그새 다른 약을 눌렀으면 그 '✓'는 남김
             }
         } catch {
+            undoFailed = false
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
         }
@@ -137,6 +140,7 @@ struct RecordTab: View {
 
     private func record(_ row: QuickRecord.Row, _ value: String) {
         do {
+            undoFailed = false
             justSaved = try QuickRecord.save(row, value: value, petId: who, in: context).id
             failed = false
             AccessibilityNotification.Announcement("아뢰었사옵니다").post()

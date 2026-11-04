@@ -64,6 +64,9 @@ final class MedSlotsTests: XCTestCase {
         let o1 = row(times: ["08:00"], from: at(20, 9))
         let o2 = row(times: ["09:00"], series: o1, from: at(21, 9))
         XCTAssertEqual(remaining([o1, o2], []), [at(27, 9)])
+        // 빠진 열린 줄로 준 기록은 짝 없는 기록 — 남은 차례 앞에서 하나 처리(하루 세 번 먹이지 않게).
+        XCTAssertEqual(remaining([o1, row(times: ["09:00", "21:00"], series: o1, from: at(27, 7))],
+                                 [given(o1, key: key(o1, "08:00"), at: at(27, 8))]), [at(27, 21)])
         // 바꾼 다음 날은 새 줄 그대로.
         XCTAssertEqual(MedSlots.remaining([s1, s2], records: [g], petId: pet, day: "2026-10-28").map(\.due), [at(28, 9), at(28, 21)])
     }

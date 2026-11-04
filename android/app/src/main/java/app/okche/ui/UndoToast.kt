@@ -27,6 +27,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -55,7 +58,8 @@ fun UndoToast(item: UndoToastItem?, onDismiss: () -> Unit, onUndo: () -> Unit, m
         val am = view.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
         if (am?.isTouchExplorationEnabled == true) return@LaunchedEffect
         val flags = android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT or android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS
-        delay((am?.getRecommendedTimeoutMillis(5_000, flags) ?: 5_000).toLong())
+        // 권장 시간은 API 29부터(minSdk 26).
+        delay(if (android.os.Build.VERSION.SDK_INT >= 29) (am?.getRecommendedTimeoutMillis(5_000, flags) ?: 5_000).toLong() else 5_000L)
         onDismiss()
     }
     AnimatedVisibility(item != null, modifier, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
@@ -68,6 +72,8 @@ fun UndoToast(item: UndoToastItem?, onDismiss: () -> Unit, onUndo: () -> Unit, m
                 .shadow(8.dp, shape, ambientColor = OkcheColor.NamsaekDeep, spotColor = OkcheColor.NamsaekDeep)
                 .background(OkcheColor.NamsaekDeep, shape)
                 .pointerInput(Unit) { detectTapGestures { } } // 글자·여백을 눌러도 아래 화면이 눌리지 않게
+                // 터치 탐색 중엔 저절로 안 닫히니 화면 읽기 동작으로 닫기.
+                .semantics { customActions = listOf(CustomAccessibilityAction("알림 닫기") { onDismiss(); true }) }
                 .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,

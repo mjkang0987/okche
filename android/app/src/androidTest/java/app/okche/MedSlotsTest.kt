@@ -104,6 +104,9 @@ class MedSlotsTest {
         val o1 = row(times = listOf("08:00"), from = at(20, 9))
         val o2 = row(times = listOf("09:00"), series = o1, from = at(21, 9))
         assertEquals(listOf(at(27, 9)), remaining(listOf(o1, o2), emptyList()))
+        // 빠진 열린 줄로 준 기록은 짝 없는 기록 — 남은 차례 앞에서 하나 처리(하루 세 번 먹이지 않게).
+        assertEquals(listOf(at(27, 21)), remaining(listOf(o1, row(times = listOf("09:00", "21:00"), series = o1, from = at(27, 7))),
+            listOf(given(o1, key(o1, "08:00"), at(27, 8)))))
         // 바꾼 다음 날은 새 줄 그대로.
         assertEquals(listOf(at(28, 9), at(28, 21)), remainingSlots(listOf(s1, s2), listOf(g), pet, "2026-10-28").map { it.due })
     }

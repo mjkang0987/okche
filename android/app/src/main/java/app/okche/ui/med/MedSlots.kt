@@ -73,7 +73,8 @@ fun remainingSlots(schedules: List<MedSchedule>, records: List<Record>, petId: S
         // 열린 줄이 둘 이상이면(백업 병합) `activeFrom`, 같으면 `updatedAt`이 늦은 것 하나만(5장).
         val keep = series.filter { it.activeUntil == null }.maxWithOrNull(compareBy({ it.activeFrom }, { it.updatedAt }))
         val rows = series.filter { it.activeUntil != null || it === keep }.sortedBy { it.activeFrom }
-        val rowById = rows.associateBy { it.id }
+        // 짝 없는 기록은 그 주기의 모든 줄로 따진다 — 병합으로 빠진 열린 줄의 기록은 짝 없음(차례가 없으니).
+        val rowById = series.associateBy { it.id }
 
         fun slots(row: MedSchedule, d: String) =
             if (row.frequency == MedFrequency.everyNHours) hoursSlots(row, given, d, zone).filter { it.day == d }
@@ -84,6 +85,7 @@ fun remainingSlots(schedules: List<MedSchedule>, records: List<Record>, petId: S
             val key = record.slotKey ?: return false
             val parts = key.split("|")
             val row = rowById[parts.first()] ?: return false
+            if (rows.none { it === row }) return true
             if (row.frequency == MedFrequency.everyNHours) {
                 val through = shiftDay(maxOf(record.day, day), 1)
                 return hoursSlots(row, given, through, zone).none { it.key == key }

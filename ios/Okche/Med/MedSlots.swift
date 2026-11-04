@@ -71,7 +71,8 @@ enum MedSlots {
             let open = series.filter { $0.activeUntil == nil }
             let keep = open.max { ($0.activeFrom, $0.updatedAt) < ($1.activeFrom, $1.updatedAt) }
             let rows = series.filter { $0.activeUntil != nil || $0 === keep }.sorted { $0.activeFrom < $1.activeFrom }
-            let rowById = Dictionary(rows.map { (id($0), $0) }, uniquingKeysWith: { a, _ in a })
+            // 짝 없는 기록은 그 주기의 모든 줄로 따진다 — 병합으로 빠진 열린 줄의 기록은 짝 없음(차례가 없으니).
+            let rowById = Dictionary(series.map { (id($0), $0) }, uniquingKeysWith: { a, _ in a })
 
             func slots(_ row: MedSchedule, _ d: String) -> [Slot] {
                 row.frequency == .everyNHours
@@ -81,6 +82,7 @@ enum MedSlots {
             /// 짝 없는 기록: 이 주기 줄의 키인데 그 줄의 차례가 아닌 그날 기록.
             func isUnmatched(_ record: Record) -> Bool {
                 guard let key = record.slotKey, let row = rowById[String(key.split(separator: "|").first ?? "")] else { return false }
+                guard rows.contains(where: { $0 === row }) else { return true }
                 if row.frequency == .everyNHours {
                     let through = QuickRecord.shift(max(record.day, day), by: 1)
                     return !hoursSlots(row, given: given, through: through).contains { $0.key == key }

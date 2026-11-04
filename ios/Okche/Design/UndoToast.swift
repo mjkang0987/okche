@@ -33,7 +33,8 @@ struct UndoToastItem: Equatable {
 
 extension View {
     /// 화면 아래(탭 바 위)에 되돌리기 알림 — 내용을 가리지 않게 그만큼 아래 여백을 늘린다. `item`이 nil이면 숨김.
-    /// 5초 뒤 저절로 닫히고, VoiceOver·스위치 제어가 켜져 있으면 닫지 않는다(되돌리기에 닿을 시간 — WCAG 2.2.1). 닫는 건 부르는 쪽(`onUndo` 성공 때).
+    /// 5초 뒤 저절로 닫히고, VoiceOver·스위치 제어가 켜져 있으면 닫지 않는다(되돌리기에 닿을 시간 — WCAG 2.2.1, 닫기는 두 손가락 문지르기).
+    /// 되돌리기는 부르는 쪽이 성공했을 때 닫는다. 화면을 떠나면 닫힌다.
     func undoToast(_ item: Binding<UndoToastItem?>, onUndo: @escaping () -> Void) -> some View {
         modifier(UndoToastHost(item: item, onUndo: onUndo))
     }
@@ -50,6 +51,7 @@ private struct UndoToastHost: ViewModifier {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let current = item {
                     UndoToast(message: current.text, onUndo: onUndo)
+                        .accessibilityAction(.escape) { item = nil } // 화면 읽기 중엔 저절로 안 닫히니 두 손가락 문지르기로 닫기
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .task(id: current.id) {
                             if announced != current.id {
@@ -64,6 +66,7 @@ private struct UndoToastHost: ViewModifier {
                         }
                 }
             }
+            .onDisappear { item = nil } // 다른 탭·화면에 갔다 오면 옛 되돌리기를 남기지 않음
             .animation(.easeOut(duration: 0.2), value: item)
     }
 }

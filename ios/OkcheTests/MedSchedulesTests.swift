@@ -207,5 +207,7 @@ final class MedChangeTests: XCTestCase {
         f.times = ["10:00"]
         XCTAssertEqual(try MedSchedules.change(hours, from: original, to: f, now: at(2026, 10, 27, 11), in: context), .none)
         XCTAssertEqual(try all().count, 1)
+        // 폼을 오래 열어 둬서 처음 먹일 때(08:00)가 저장한 때(09:00:30)보다 이르면 저장한 때(분 올림)로.
+        XCTAssertEqual(try make(.everyNHours, pets: [UUID()], now: at(2026, 10, 27, 9) + 30)[0].firstAt, at(2026, 10, 27, 9, 1))
     }
 }

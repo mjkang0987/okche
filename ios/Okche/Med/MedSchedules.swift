@@ -255,7 +255,7 @@ enum MedSchedules {
                         startDate: f.frequency == .everyNDays ? PetRegistration.day(f.startDate, .okcheDevice) : nil,
                         weekdays: f.frequency == .weekdays ? f.weekdays.sorted() : [],
                         everyHours: hours ? PetRegistration.wholeNumber(f.everyHours.trimmingCharacters(in: .whitespaces)) : nil,
-                        firstAt: hours ? f.firstAt : nil, shiftOnLate: f.shiftOnLate, howTo: f.howTo,
+                        firstAt: hours ? max(f.firstAt, roundedUp(now)) : nil, // 지금보다 이르면 지금(폼을 오래 열어 둬도 첫 차례가 빠지지 않게) shiftOnLate: f.shiftOnLate, howTo: f.howTo,
                         reminder: f.frequency == .asNeeded ? false : f.reminder, leadMinutes: f.leadMinutes, activeFrom: now)
         }
         return made
@@ -350,7 +350,6 @@ enum MedSchedules {
             var next = f
             next.petIds = [s.petId]
             next.medicationId = s.medicationId
-            if next.frequency == .everyNHours, next.firstAt < now { next.firstAt = roundedUp(now) } // 지금보다 이르면 지금
             // 닫기와 새 줄을 한 번에 저장(반쯤 바뀐 채 남지 않게).
             for row in rows(next, unit: s.unit, now: now) {
                 row.seriesId = s.seriesId

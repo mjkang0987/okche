@@ -263,7 +263,7 @@ iOS(SwiftData)와 안드로이드(Room)가 똑같이 따르는 저장 구조. �
 - 카드와 사료 바꾸기 시트에서 아이 종에 맞는 '사료 바꾸는 법' 레이어를 연다(고양이: 길게는 40일, 강아지: 7일 — 미국 동물병원협회 자료).
 - `method = atOnce`여도 같은 규칙을 쓴다(바꾼 뒤 잘 먹는지 확인하는 기간).
 
-**다과 (`Snack`)**: `name`, `kind`: `lickable`(짜 먹는 간식), `freezeDried`, `jerky`(져키·스틱), `wet`(캔·파우치), `prescription`(처방 간식), `human`(사람 음식) · `okDuringFoodChange`(수라 바꾸기 중에도 괜찮은 간식) · `ingredientPhotoId`.
+**다과 (`Snack`)**: `name`, `kind`: `lickable`(짜 먹는 간식), `freezeDried`, `jerky`(져키·스틱), `wet`(캔·파우치), `prescription`(처방 간식), `human`(사람 음식) · `okDuringFoodChange`(수라 바꾸기 중에도 괜찮은 간식) · `ingredientPhotoId`. (2026-11-04, 7-4b) 다과는 모든 아이 공통, 목록은 들인 순(`createdAt`). '목록에서 빼기' = `deletedAt`(지난 기록 글자엔 이름이 남음 — 1-4). 다과 기록 `data` = `{amount?, snackId}`(칸 이름 순, `snackId`는 소문자 UUID 글자, `amount`는 앞뒤 빈칸 뺀 글자·비면 칸 없음). 목록 줄 '이번 달 n번' = 지금 보는 아이의 그 다과 기록, 기기 달력 달. 다과 기록 시트의 고르기 순서 = 이 아이에게 최근 준 다과 먼저(마지막 준 날 '오늘'·'어제'·'10월 20일' — 기록의 `day`), 나머지는 들인 순.
 
 **끼니 계획 (`MealPlan`)**: `petId`, `mode`: `direct`(직접 급여) / `feeder`(급식기, 수라간), `slots`: `{name, time: HH:mm, grams: 정수 또는 없음}` 목록(`grams` = 그 끼니에 주는 양, 선택 — 2026-11-01 추가), `activeFrom`, `activeUntil`(UTC 시각, 5장과 같은 방식).
 - 수라 화면의 '아침 · 08:10', '저녁 · 아직 기록 전'과 실록의 '다 먹은 끼니 52/60' 분모가 여기서 나온다. 끼니 차례의 `slotKey = {planId}|{day}|{HH:mm}`.

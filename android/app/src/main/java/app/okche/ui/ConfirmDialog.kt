@@ -41,6 +41,8 @@ fun OkcheConfirmDialog(
     message: String? = null,
     bullets: List<String> = emptyList(),
     confirmLook: ButtonLook = ButtonLook.Filled,
+    /** 거짓이면 '그냥 둘게요' 없이 버튼 하나(안내 창 — '지금은 뺄 수 없어요', 8-1). */
+    showsCancel: Boolean = true,
     extra: @Composable ColumnScope.() -> Unit = {},
 ) {
     Dialog(onDismissRequest = onCancel) {
@@ -71,12 +73,12 @@ fun OkcheConfirmDialog(
             // 큰 글자에서는 두 버튼을 세로로 쌓는다(아이 바꾸기 시트와 같은 기준).
             if (LocalDensity.current.fontScale >= 1.15f) {
                 Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OkchePrimaryButton("그냥 둘게요", onCancel, look = ButtonLook.Outlined)
+                    if (showsCancel) OkchePrimaryButton("그냥 둘게요", onCancel, look = ButtonLook.Outlined)
                     OkchePrimaryButton(confirm, onConfirm, look = confirmLook)
                 }
             } else {
                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OkchePrimaryButton("그냥 둘게요", onCancel, Modifier.weight(1f), look = ButtonLook.Outlined)
+                    if (showsCancel) OkchePrimaryButton("그냥 둘게요", onCancel, Modifier.weight(1f), look = ButtonLook.Outlined)
                     OkchePrimaryButton(confirm, onConfirm, Modifier.weight(1f), look = confirmLook)
                 }
             }

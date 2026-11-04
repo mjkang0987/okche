@@ -35,6 +35,12 @@ abstract class OkcheDao {
     @Update abstract suspend fun update(record: Record)
     @Update abstract suspend fun update(change: FoodChange)
     @Update abstract suspend fun update(snack: Snack)
+    @Update abstract suspend fun update(medication: Medication)
+
+    // 약방(8-1): 뺀 약도 이름은 지난 기록 글자에 쓰여서 모두 읽는다.
+    @Query("SELECT * FROM medication") abstract fun medicationsFlow(): Flow<List<Medication>>
+    @Query("SELECT * FROM record WHERE kind = 'med' AND deleted_at IS NULL") abstract fun medRecordsFlow(): Flow<List<Record>>
+    @Query("SELECT * FROM med_schedule WHERE deleted_at IS NULL") abstract fun medSchedulesFlow(): Flow<List<MedSchedule>>
 
     // 다과(7-4b): 목록에서 뺀 다과도 이름은 지난 기록 글자에 쓰여서 모두 읽는다.
     @Query("SELECT * FROM snack") abstract fun snacksFlow(): Flow<List<Snack>>

@@ -119,9 +119,9 @@ fun SnackListScreen(current: Pet?, seal: @Composable () -> Unit, onBack: () -> U
     }
 }
 
-/** 다과 줄(목록): 48 '간식' 칸 + 이름(굵게) + 아래 줄 + ›, 72 높이. */
+/** 다과 줄(목록): 48 '간식' 칸 + 이름(굵게) + 아래 줄 + ›, 72 높이. 약방 약 줄도 같이 씀(칸 글자 '알약'·'물약' — 8-1). */
 @Composable
-private fun SnackRow(name: String, detail: String, onClick: () -> Unit) {
+fun SnackRow(name: String, detail: String, badge: String = "간식", onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(role = Role.Button, onClickLabel = "고치기", onClick = onClick).padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -133,7 +133,7 @@ private fun SnackRow(name: String, detail: String, onClick: () -> Unit) {
         ) {
             // 칸은 48 그대로라 큰 글자에선 글자를 줄여 넣는다.
             val caption = OkcheType.Caption.toTextStyle()
-            Text("간식", color = OkcheColor.NamsaekDeep, style = caption, maxLines = 1, softWrap = false,
+            Text(badge, color = OkcheColor.NamsaekDeep, style = caption, maxLines = 1, softWrap = false,
                 autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = caption.fontSize * 0.5f, maxFontSize = caption.fontSize))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -199,7 +199,7 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
 
     if (removing && editing != null) {
         OkcheConfirmDialog(
-            "${withObjectParticle(editing.name)} 목록에서 뺄까요?", "빼기",
+            "${withObjectParticle(editing.name)} 목록에서 뺄까요?", "빼기", destructive = true,
             onCancel = { removing = false },
             onConfirm = { removing = false; run { removeSnack(dao, editing) } },
             message = "다과 기록에서 더는 고를 수 없어요. 지난 기록의 간식 이름은 그대로 남아요.",

@@ -47,6 +47,10 @@ private struct MoreMenu: View {
             }
             NavigationLink { SnackListView() } label: { MoreMenuLabel(title: "다과", note: "간식 목록") }
                 .buttonStyle(.plain)
+            Rectangle().fill(OkcheColor.line).frame(height: 1)
+            // 탕약 · 약 알림은 8-2에서(보드 순서는 다과 다음 탕약, 그다음 약방).
+            NavigationLink { YakbangView() } label: { MoreMenuLabel(title: "약방", note: "약 목록") }
+                .buttonStyle(.plain)
         }
         .padding(.horizontal, OkcheSpacing.space4)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))

@@ -46,8 +46,9 @@ struct SnackListView: View {
     }
 }
 
-/// 다과 줄(목록): 48 '간식' 칸 + 이름(굵게) + 아래 줄 + ›, 72 높이.
+/// 다과 줄(목록): 48 '간식' 칸 + 이름(굵게) + 아래 줄 + ›, 72 높이. 약방 약 줄도 같이 씀(칸 글자 '알약'·'물약' — 8-1).
 struct SnackRow: View {
+    var badge = "간식"
     let name: String
     let detail: String
     let action: () -> Void
@@ -55,7 +56,7 @@ struct SnackRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Text("간식").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.namsaekDeep)
+                Text(badge).okcheText(OkcheType.caption).foregroundStyle(OkcheColor.namsaekDeep)
                     .lineLimit(1).minimumScaleFactor(0.5).padding(.horizontal, 4) // 칸은 48 그대로
                     .frame(width: 48, height: 48)
                     .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusSm))
@@ -165,7 +166,7 @@ struct SnackFormSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .fullScreenCover(isPresented: $removing) {
-            OkcheConfirmDialog(title: "\(editing.map { PetTitle.withObjectParticle($0.name) } ?? "") 목록에서 뺄까요?",
+            OkcheConfirmDialog(title: "\(editing.map { PetTitle.withObjectParticle($0.name) } ?? "") 목록에서 뺄까요?", destructive: true,
                                message: "다과 기록에서 더는 고를 수 없어요. 지난 기록의 간식 이름은 그대로 남아요.",
                                confirm: "빼기", confirmLook: .danger,
                                onCancel: { removing = false }, onConfirm: remove) { EmptyView() }

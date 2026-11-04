@@ -436,6 +436,37 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(row.waitForExistence(timeout: 2))
     }
 
+    /// 더보기 → 약방(약 없음) → 들이기(오류 → 저장) → 줄 → 고치기 → 약방에서 빼기 확인 (8-1).
+    func testYakbangAddEditRemove() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["약방 · 약 목록"], in: app)
+        XCTAssertTrue(app.staticTexts["아직 들인 약이 없어요."].waitForExistence(timeout: 3))
+        app.buttons["+ 약 들이기"].tap()
+        XCTAssertTrue(app.staticTexts["약방에 약 들이기"].waitForExistence(timeout: 3))
+        app.buttons["약방에 들이기"].tap()
+        XCTAssertTrue(app.staticTexts["약 이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        let name = app.textFields["약 이름"]
+        name.tap()
+        name.typeText("위장약 시럽")
+        app.buttons["물약"].tap()
+        let stock = app.textFields["지금 남은 양 (선택)"]
+        tapBelow(stock, in: app)
+        stock.typeText("120")
+        app.buttons["약방에 들이기"].tap()
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '위장약 시럽'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        XCTAssertTrue(row.label.contains("물약 · 1ml씩 · 남은 120ml"))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["약 고치기"].waitForExistence(timeout: 3))
+        tapBelow(app.buttons["약방에서 빼기"], in: app)
+        XCTAssertTrue(app.staticTexts["위장약 시럽을 약방에서 뺄까요?"].waitForExistence(timeout: 3))
+        app.buttons["빼기"].tap()
+        XCTAssertTrue(app.staticTexts["아직 들인 약이 없어요."].waitForExistence(timeout: 3))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

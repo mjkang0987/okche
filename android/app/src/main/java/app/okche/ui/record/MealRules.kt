@@ -157,7 +157,8 @@ suspend fun saveMealPlan(dao: OkcheDao, petId: String, mode: MealMode, slots: Li
  * 같은 ID 줄이 있으면(지운 줄 포함) 만들지 않고, 그 차례에 보호자가 남긴 기록이 있어도 만들지 않는다. 몇 개 만들었는지 돌려준다.
  */
 suspend fun fillFeeder(dao: OkcheDao, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): Int {
-    val plans = dao.mealPlans().filter { it.mode == MealMode.feeder }
+    // 아이마다 쓸 계획(열린 줄 하나 — 7장)만, 그중 급식기.
+    val plans = dao.mealPlans().groupBy { it.petId }.values.flatMap(::usable).filter { it.mode == MealMode.feeder }
     if (plans.isEmpty()) return 0
     val ids = dao.mealRecordIds().toMutableSet()
     val keys = dao.mealSlotKeys().toMutableSet()

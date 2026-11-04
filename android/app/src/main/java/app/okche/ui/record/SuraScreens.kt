@@ -112,7 +112,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
     }
     val today = OkcheDay.of(now)
     val plans by remember(petId) { petId?.let { dao.mealPlansFlow(it) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
-    val meals by remember(petId) { petId?.let { dao.dayMealsFlow(it, today) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
+    val meals by remember(petId, today) { petId?.let { dao.dayMealsFlow(it, today) } ?: flowOf(emptyList()) }.collectAsState(emptyList())
     val dismissed by remember { context.mealHintDismissed }.collectAsState(null)
     var editing by remember { mutableStateOf<MealMode?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -152,7 +152,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit) {
                     val slots = mealOccurrences(plans, today)
                     if (slots.isEmpty()) {
                         // 오늘 처음 정해 끼니가 모두 지났을 때('아직 지나지 않은 끼니부터 적용').
-                        Text("오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
+                        Text(if (plan.mode == MealMode.feeder) "오늘은 남은 끼니가 없어요. 내일부터 끼니 시간에 기록돼요." else "오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.", color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())
                     }
                     for (slot in slots) {
                         MealCard(slot, now, meals.firstOrNull { it.slotKey == slot.key },
@@ -299,7 +299,11 @@ private fun MealCard(slot: MealOccurrence, now: Long, record: Record?, onPick: (
                             when {
                                 v.isBlank() -> { error = null; onLeft(record, null) }
                                 grams != null && grams in 0..(given ?: 2000) -> { error = null; onLeft(record, grams) }
-                                else -> error = given?.let { "준 양(${it}g)보다 많을 수 없어요" } ?: "0에서 2000 사이 숫자로 넣어 주세요"
+                                else -> {
+                                    // 잘못된 값이면 치는 중 저장된 앞 숫자(30을 치다 남은 3)가 남지 않게 비운다.
+                                    error = given?.let { "준 양(${it}g)보다 많을 수 없어요" } ?: "0에서 2000 사이 숫자로 넣어 주세요"
+                                    onLeft(record, null)
+                                }
                             }
                         },
                         "${slot.slot.name} 남은 양 (그램, 선택)",

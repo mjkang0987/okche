@@ -38,9 +38,13 @@ struct SuraScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear { try? MealRules.fillFeeder(in: context) }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) {
-            now = $0
-            try? MealRules.fillFeeder(now: $0, in: context)
+        .task {
+            // 화면이 떠 있는 동안 1분마다(다시 그려도 처음부터 세지 않게 task로).
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                now = .now
+                try? MealRules.fillFeeder(now: now, in: context)
+            }
         }
         .sheet(item: $editing) { mode in
             if let pet { MealTimeSheet(petId: pet.id, mode: mode, plan: plan(pet)) }
@@ -66,7 +70,7 @@ struct SuraScreen: View {
             let slots = MealRules.occurrences(plans.filter { $0.petId == pet.id }, day: OkcheDay.of(now))
             if slots.isEmpty {
                 // 오늘 처음 정해 끼니가 모두 지났을 때('아직 지나지 않은 끼니부터 적용').
-                Text("오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.").okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
+                Text(plan.mode == .feeder ? "오늘은 남은 끼니가 없어요. 내일부터 끼니 시간에 기록돼요." : "오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.").okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
             }
             ForEach(slots, id: \.key) { slot in
                 MealCard(slot: slot, now: now, record: meals.first { $0.slotKey == slot.key }) { result in
@@ -304,6 +308,8 @@ private struct MealCard: View {
             onLeft(record, grams)
         } else {
             leftError = given.map { "준 양(\($0)g)보다 많을 수 없어요" } ?? "0에서 2000 사이 숫자로 넣어 주세요"
+            // 잘못된 값이면 치는 중 저장된 앞 숫자(30을 치다 남은 3)가 남지 않게 비운다.
+            onLeft(record, nil)
         }
     }
 }

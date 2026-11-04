@@ -196,7 +196,9 @@ enum MealRules {
     @discardableResult
     static func fillFeeder(now: Date = .now, timeZone: TimeZone = .autoupdatingCurrent, in context: ModelContext) throws -> Int {
         let feeder = MealMode.feeder
-        let plans = try context.fetch(FetchDescriptor<MealPlan>(predicate: #Predicate { $0.deletedAt == nil })).filter { $0.mode == feeder }
+        // 아이마다 쓸 계획(열린 줄 하나 — 7장)만, 그중 급식기.
+        let all = try context.fetch(FetchDescriptor<MealPlan>(predicate: #Predicate { $0.deletedAt == nil }))
+        let plans = Dictionary(grouping: all, by: \.petId).values.flatMap(usable).filter { $0.mode == feeder }
         guard !plans.isEmpty else { return 0 }
         let meal = RecordKind.meal.rawValue
         let meals = try context.fetch(FetchDescriptor<Record>(predicate: #Predicate { $0.kind == meal }))

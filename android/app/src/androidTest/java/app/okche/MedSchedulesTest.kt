@@ -269,5 +269,12 @@ class MedChangeTest {
         app.okche.ui.med.stopSchedule(dao, hours, at(2026, 10, 27, 9))
         assertEquals(at(2026, 10, 27, 9), all().single().activeUntil)
         assertTrue(app.okche.ui.med.openSeries(all()).isEmpty())
+        // 그만 먹인 줄은 되살리지도, 그만 먹인 때를 덮지도 않음
+        val closed = all().single()
+        app.okche.ui.med.stopSchedule(dao, closed, at(2026, 10, 27, 11))
+        assertEquals(at(2026, 10, 27, 9), all().single().activeUntil)
+        val original = app.okche.ui.med.scheduleFieldsOf(closed, t0)
+        assertEquals(app.okche.ui.med.ChangeResult.None, app.okche.ui.med.changeSchedule(dao, closed, original, original.copy(times = listOf("10:00")), at(2026, 10, 27, 11)))
+        assertEquals(1, all().size)
     }
 }

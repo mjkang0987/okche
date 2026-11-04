@@ -257,9 +257,9 @@ fun MedAddScreen(
         var next = f.change()
         // 고치기에서 '처음 먹일 때'를 손대지 않았으면 간격·늦게 줬을 때를 바꿀 때 다시 채운다(6-1).
         // 처음과 같으면 처음 채운 값 그대로(시각이 흘러 값이 바뀌어 새 줄이 생기지 않게).
-        if (editing != null && original != null && !firstAtTouched && next.frequency == MedFrequency.everyNHours) {
+        if (editing != null && original != null && !firstAtTouched && next.frequency == MedFrequency.everyNHours && key in setOf("everyHours", "shiftOnLate", "frequency")) {
             val same = next.everyHours == original.everyHours && next.shiftOnLate == original.shiftOnLate && next.frequency == original.frequency
-            next = next.copy(firstAt = if (same) original.firstAt else firstAtPrefill(editing, next.everyHours.toWholeNumber() ?: 8, next.shiftOnLate, schedules, records))
+            next = next.copy(firstAt = if (same) original.firstAt else firstAtPrefill(editing, next.everyHours.toWholeNumber() ?: editing.everyHours ?: 8, next.shiftOnLate, schedules, records))
         }
         f = next
         errors = errors - key
@@ -329,7 +329,7 @@ fun MedAddScreen(
                             med?.let { withStyle(SpanStyle(color = OkcheColor.InkMuted, fontWeight = FontWeight.Normal, fontSize = 0.875.em)) { append("  ${medFormTitle(it.form)}") } }
                         },
                         Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 16.dp, vertical = 14.dp)
-                            .semantics { contentDescription = "누가 · 어떤 약, $petName ${med?.name.orEmpty()}" },
+                            .semantics { contentDescription = "누가 · 어떤 약, $petName ${med?.name.orEmpty()} ${med?.let { medFormTitle(it.form) }.orEmpty()}" },
                         color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(FontWeight.Bold),
                     )
                     Note("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요.")
@@ -367,7 +367,7 @@ fun MedAddScreen(
                 if (editing != null) {
                     Text(
                         "이 약 그만 먹이기",
-                        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { stopping = true }.padding(vertical = 12.dp),
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, enabled = !busy) { stopping = true }.padding(vertical = 12.dp),
                         color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )

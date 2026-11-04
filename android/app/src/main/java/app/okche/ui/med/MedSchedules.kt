@@ -244,7 +244,8 @@ private fun buildRows(f: ScheduleFields, unit: DoseUnit, now: Long): List<MedSch
 /** 고치기 처음 값: 그 줄의 지금 값. '처음 먹일 때'는 미리 채운 값. */
 fun scheduleFieldsOf(s: MedSchedule, firstAt: Long) = ScheduleFields(
     petIds = listOf(s.petId), medicationId = s.medicationId, dose = medNumber(s.amount), frequency = s.frequency,
-    everyDays = (s.everyDays ?: 2).toString(), startDate = s.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now(),
+    // 며칠마다가 아니던 줄을 며칠마다로 바꾸면 시작하는 날은 6시 기준 오늘(약 추가와 같음).
+    everyDays = (s.everyDays ?: 2).toString(), startDate = runCatching { LocalDate.parse(s.startDate ?: app.okche.store.OkcheDay.of(System.currentTimeMillis())) }.getOrElse { LocalDate.now() },
     weekdays = s.weekdays.sorted(), times = s.times.sorted().ifEmpty { listOf("08:00") }, everyHours = (s.everyHours ?: 8).toString(),
     firstAt = firstAt, shiftOnLate = s.shiftOnLate, reminder = s.reminder, leadMinutes = s.leadMinutes, howTo = s.howTo ?: HowTo.plain,
 )
@@ -284,7 +285,7 @@ enum class ChangeResult { None, SameRow, NewRow }
 
 /** 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로. */
 suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFields, f: ScheduleFields, now: Long = System.currentTimeMillis()): ChangeResult {
-    if (f == original) return ChangeResult.None
+    if (f == original || s.activeUntil != null) return ChangeResult.None // 닫힌 줄은 되살리지 않음
     if (core(f) != core(original)) {
         var next = f.copy(petIds = listOf(s.petId), medicationId = s.medicationId)
         if (next.frequency == MedFrequency.everyNHours && next.firstAt < now) next = next.copy(firstAt = roundedUp(now)) // 지금보다 이르면 지금
@@ -297,7 +298,9 @@ suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFiel
 }
 
 /** 이 약 그만 먹이기: 그 줄만 닫음(다른 아이가 먹는 같은 약·약방은 그대로). */
-suspend fun stopSchedule(dao: OkcheDao, s: MedSchedule, now: Long = System.currentTimeMillis()) = dao.update(s.copy(activeUntil = now, updatedAt = now))
+suspend fun stopSchedule(dao: OkcheDao, s: MedSchedule, now: Long = System.currentTimeMillis()) {
+    if (s.activeUntil == null) dao.update(s.copy(activeUntil = now, updatedAt = now)) // 이미 그만 먹인 때를 덮지 않음
+}
 
 /** 알림 스위치(바로 저장 — 그 줄을 고침, 5장). */
 suspend fun setReminder(dao: OkcheDao, s: MedSchedule, on: Boolean, now: Long = System.currentTimeMillis()) = dao.update(s.copy(reminder = on, updatedAt = now))

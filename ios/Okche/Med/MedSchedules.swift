@@ -271,7 +271,8 @@ enum MedSchedules {
         f.dose = MedRules.number(s.amount)
         f.frequency = s.frequency
         f.everyDays = String(s.everyDays ?? 2)
-        f.startDate = s.startDate.flatMap { PetRegistration.date($0, .okcheDevice) } ?? f.startDate
+        // 며칠마다가 아니던 줄을 며칠마다로 바꾸면 시작하는 날은 6시 기준 오늘(약 추가와 같음).
+        f.startDate = PetRegistration.date(s.startDate ?? OkcheDay.of(.now), .okcheDevice) ?? f.startDate
         f.weekdays = s.weekdays.sorted()
         f.times = s.times.isEmpty ? ["08:00"] : s.times.sorted()
         f.everyHours = String(s.everyHours ?? 8)
@@ -342,7 +343,7 @@ enum MedSchedules {
     /// 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로.
     @discardableResult
     static func change(_ s: MedSchedule, from original: Form, to f: Form, now: Date = .now, in context: ModelContext) throws -> ChangeResult {
-        guard f != original else { return .none }
+        guard f != original, s.activeUntil == nil else { return .none } // 닫힌 줄은 되살리지 않음
         if core(f) != core(original) {
             s.activeUntil = now
             s.updatedAt = now
@@ -368,6 +369,7 @@ enum MedSchedules {
 
     /// 이 약 그만 먹이기: 그 줄만 닫음(다른 아이가 먹는 같은 약·약방은 그대로).
     static func stop(_ s: MedSchedule, now: Date = .now, in context: ModelContext) throws {
+        guard s.activeUntil == nil else { return } // 이미 그만 먹인 때를 덮지 않음
         s.activeUntil = now
         s.updatedAt = now
         try save(context)

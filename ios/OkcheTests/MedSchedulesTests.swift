@@ -199,5 +199,13 @@ final class MedChangeTests: XCTestCase {
         try MedSchedules.stop(hours, now: at(2026, 10, 27, 9), in: context)
         XCTAssertEqual(hours.activeUntil, at(2026, 10, 27, 9))
         XCTAssertTrue(MedSchedules.openSeries(try all()).isEmpty)
+        // 그만 먹인 줄은 되살리지도, 그만 먹인 때를 덮지도 않음
+        try MedSchedules.stop(hours, now: at(2026, 10, 27, 11), in: context)
+        XCTAssertEqual(hours.activeUntil, at(2026, 10, 27, 9))
+        var f = MedSchedules.form(hours, firstAt: t0)
+        let original = f
+        f.times = ["10:00"]
+        XCTAssertEqual(try MedSchedules.change(hours, from: original, to: f, now: at(2026, 10, 27, 11), in: context), .none)
+        XCTAssertEqual(try all().count, 1)
     }
 }

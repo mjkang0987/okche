@@ -104,6 +104,7 @@ struct TangyakCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(med.name) · \(detail) · 고치기")
+        .accessibilityAddTraits(.isHeader) // 카드 사이를 제목으로 옮겨 다니게(안드로이드와 같음)
     }
 
     @ViewBuilder private var reminderToggle: some View {
@@ -192,7 +193,8 @@ struct MedAddView: View {
     @State private var pickedUnit: DoseUnit?
     private var unit: DoseUnit { pickedUnit ?? meds.first { $0.id == form.medicationId }?.unit ?? .pill }
 
-    private var editing: MedSchedule? { scheduleId.flatMap { id in schedules.first { $0.id == id } } }
+    /// 고칠 줄 — 그 사이 그만 먹였으면(닫힌 줄) 없음(되살리지 않게).
+    private var editing: MedSchedule? { scheduleId.flatMap { id in schedules.first { $0.id == id && $0.activeUntil == nil } } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -399,7 +401,9 @@ struct MedAddView: View {
         if let scheduleId {
             guard let editing else { return dismiss() } // 그 사이 그만 먹였으면 탕약으로
             pickedUnit = editing.unit
-            form = MedSchedules.form(editing, firstAt: prefill(editing))
+            // 미리 채우기는 그 줄의 간격·늦게 줬을 때로(폼이 아직 처음 값이라 폼 값을 쓰면 안 됨).
+            form = MedSchedules.form(editing, firstAt: MedSchedules.firstAtPrefill(editing, everyHours: editing.everyHours ?? 8,
+                                                                                  shiftOnLate: editing.shiftOnLate, series: schedules, records: records))
             original = form
             return
         }
@@ -432,7 +436,10 @@ struct MedAddView: View {
         } catch {
             stopping = false
             failed = true
-            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+            // 창이 닫히며 화면 읽기 초점이 옮겨 가는 사이 끊기지 않게 조금 뒤에.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+            }
         }
     }
 
@@ -442,12 +449,12 @@ struct MedAddView: View {
         return VStack(alignment: .leading, spacing: 6) {
             OkcheFieldLabel(title: "누가 · 어떤 약").accessibilityHidden(true)
             (Text("\(pets.first { $0.id == s.petId }?.name ?? "") · \(med?.name ?? "")")
-                + Text(med.map { "  \(MedRules.formTitle($0.form))" } ?? "").font(.subheadline).fontWeight(.regular).foregroundColor(OkcheColor.inkMuted))
+                + Text(med.map { "  \(MedRules.formTitle($0.form))" } ?? "").font(.system(size: 14)).fontWeight(.regular).foregroundColor(OkcheColor.inkMuted))
                 .okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 14).padding(.horizontal, 16)
                 .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                .accessibilityLabel("누가 · 어떤 약, \(pets.first { $0.id == s.petId }?.name ?? "") \(med?.name ?? "")")
+                .accessibilityLabel("누가 · 어떤 약, \(pets.first { $0.id == s.petId }?.name ?? "") \(med?.name ?? "") \(med.map { MedRules.formTitle($0.form) } ?? "")")
             note("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요.")
         }
     }

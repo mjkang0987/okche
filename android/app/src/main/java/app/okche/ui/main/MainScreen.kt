@@ -57,6 +57,7 @@ import app.okche.store.RecordKind
 import app.okche.ui.ButtonLook
 import app.okche.ui.OkchePrimaryButton
 import app.okche.ui.TabScreen
+import app.okche.ui.food.FoodCheckCard
 import app.okche.ui.goldFrame
 import app.okche.ui.toTextStyle
 import app.okche.ui.pet.companionDays
@@ -127,7 +128,7 @@ fun MainTab(
                     style = OkcheType.Display.toTextStyle(FontWeight.Normal).copy(fontSize = 16.sp, lineHeight = 22.sp),
                 )
                 PetCard(current, today)
-                // '사료 다 바꿨나요?' 카드 자리(7-4).
+                FoodCheckCard(current, day)
                 OkchePrimaryButton("기록하기", onRecord)
                 TodayRecords(pets, current, day, onOpenSura)
             }

@@ -57,7 +57,7 @@ enum QuickRecord {
             let slot = try MealRules.quickSlot(petId: petId, now: now, timeZone: timeZone, in: context)
             let record = Record(id: try slot.map { try MealRules.newRecordId(for: $0, in: context) } ?? UUID(),
                                 now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot?.key,
-                                data: MealRules.data(result: value, slotName: slot?.slot.name, givenGrams: slot?.slot.grams, leftGrams: nil))
+                                data: MealRules.data(result: value, foodId: try MealRules.foodId(petId, now, timeZone, in: context), slotName: slot?.slot.name, givenGrams: slot?.slot.grams, leftGrams: nil))
             context.insert(record)
             try save(context)
             return record
@@ -95,8 +95,16 @@ enum QuickRecord {
     /// 누구였는지 정하기.
     static func assign(_ record: Record, to petId: UUID?, now: Date = .now, in context: ModelContext) throws {
         guard record.petId != petId else { return }
+        // 수라는 정한 아이가 그날 먹던 사료로(7-4a). 던질 수 있는 일을 먼저 끝낸 뒤 한꺼번에 바꾼다.
+        var data = record.data
+        if record.kind == RecordKind.meal.rawValue {
+            var json = MealRules.json(record)
+            json["foodId"] = try FoodRules.foodId(petId: petId, day: record.day, in: context)?.uuidString.lowercased()
+            data = String(decoding: try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]), as: UTF8.self)
+        }
         record.petId = petId
         record.updatedAt = now
+        record.data = data
         try save(context)
     }
 

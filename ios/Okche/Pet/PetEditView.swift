@@ -20,6 +20,9 @@ struct PetEditView: View {
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
     @Query private var weights: [Record]
+    @Query(filter: #Predicate<FoodChange> { $0.deletedAt == nil }) private var foodChanges: [FoodChange]
+    @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
+    @State private var changingFood = false
 
     init(form: PetEditing) {
         _form = State(initialValue: form)
@@ -127,10 +130,25 @@ struct PetEditView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 지금 먹는 사료·옥체(체중). 보기만(사료는 8단계, 체중 화면은 그 단계에서 눌리게).
+    /// 지금 먹는 사료(누르면 사료 바꾸기 — 7-4a, 추억 아이는 보기만)·옥체(체중, 그 단계에서 눌리게).
     private var laterRows: some View {
         VStack(spacing: 0) {
-            laterRow(title: "지금 먹는 사료", value: "아직 없어요")
+            let food = FoodRules.change(at: OkcheDay.of(.now), petId: pet.id, in: foodChanges)
+                .map { change in FoodRules.line(change, food: foods.first { $0.id == change.foodId }) } ?? "아직 없어요"
+            if pet.memorializedAt == nil {
+                Button { changingFood = true } label: {
+                    HStack {
+                        laterRow(title: "지금 먹는 사료", value: food)
+                        Text("›").okcheText(OkcheType.body).foregroundStyle(OkcheColor.lineStrong).accessibilityHidden(true)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("사료 바꾸기")
+                .sheet(isPresented: $changingFood) { FoodChangeSheet(pet: pet) }
+            } else {
+                laterRow(title: "지금 먹는 사료", value: food)
+            }
             Rectangle().fill(OkcheColor.line).frame(height: 1)
             laterRow(title: "옥체 · 체중", value: latestWeight ?? "아직 없어요")
         }

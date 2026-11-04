@@ -25,7 +25,7 @@ struct MainTab: View {
                             .okcheText(greeting).foregroundStyle(OkcheColor.namsaekDeep)
                             .padding(.top, -6)
                         MainPetCard(pet: pet, today: now)
-                        // '사료 다 바꿨나요?' 카드 자리(7-4).
+                        FoodCheckCard(pet: pet, day: day)
                         Button("기록하기") { openTab(.record) }.buttonStyle(.okchePrimary)
                         TodayRecordSection(petId: pet.id, day: day)
                     } else {

@@ -285,7 +285,8 @@ struct OkcheSwitchRow: View {
 /// ⑤ 큰 버튼: 52 높이 남색, 흰 18 굵은 글자. 모양 옵션(6-3): 흰 바탕 테두리(`outlined`)·점선(`dashed`) 52, 남색 알약 40(`pill`),
 /// 지우기처럼 되돌릴 수 없는 일은 연지색 테두리·굵은 글자(`danger`, 6-4).
 struct OkchePrimaryButtonStyle: ButtonStyle {
-    enum Look { case filled, outlined, dashed, pill, danger }
+    /// `emphasis`: 남색 테두리·굵은 남색 글자(둘 중 권하는 답 — '다 바꿨어요', 7-4a).
+    enum Look { case filled, outlined, dashed, pill, danger, emphasis }
     var look: Look = .filled
     @ScaledMetric(relativeTo: .title3) private var height: CGFloat = 52
     @ScaledMetric(relativeTo: .subheadline) private var pillHeight: CGFloat = 40
@@ -300,15 +301,15 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
                     .padding(.horizontal, OkcheSpacing.space4)
                     .frame(maxWidth: .infinity, minHeight: height)
                     .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-            case .outlined, .dashed, .danger:
+            case .outlined, .dashed, .danger, .emphasis:
                 configuration.label
-                    .okcheText(OkcheType.body, weight: look == .danger ? .bold : nil)
-                    .foregroundStyle(look == .danger ? OkcheColor.yeonji : OkcheColor.ink)
+                    .okcheText(OkcheType.body, weight: look == .danger || look == .emphasis ? .bold : nil)
+                    .foregroundStyle(look == .danger ? OkcheColor.yeonji : look == .emphasis ? OkcheColor.namsaekDeep : OkcheColor.ink)
                     .padding(.horizontal, OkcheSpacing.space3)
                     .frame(maxWidth: .infinity, minHeight: height)
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                     .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
-                        .strokeBorder(look == .danger ? OkcheColor.yeonji : OkcheColor.lineStrong,
+                        .strokeBorder(look == .danger ? OkcheColor.yeonji : look == .emphasis ? OkcheColor.namsaek : OkcheColor.lineStrong,
                                       style: StrokeStyle(lineWidth: 1.5, dash: look == .dashed ? [6, 4] : [])))
             case .pill:
                 configuration.label

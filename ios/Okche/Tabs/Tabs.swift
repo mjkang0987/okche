@@ -20,9 +20,66 @@ struct AlbumTab: View {
 struct MoreTab: View {
     var body: some View {
         NavigationStack {
-            // 더보기의 다른 줄(사료·다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
-            TabScreen(title: "더보기", content: { PetManageSection() })
+            // 더보기의 다른 줄(다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
+            TabScreen(title: "더보기", content: { PetManageSection(); MoreMenu() })
                 .toolbar(.hidden, for: .navigationBar)
         }
+    }
+}
+
+/// 더보기 메뉴(보드 `More`): 흰 칸 안 52 줄, 이름 + 쉬운 말 + ›. 사료 · 처방식은 지금 보는 아이의 사료 바꾸기 시트.
+private struct MoreMenu: View {
+    @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
+    @AppStorage("lastPetId") private var lastPetId = ""
+    @State private var foodPet: Pet?
+    @Query(filter: #Predicate<FoodChange> { $0.deletedAt == nil }) private var changes: [FoodChange]
+    @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
+
+    var body: some View {
+        // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음).
+        if let pet = PetTitle.current(pets, lastPetId: lastPetId), pet.memorializedAt == nil {
+            VStack(spacing: 0) {
+                // 아래 줄에 지금 먹는 사료 — 바꾸면 바로 바뀌어 저장한 게 보이게(2026-11-04 사용자).
+                let food = FoodRules.change(at: OkcheDay.of(.now), petId: pet.id, in: changes)
+                    .map { change in FoodRules.line(change, food: foods.first { $0.id == change.foodId }) }
+                MoreMenuRow(title: "사료 · 처방식", detail: food) { foodPet = pet }
+            }
+            .padding(.horizontal, OkcheSpacing.space4)
+            .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("설정 메뉴")
+            .sheet(item: $foodPet) { FoodChangeSheet(pet: $0) }
+        }
+    }
+}
+
+/// 더보기 메뉴 줄: 이름(+ 쉬운 말) + ›, 52 높이.
+struct MoreMenuRow: View {
+    let title: String
+    var note: String?
+    /// 아래 줄(흐린 14) — 사료 줄의 지금 먹는 사료.
+    var detail: String?
+    let action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 52
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    (Text(title) + Text(note.map { " · \($0)" } ?? "").font(.subheadline).foregroundColor(OkcheColor.inkMuted))
+                        .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                    if let detail {
+                        Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    }
+                }
+                .padding(.vertical, detail == nil ? 0 : 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("›").okcheText(OkcheType.body).foregroundStyle(OkcheColor.lineStrong).accessibilityHidden(true)
+            }
+            .multilineTextAlignment(.leading)
+            .frame(minHeight: height)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

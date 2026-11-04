@@ -15,6 +15,7 @@ struct SuraScreen: View {
     /// '괜찮아요'를 누른 아이 ID들(이 기기만의 설정 `mealHintDismissed`, 쉼표로 이음).
     @AppStorage("mealHintDismissed") private var hintDismissed = ""
     @State private var editing: MealMode?
+    @Query(filter: #Predicate<Food> { $0.deletedAt == nil }) private var foods: [Food]
     /// '오늘 남긴 수라' 줄을 눌러 결과를 바꿀 기록(끼니 없이 남긴 수라 고치기 — 2026-11-04 사용자).
     @State private var changing: Record?
     @State private var failed = false
@@ -92,7 +93,10 @@ struct SuraScreen: View {
                 Text(plan.mode == .feeder ? "오늘은 남은 끼니가 없어요. 내일부터 끼니 시간에 기록돼요." : "오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요.").okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
             }
             ForEach(slots, id: \.key) { slot in
-                MealCard(slot: slot, now: now, record: meals.first { $0.slotKey == slot.key }) { result in
+                let record = meals.first { $0.slotKey == slot.key }
+                let foodId = record.flatMap { MealRules.json($0)["foodId"] as? String }
+                MealCard(slot: slot, now: now, record: record,
+                         foodName: foods.first { $0.id.uuidString.lowercased() == foodId }?.name) { result in
                     run { try MealRules.pick(result, for: slot, petId: pet.id, in: context) }
                 } onLeft: { record, grams in
                     run { try MealRules.setLeft(grams, on: record, in: context) }
@@ -276,6 +280,7 @@ private struct MealCard: View {
     let slot: MealRules.Occurrence
     let now: Date
     let record: Record?
+    var foodName: String?
     let onPick: (String) -> Void
     let onLeft: (Record, Int?) -> Void
     @State private var left = ""
@@ -328,7 +333,8 @@ private struct MealCard: View {
     private func status(feeder: Bool, waiting: Bool) -> String {
         if waiting { return "아직 시간 전" }
         guard let record else { return "아직 기록 전" }
-        return record.auto ? "자동 기록됨" : QuickRecord.time(record)
+        // '08:10 · 건사료' — 그때 먹던 사료(7-4a).
+        return ([record.auto ? "자동 기록됨" : QuickRecord.time(record)] + [foodName].compactMap { $0 }).joined(separator: " · ")
     }
 
     private var stored: String { record.flatMap { (MealRules.json($0)["leftGrams"] as? Int).map(String.init) } ?? "" }

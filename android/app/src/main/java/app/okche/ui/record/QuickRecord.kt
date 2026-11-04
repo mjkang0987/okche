@@ -60,7 +60,7 @@ suspend fun saveQuickRecord(dao: OkcheDao, row: QuickRow, value: String, petId: 
     if (row.kind == RecordKind.meal) {
         val slot = quickMealSlot(dao, petId, now, zone)
         return Record(id = slot?.let { newMealRecordId(dao, it) } ?: app.okche.store.newId(), createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot?.key,
-            data = mealData(value, slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
+            data = mealData(value, app.okche.ui.food.foodIdAt(dao, petId, OkcheDay.of(now, zone)), slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
     }
     val data = JSONObject().put(row.key, if (row.kind == RecordKind.vomit) JSONArray(listOf(value)) else value).toString()
     val record = Record(createdAt = now, petId = petId, kind = row.kind, occurredAt = now, day = OkcheDay.of(now, zone), data = data)
@@ -75,7 +75,15 @@ fun daySummary(records: List<Record>): String? =
 
 /** 누구였는지 정하기. */
 suspend fun assignRecord(dao: OkcheDao, record: Record, petId: String?, now: Long = System.currentTimeMillis()) {
-    if (record.petId != petId) dao.update(record.copy(petId = petId, updatedAt = now))
+    if (record.petId == petId) return
+    // 수라는 정한 아이가 그날 먹던 사료로(7-4a). 칸 이름 순은 mealData와 같게 다시 만든다.
+    val data = if (record.kind != RecordKind.meal) record.data else runCatching { JSONObject(record.data) }.getOrNull()?.let { json ->
+        mealData(
+            json.optString("result"), app.okche.ui.food.foodIdAt(dao, petId, record.day), json.optString("slotName").takeIf { it.isNotEmpty() },
+            if (json.has("givenGrams")) json.optInt("givenGrams") else null, if (json.has("leftGrams")) json.optInt("leftGrams") else null,
+        )
+    } ?: record.data
+    dao.update(record.copy(petId = petId, updatedAt = now, data = data))
 }
 
 /** 기록 지우기: `deletedAt`·`updatedAt`, '되돌릴 수 없어요'라서 선택 칸을 비움 — `data` = `{}`, `slotKey`(데이터 1-4). */

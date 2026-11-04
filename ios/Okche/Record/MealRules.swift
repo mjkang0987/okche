@@ -94,14 +94,20 @@ enum MealRules {
         .sorted { $0.at < $1.at }
     }
 
-    /// 수라 기록 `data`: 결과 + 끼니 이름·준 양·남은 양(있을 때만).
-    static func data(result: String, slotName: String?, givenGrams: Int?, leftGrams: Int?) -> String {
+    /// 수라 기록 `data`: 결과 + 그때 먹던 사료·끼니 이름·준 양·남은 양(있을 때만). 사료 ID는 소문자(두 플랫폼 같은 글자).
+    static func data(result: String, foodId: String?, slotName: String?, givenGrams: Int?, leftGrams: Int?) -> String {
         var json: [String: Any] = ["result": result]
+        json["foodId"] = foodId
         json["slotName"] = slotName
         json["givenGrams"] = givenGrams
         json["leftGrams"] = result == "some" ? leftGrams : nil
         let bytes = (try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])) ?? Data("{}".utf8)
         return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /// 그때(6시 기준 그날) 먹던 사료 ID 글자.
+    static func foodId(_ petId: UUID?, _ at: Date, _ timeZone: TimeZone, in context: ModelContext) throws -> String? {
+        try FoodRules.foodId(petId: petId, day: OkcheDay.of(at, in: timeZone), in: context)?.uuidString.lowercased()
     }
 
     static func json(_ record: Record) -> [String: Any] {
@@ -142,14 +148,14 @@ enum MealRules {
             let json = json(existing)
             // 같은 결과를 다시 고르면 아무것도 안 바꾼다('자동 기록됨' 표시도 그대로).
             if json["result"] as? String == result { return existing }
-            existing.data = data(result: result, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
+            existing.data = data(result: result, foodId: json["foodId"] as? String, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
                                  leftGrams: json["leftGrams"] as? Int)
             existing.updatedAt = now
             existing.auto = false // 보호자가 고친 기록
             record = existing
         } else {
             record = Record(id: try newRecordId(for: slot, in: context), now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot.key,
-                            data: data(result: result, slotName: slot.slot.name, givenGrams: slot.slot.grams, leftGrams: nil))
+                            data: data(result: result, foodId: try foodId(petId, now, timeZone, in: context), slotName: slot.slot.name, givenGrams: slot.slot.grams, leftGrams: nil))
             context.insert(record)
         }
         try save(context)
@@ -163,7 +169,7 @@ enum MealRules {
     static func setResult(_ result: String, on record: Record, now: Date = .now, in context: ModelContext) throws {
         let json = json(record)
         guard json["result"] as? String != result else { return }
-        record.data = data(result: result, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
+        record.data = data(result: result, foodId: json["foodId"] as? String, slotName: json["slotName"] as? String, givenGrams: json["givenGrams"] as? Int,
                            leftGrams: json["leftGrams"] as? Int)
         record.updatedAt = now
         record.auto = false
@@ -174,7 +180,7 @@ enum MealRules {
     @discardableResult
     static func pickNow(_ result: String, petId: UUID, now: Date = .now, timeZone: TimeZone = .autoupdatingCurrent, in context: ModelContext) throws -> Record {
         let record = Record(now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone,
-                            data: data(result: result, slotName: nil, givenGrams: nil, leftGrams: nil))
+                            data: data(result: result, foodId: try foodId(petId, now, timeZone, in: context), slotName: nil, givenGrams: nil, leftGrams: nil))
         context.insert(record)
         try save(context)
         return record
@@ -183,7 +189,7 @@ enum MealRules {
     /// '남은 양 (g, 선택)': 0~2000 정수, 비우면 없음.
     static func setLeft(_ grams: Int?, on record: Record, now: Date = .now, in context: ModelContext) throws {
         let json = json(record)
-        record.data = data(result: json["result"] as? String ?? "some", slotName: json["slotName"] as? String,
+        record.data = data(result: json["result"] as? String ?? "some", foodId: json["foodId"] as? String, slotName: json["slotName"] as? String,
                            givenGrams: json["givenGrams"] as? Int, leftGrams: grams)
         record.updatedAt = now
         try save(context)
@@ -244,6 +250,7 @@ enum MealRules {
         var ids = Set(meals.map(\.id))
         var keys = Set(meals.filter { $0.deletedAt == nil }.compactMap(\.slotKey))
         let cal = calendar(timeZone)
+        let changes = try FoodRules.allChanges(in: context)
         var made = 0
         for plan in plans {
             let until = min(plan.activeUntil ?? now, now)
@@ -257,7 +264,7 @@ enum MealRules {
                     guard !ids.contains(id), !keys.contains(o.key) else { continue }
                     // `createdAt`은 만든 때, `updatedAt`만 끼니 예정 시각(1-5 — 보호자가 고친 기록이 병합에서 이기게).
                     let record = Record(id: id, now: now, petId: plan.petId, kind: .meal, occurredAt: o.at, timeZone: timeZone, slotKey: o.key,
-                                        data: data(result: "all", slotName: slot.name, givenGrams: slot.grams, leftGrams: nil), auto: true)
+                                        data: data(result: "all", foodId: FoodRules.change(at: OkcheDay.of(o.at, in: timeZone), petId: plan.petId, in: changes)?.foodId.uuidString.lowercased(), slotName: slot.name, givenGrams: slot.grams, leftGrams: nil), auto: true)
                     record.updatedAt = o.at
                     context.insert(record)
                     ids.insert(id)

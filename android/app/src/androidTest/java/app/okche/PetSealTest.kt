@@ -168,6 +168,9 @@ class PetSwitchFlowTest {
         }
         scenario = ActivityScenario.launch(MainActivity::class.java)
         waitFor(hasText("+ 새 아기씨 모시기"))
+        rule.onNode(tab("문안")).performClick()
+        waitFor(hasText("아직 모신 아이가 없어요. 아기씨를 모시면 여기에서 날마다 안부를 여쭤요."))
+        assertEquals(2, rule.onAllNodes(hasText("+ 새 아기씨 모시기")).fetchSemanticsNodes().size) // 머리 알약 + 점선 버튼
         rule.onNode(tab("더보기")).performClick()
         waitFor(hasText("아직 모신 아이가 없어요."))
         rule.onNode(hasText("+ 새 아기씨 모시기").and(hasClickAction())).performClick()

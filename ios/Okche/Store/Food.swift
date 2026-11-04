@@ -21,6 +21,8 @@ struct MealSlot: Codable, Hashable {
     var name: String
     /// `HH:mm`
     var time: String
+    /// 그 끼니에 주는 양(g, 선택 — 2026-11-01). 옛 줄엔 없음.
+    var grams: Int? = nil
 }
 
 /// 사료 (8장). 지워도 `name`을 남긴다.

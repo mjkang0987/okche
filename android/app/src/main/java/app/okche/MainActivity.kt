@@ -25,6 +25,7 @@ import app.okche.store.setOnboardingDone
 import app.okche.ui.OnboardingScreen
 import app.okche.ui.RootTabs
 import app.okche.ui.pet.PetRegisterScreen
+import app.okche.ui.record.fillFeeder
 import app.okche.ui.theme.OkcheColor
 import kotlinx.coroutines.launch
 
@@ -39,6 +40,12 @@ class MainActivity : ComponentActivity() {
         setContent { OkcheApp() }
         // 저장소를 열고 설정 줄을 없을 때만 만든다(IGNORE라 화면을 다시 만들 때 여러 번 불려도 안전).
         lifecycleScope.launch { OkcheDatabase.get(this@MainActivity).dao().loadOrCreateSetting() }
+    }
+
+    // 앱을 열 때·다시 앞으로 올 때 급식기 지난 끼니를 채운다(7-3).
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch { runCatching { fillFeeder(OkcheDatabase.get(this@MainActivity).dao()) } }
     }
 }
 

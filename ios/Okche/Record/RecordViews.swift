@@ -12,6 +12,8 @@ struct RecordTab: View {
     @State private var justSaved: UUID?
     @State private var failed = false
     @State private var detail: DetailTarget?
+    /// 일기 탭 안 화면 쌓기(수라 화면 — 7-3). `navigationDestination(isPresented:)`는 이 탭에서 화면을 끝없이 다시 그려 멈춰서(2026-11-04 확인) 경로로.
+    @State private var path: [RecordRoute] = []
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
     private var chipPets: [Pet] { pets.filter { $0.memorializedAt == nil } }
@@ -23,19 +25,24 @@ struct RecordTab: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             TabScreen(title: "승정원일기", subtitle: "매일 기록", trailing: { PetSeal() }) {
                 FieldGroup(title: "누구 기록인가요?") {
                     OkcheChoiceChips(options: chipPets.map { ($0.id.uuidString, $0.name) } + [("", "누군지 몰라요")],
                                      selection: Binding(get: { who?.uuidString ?? "" }, set: { pick($0 ?? "") }),
                                      allowsNone: false)
                 }
-                QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { detail = DetailTarget(kind: $0, petId: who) })
+                // 수라 ⋯은 수라 화면(지금 보는 아이 — 7-3), 아이가 없거나 추억이면 숨김.
+                let suraPet = PetTitle.current(pets, lastPetId: lastPetId).map { $0.memorializedAt == nil } ?? false
+                QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
+                    if kind == .meal { path.append(.sura) } else { detail = DetailTarget(kind: kind, petId: who) }
+                }, mealMore: suraPet)
                 Text("누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: RecordRoute.self) { _ in SuraScreen() }
         }
         .sheet(item: $detail) { target in
             RecordDetailSheet(target: target) { record, isNew in
@@ -68,11 +75,15 @@ struct RecordTab: View {
     }
 }
 
+enum RecordRoute: Hashable { case sura }
+
 /// 바로 기록 줄 넷(구토·매화·소피·수라): 아이콘·종류 이름 + 56 높이 버튼 셋 + ⋯ 자세히(수라는 7-3), 흰 카드 안 줄 사이 선(보드 `Record`).
 /// 큰 글자·좁은 폭에선 이름 아래로 버튼.
 struct QuickRecordCard: View {
     let onTap: (QuickRecord.Row, String) -> Void
     let onDetail: (RecordKind) -> Void
+    /// 수라 ⋯(수라 화면)을 보일지.
+    var mealMore = false
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
@@ -120,7 +131,7 @@ struct QuickRecordCard: View {
 
     /// ⋯ 자세히 남기기(점선 44) — 자세히 시트가 있는 종류만.
     @ViewBuilder private func more(_ row: QuickRecord.Row) -> some View {
-        if !RecordDetail.fields(row.kind).isEmpty {
+        if !RecordDetail.fields(row.kind).isEmpty || (row.kind == .meal && mealMore) {
             Button { onDetail(row.kind) } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
                     .frame(width: min(moreSize, 72), height: min(moreSize, 72)) // 큰 글자에서 지나치게 커지지 않게

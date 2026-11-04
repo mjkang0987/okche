@@ -102,9 +102,18 @@ internal fun ordinal(n: Int) =
 
 /** 화면 머리: 왼쪽 버튼(닫기·뒤로) + 제목 22 + 쉬운 말 14. 큰 글자에서 한 줄에 안 들어가면 쉬운 말이 아래로. */
 @Composable
-internal fun FormHeader(title: String, note: String, icon: ImageVector, iconLabel: String, onClick: () -> Unit, enabled: Boolean = true) {
+internal fun FormHeader(
+    title: String,
+    note: String,
+    icon: ImageVector,
+    iconLabel: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    /** 머리 오른쪽(수라 화면의 낙관 — 7-3). 있으면 오른쪽 여백 16(보드). */
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = OkcheSpacing.Space2),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = OkcheSpacing.Space2, end = if (trailing == null) OkcheSpacing.Space2 else OkcheSpacing.Space4),
         horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -121,6 +130,7 @@ internal fun FormHeader(title: String, note: String, icon: ImageVector, iconLabe
             Text(title, Modifier.singleLineHeight(style.lineHeight), color = OkcheColor.Ink, style = style, maxLines = 1)
             Text(note, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
+        trailing?.invoke()
     }
 }
 

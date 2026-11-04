@@ -300,6 +300,36 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '사료 · 이물질 · 붉은색 · 3번 이상'")).firstMatch.waitForExistence(timeout: 5))
     }
 
+    /// 수라 ⋯ → 끼니 없음(지금 먹은 것·오늘 남긴 수라) → 끼니 시간 정하기 → 끼니 칸 남김 → 급식기로 바꾸기 (7-3).
+    func testSuraNoPlanThenPlanThenFeeder() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        let more = app.buttons["수라 자세히 남기기"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        XCTAssertTrue(app.staticTexts["끼니 시간을 정해 둘까요?"].waitForExistence(timeout: 3))
+        app.buttons["지금 남김"].tap()
+        XCTAssertTrue(app.staticTexts["오늘 남긴 수라"].waitForExistence(timeout: 3))
+        app.buttons["괜찮아요"].tap()
+        XCTAssertFalse(app.staticTexts["끼니 시간을 정해 둘까요?"].waitForExistence(timeout: 1)) // 다시 안 뜸
+
+        tapBelow(app.buttons["끼니 시간 정하기 ›"], in: app)
+        XCTAssertTrue(app.buttons["아침 시간"].waitForExistence(timeout: 3))
+        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertTrue(app.buttons["끼니 시간 바꾸기"].waitForExistence(timeout: 3))
+        // 오늘 정한 끼니는 아직 지나지 않은 것만 칸이 생긴다(18시 뒤엔 없음) — 있으면 남김까지.
+        let some = app.buttons["남김"].firstMatch
+        if some.waitForExistence(timeout: 2) {
+            some.tap()
+            XCTAssertTrue(app.textFields.matching(NSPredicate(format: "label ENDSWITH '남은 양 (그램, 선택)'")).firstMatch.waitForExistence(timeout: 3))
+        } else {
+            XCTAssertTrue(app.staticTexts["오늘은 남은 끼니가 없어요. 내일부터 끼니마다 남겨요."].exists)
+        }
+
+        app.buttons["급식기 (수라간)"].tap()
+        XCTAssertTrue(app.buttons["급식기 시간 바꾸기"].waitForExistence(timeout: 3))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

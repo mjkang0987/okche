@@ -39,6 +39,15 @@ enum QuickRecord {
     @discardableResult
     static func save(_ row: Row, value: String, petId: UUID?, now: Date = .now, timeZone: TimeZone = .autoupdatingCurrent,
                      in context: ModelContext) throws -> Record {
+        // 수라는 끼니가 있으면 지금 끼니 차례로(그 차례에 이미 있으면 추가 식사 — 7-3).
+        if row.kind == .meal {
+            let slot = try MealRules.quickSlot(petId: petId, now: now, timeZone: timeZone, in: context)
+            let record = Record(now: now, petId: petId, kind: .meal, occurredAt: now, timeZone: timeZone, slotKey: slot?.key,
+                                data: MealRules.data(result: value, slotName: slot?.slot.name, givenGrams: slot?.slot.grams, leftGrams: nil))
+            context.insert(record)
+            try save(context)
+            return record
+        }
         let payload: Any = row.kind == .vomit ? [value] : value
         let data = try JSONSerialization.data(withJSONObject: [row.key: payload], options: [.sortedKeys])
         let record = Record(now: now, petId: petId, kind: row.kind, occurredAt: now, timeZone: timeZone,

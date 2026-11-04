@@ -3,6 +3,8 @@ import SwiftUI
 /// 하단 탭 5개. 순서는 디자인 기준(일기 → 문안 → 실록 → 어진첩 → 더보기), 첫 화면은 일기.
 struct RootTabView: View {
     @State private var tab = AppTab.record
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var context
 
     var body: some View {
         TabView(selection: $tab) {
@@ -24,5 +26,7 @@ struct RootTabView: View {
                 .tag(AppTab.more)
         }
         .environment(\.openTab) { tab = $0 }
+        // 앱을 열 때·다시 앞으로 올 때 급식기 지난 끼니를 채운다(7-3).
+        .onChange(of: scenePhase, initial: true) { if scenePhase == .active { try? MealRules.fillFeeder(in: context) } }
     }
 }

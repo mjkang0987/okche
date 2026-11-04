@@ -14,8 +14,8 @@ enum class SnackKind { lickable, freezeDried, jerky, wet, prescription, human }
 @Suppress("EnumEntryName")
 enum class MealMode { direct, feeder }
 
-/** 끼니 이름과 시간(`HH:mm`). */
-data class MealSlot(val name: String, val time: String)
+/** 끼니 이름과 시간(`HH:mm`), 그 끼니에 주는 양(g, 선택 — 2026-11-01. 옛 줄엔 없음). */
+data class MealSlot(val name: String, val time: String, val grams: Int? = null)
 
 /** 사료 (8장). 지워도 `name`을 남긴다. */
 @Entity(tableName = "food")

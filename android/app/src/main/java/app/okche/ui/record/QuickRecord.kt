@@ -48,6 +48,12 @@ fun recordValue(record: Record): String {
 
 /** 바로 기록: 그때 시각·6시 기준 `day`로 바로 저장. `petId`가 없으면 누군지 모름. */
 suspend fun saveQuickRecord(dao: OkcheDao, row: QuickRow, value: String, petId: String?, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): Record {
+    // 수라는 끼니가 있으면 지금 끼니 차례로(그 차례에 이미 있으면 추가 식사 — 7-3).
+    if (row.kind == RecordKind.meal) {
+        val slot = quickMealSlot(dao, petId, now, zone)
+        return Record(createdAt = now, petId = petId, kind = RecordKind.meal, occurredAt = now, day = OkcheDay.of(now, zone), slotKey = slot?.key,
+            data = mealData(value, slot?.slot?.name, slot?.slot?.grams, null)).also { dao.insert(it) }
+    }
     val data = JSONObject().put(row.key, if (row.kind == RecordKind.vomit) JSONArray(listOf(value)) else value).toString()
     val record = Record(createdAt = now, petId = petId, kind = row.kind, occurredAt = now, day = OkcheDay.of(now, zone), data = data)
     dao.insert(record)

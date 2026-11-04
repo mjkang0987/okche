@@ -193,8 +193,8 @@ struct MedAddView: View {
     @State private var pickedUnit: DoseUnit?
     private var unit: DoseUnit { pickedUnit ?? meds.first { $0.id == form.medicationId }?.unit ?? .pill }
 
-    /// 고칠 줄 — 그 사이 그만 먹였으면(닫힌 줄) 없음(되살리지 않게).
-    private var editing: MedSchedule? { scheduleId.flatMap { id in schedules.first { $0.id == id && $0.activeUntil == nil } } }
+    /// 고칠 줄 — 닫힌 줄은 start()에서 거름(여기서 거르면 그만 먹이고 닫히는 동안 약 추가 화면으로 깜빡임).
+    private var editing: MedSchedule? { scheduleId.flatMap { id in schedules.first { $0.id == id } } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -399,7 +399,7 @@ struct MedAddView: View {
         guard !started else { return }
         started = true
         if let scheduleId {
-            guard let editing else { return dismiss() } // 그 사이 그만 먹였으면 탕약으로
+            guard let editing, editing.activeUntil == nil else { return dismiss() } // 그 사이 그만 먹였으면 탕약으로
             pickedUnit = editing.unit
             // 미리 채우기는 그 줄의 간격·늦게 줬을 때로(폼이 아직 처음 값이라 폼 값을 쓰면 안 됨).
             form = MedSchedules.form(editing, firstAt: MedSchedules.firstAtPrefill(editing, everyHours: editing.everyHours ?? 8,

@@ -142,7 +142,7 @@ fun openSeries(schedules: List<MedSchedule>) = schedules.filter { it.deletedAt =
 fun medCards(schedules: List<MedSchedule>, pets: List<Pet>, now: Long = System.currentTimeMillis()): List<Pair<MedSchedule, Pet>> {
     val alive = pets.filter { it.deletedAt == null && it.memorializedAt == null }.associateBy { it.id }
     return openSeries(schedules).mapNotNull { s -> alive[s.petId]?.let { s to it } }
-        .sortedWith(compareBy<Pair<MedSchedule, Pet>, Long?>(nullsLast()) { nextDue(it.first, now) }.thenBy { it.second.createdAt })
+        .sortedWith(compareBy<Pair<MedSchedule, Pet>, Long?>(nullsLast()) { nextDue(it.first, now) }.thenBy { it.second.createdAt }.thenBy { it.first.createdAt }.thenBy { it.first.id }) // 늘 같은 순서로
 }
 
 /** 하루 양(일분 셈): 매일 = 시간 수 × 양, 며칠마다 ÷ 간격, 요일 × 요일 수 ÷ 7, 몇 시간마다 × 24 ÷ 간격, 필요할 때만 0. */

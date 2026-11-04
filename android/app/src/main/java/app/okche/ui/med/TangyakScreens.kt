@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -80,6 +81,7 @@ import app.okche.ui.food.SnackPickCard
 import app.okche.ui.okcheSwitchColors
 import app.okche.ui.pet.FormHeader
 import app.okche.ui.pet.ordinal
+import app.okche.ui.pet.toWholeNumber
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheSpacing
@@ -152,12 +154,14 @@ private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String
         }
         val toggle = @Composable {
             if (s.frequency != MedFrequency.asNeeded) {
+                // 줄 전체가 스위치 하나(TalkBack이 이름과 함께 한 번에 읽게 — OkcheSwitchRow와 같은 방식).
                 Row(
-                    Modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) { contentDescription = "${med.name} ${pet.name} 알림" },
+                    Modifier.heightIn(min = 48.dp).toggleable(s.reminder, role = Role.Switch, onValueChange = onReminder)
+                        .semantics { contentDescription = "${med.name} ${pet.name} 알림" },
                     horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("알림", Modifier.clearAndSetSemantics {}, color = OkcheColor.Ink, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-                    Switch(s.reminder, onReminder, colors = okcheSwitchColors())
+                    Switch(s.reminder, null, colors = okcheSwitchColors())
                 }
             }
         }
@@ -226,8 +230,12 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
     var adding by rememberSaveable { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    val anchors = remember { app.okche.ui.pet.Anchors() }
     val listed = meds.filter { it.deletedAt == null }.sortedBy { it.createdAt }
-    val unit = meds.firstOrNull { it.id == f.medicationId }?.unit ?: app.okche.store.DoseUnit.pill
+    // 고른 약의 단위 — 고를 때 기억해 둔다(방금 들인 약이 목록에 아직 안 떠도 맞게).
+    var pickedUnit by remember { mutableStateOf<app.okche.store.DoseUnit?>(null) }
+    // shortcut: 화면을 돌리면 적던 칸이 처음 값으로 돌아감, 불편하다는 말이 나오면 칸을 rememberSaveable로.
+    val unit = pickedUnit ?: meds.firstOrNull { it.id == f.medicationId }?.unit ?: app.okche.store.DoseUnit.pill
 
     fun edit(key: String, change: ScheduleFields.() -> ScheduleFields) {
         f = f.change()
@@ -235,6 +243,7 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
     }
 
     fun pick(med: Medication) {
+        pickedUnit = med.unit
         f = f.copy(medicationId = med.id, dose = medNumber(med.doseAmount)) // 그 약의 '한 번에'
         errors = errors - "med" - "dose"
     }
@@ -243,7 +252,10 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
         if (busy) return
         errors = scheduleErrors(f)
         if (errors.isNotEmpty()) {
-            view.announceForAccessibility(errors.values.first())
+            // 화면 위에서부터 첫 오류 칸으로 옮겨 가 눈에 보이게.
+            val first = errors.keys.first()
+            scope.launch { anchors.goTo(first, focusable = false) }
+            view.announceForAccessibility(if (errors.size == 1) errors.getValue(first) else "고칠 곳 ${errors.size}개. ${errors.getValue(first)}")
             return
         }
         busy = true
@@ -261,14 +273,14 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
             Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(anchors.of("pets"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OkcheMultiChips("누가 먹나요?", alive.map { it.id to it.name }, f.petIds, { id ->
                     edit("pets") { copy(petIds = if (id in petIds) petIds - id else petIds + id) }
                 }, hint = "(여럿 고를 수 있어요)")
                 Note("여럿 고르면 아이마다 따로 만들어져요. 양·시간은 나중에 아이마다 고칠 수 있어요.")
                 errors["pets"]?.let { OkcheErrorText(it) }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(anchors.of("med"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OkcheFieldLabel("약방에서 고르기", Modifier.semantics { heading() })
                 for (med in listed) {
                     val left = medRemaining(med, records)?.let { "남은 ${medNumber(maxOf(it, 0.0))}${unitTitle(med.unit)}" }
@@ -282,10 +294,10 @@ fun MedAddScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit) {
                 errors["med"]?.let { OkcheErrorText(it) }
             }
             OkcheTextField(
-                f.dose, { v -> edit("dose") { copy(dose = v) } }, "한 번에 얼마나", Modifier.width(160.dp), suffix = unitTitle(unit), description = unitTitle(unit),
+                f.dose, { v -> edit("dose") { copy(dose = v) } }, "한 번에 얼마나", Modifier.width(160.dp).then(anchors.of("dose")), suffix = unitTitle(unit), description = unitTitle(unit),
                 error = errors["dose"], keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
-            Frequency(f, errors, ::edit)
+            Frequency(f, errors, anchors, ::edit)
             OkcheMenuPicker("먹이는 방법", howTos, f.howTo, { v -> edit("howTo") { copy(howTo = v) } }, inline = false, hint = "(선택)")
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
             OkchePrimaryButton("저장하기", ::save)
@@ -298,25 +310,36 @@ private fun Note(text: String) = Text(text, color = OkcheColor.InkMuted, style =
 
 /** 얼마나 자주 + 주기마다 칸 + 먹일 시간·알림. */
 @Composable
-private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (String, ScheduleFields.() -> ScheduleFields) -> Unit) {
+private fun Frequency(f: ScheduleFields, errors: Map<String, String>, anchors: app.okche.ui.pet.Anchors, edit: (String, ScheduleFields.() -> ScheduleFields) -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
+    // 간격 + 날짜 칸: 나란히, 아주 큰 글자에선 위아래로.
+    val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
+    val pair = @Composable { key: String, left: @Composable (Modifier) -> Unit, right: @Composable (Modifier) -> Unit ->
+        if (stacked) {
+            Column(anchors.of(key), verticalArrangement = Arrangement.spacedBy(12.dp)) { left(Modifier.fillMaxWidth()); right(Modifier.fillMaxWidth()) }
+        } else {
+            Row(anchors.of(key), horizontalArrangement = Arrangement.spacedBy(8.dp)) { left(Modifier.width(if (key == "everyDays") 150.dp else 160.dp)); right(Modifier.weight(1f)) }
+        }
+    }
     val zone = ZoneId.systemDefault()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OkcheChoiceChips("얼마나 자주", medFrequencies, f.frequency, { v -> edit("frequency") { copy(frequency = v) } })
         when (f.frequency) {
             MedFrequency.everyNDays -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair("everyDays", { m ->
                     OkcheTextField(
-                        f.everyDays, { v -> edit("everyDays") { copy(everyDays = v) } }, "간격", Modifier.width(150.dp), suffix = "일마다", description = "일마다",
+                        f.everyDays, { v -> edit("everyDays") { copy(everyDays = v) } }, "간격", m, suffix = "일마다", description = "일마다",
                         error = errors["everyDays"], keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
+                }) { m ->
                     OkchePickerField(
                         "${f.startDate.monthValue}월 ${f.startDate.dayOfMonth}일", "시작하는 날",
                         {
                             DatePickerDialog(context, { _, y, m, d -> edit("startDate") { copy(startDate = LocalDate.of(y, m + 1, d)) } },
                                 f.startDate.year, f.startDate.monthValue - 1, f.startDate.dayOfMonth).show()
                         },
-                        Modifier.weight(1f), icon = Icons.Outlined.CalendarMonth,
+                        m, icon = Icons.Outlined.CalendarMonth,
                     )
                 }
                 Note("이틀에 한 번이면 2, 일주일에 한 번이면 7. 먹는 날에만 일기 탕약 줄과 알림에 나와요.")
@@ -325,18 +348,19 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
                 OkcheMultiChips("먹는 요일", (1..7).map { it to weekdayNames[it - 1] }, f.weekdays, { d ->
                     edit("weekdays") { copy(weekdays = if (d in weekdays) weekdays - d else weekdays + d) }
                 })
-                errors["weekdays"]?.let { OkcheErrorText(it) }
+                errors["weekdays"]?.let { OkcheErrorText(it, anchors.of("weekdays")) }
                 val picked = f.weekdays.sorted().map { weekdayNames[it - 1] }
                 val counts = listOf("", "한", "두", "세", "네", "다섯", "여섯", "일곱")
                 Note("고른 요일에만 일기 탕약 줄과 알림에 나와요." + if (picked.isEmpty()) "" else " 지금은 ${picked.joinToString("·")}, 일주일에 ${counts[picked.size]} 번.")
             }
             MedFrequency.everyNHours -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val first = Instant.ofEpochMilli(f.firstAt).atZone(zone)
+                pair("everyHours", { m ->
                     OkcheTextField(
-                        f.everyHours, { v -> edit("everyHours") { copy(everyHours = v) } }, "간격", Modifier.width(160.dp), suffix = "시간마다", description = "시간마다",
+                        f.everyHours, { v -> edit("everyHours") { copy(everyHours = v) } }, "간격", m, suffix = "시간마다", description = "시간마다",
                         error = errors["everyHours"], keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
-                    val first = Instant.ofEpochMilli(f.firstAt).atZone(zone)
+                }) { m ->
                     OkchePickerField(
                         first.format(DateTimeFormatter.ofPattern("M/d a h:mm", Locale.KOREAN)), "처음 먹일 때",
                         {
@@ -346,10 +370,10 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
                                 }, first.hour, first.minute, false).show()
                             }, first.year, first.monthValue - 1, first.dayOfMonth).show()
                         },
-                        Modifier.weight(1f), icon = Icons.Outlined.CalendarMonth,
+                        m, icon = Icons.Outlined.CalendarMonth,
                     )
                 }
-                f.everyHours.trim().toIntOrNull()?.takeIf { it >= 1 }?.let { HoursPreview(hoursPreview(f.firstAt, it)) }
+                f.everyHours.toWholeNumber()?.takeIf { it >= 1 }?.let { HoursPreview(hoursPreview(f.firstAt, it)) }
                 Note("시간이 날마다 바뀌어서 먹일 시간은 따로 정하지 않아요.")
                 OkcheChoiceCards("늦게 줬을 때 다음 차례는", listOf(true to "준 시각부터 다시 세기", false to "처음 정한 시간대로"), f.shiftOnLate, { v ->
                     edit("shiftOnLate") { copy(shiftOnLate = v) }
@@ -367,6 +391,8 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
             TimeFieldsRow(
                 f.times,
                 onPick = { index, time ->
+                    // 칸이 사라지는 게 보이고, TalkBack에도 알린다.
+                    if (time in f.times && f.times.indexOf(time) != index) view.announceForAccessibility("이미 있는 시간이라 하나로 합쳤어요")
                     edit("times") {
                         // 같은 시간이 이미 있으면 그 칸을 빼서 겹치지 않게.
                         copy(times = if (time in times && times.indexOf(time) != index) times.filterIndexed { i, _ -> i != index } else times.mapIndexed { i, t -> if (i == index) time else t })
@@ -379,7 +405,7 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
                 },
                 onRemove = { index -> if (f.times.size > 1) edit("times") { copy(times = times.filterIndexed { i, _ -> i != index }) } },
             )
-            errors["times"]?.let { OkcheErrorText(it) }
+            errors["times"]?.let { OkcheErrorText(it, anchors.of("times")) }
         }
         OkcheSwitchRow(
             if (f.frequency == MedFrequency.everyNHours) "차례마다 알림 보내기" else "시간마다 알림 보내기", "", f.reminder,

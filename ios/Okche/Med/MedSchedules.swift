@@ -154,7 +154,7 @@ enum MedSchedules {
                 case let (x?, y?) where x != y: x < y
                 case (nil, _?): false
                 case (_?, nil): true
-                default: a.1.createdAt < b.1.createdAt
+                default: (a.1.createdAt, a.0.createdAt, a.0.id.uuidString) < (b.1.createdAt, b.0.createdAt, b.0.id.uuidString) // 늘 같은 순서로
                 }
             }
             .map { ($0.0, $0.1) }

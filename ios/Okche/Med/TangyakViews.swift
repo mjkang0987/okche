@@ -169,29 +169,33 @@ struct MedAddView: View {
     @State private var editingTime: TimeIndex?
     @State private var pickingStart = false
     @State private var pickingFirst = false
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var alive: [Pet] { pets.filter { $0.memorializedAt == nil } }
     private var listed: [Medication] { meds.filter { $0.deletedAt == nil }.sorted { $0.createdAt < $1.createdAt } }
-    private var unit: DoseUnit { meds.first { $0.id == form.medicationId }?.unit ?? .pill }
+    /// 고른 약의 단위 — 고를 때 기억해 둔다(방금 들인 약이 목록에 아직 안 떠도 맞게).
+    @State private var pickedUnit: DoseUnit?
+    private var unit: DoseUnit { pickedUnit ?? meds.first { $0.id == form.medicationId }?.unit ?? .pill }
 
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: "탕약", note: "약 추가", icon: "chevron.left", iconLabel: "탕약으로 돌아가기") { dismiss() }
-            ScrollView {
+            ScrollViewReader { scroller in ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    who
-                    medPicker
+                    who.id(MedSchedules.Field.pets)
+                    medPicker.id(MedSchedules.Field.med)
                     OkcheTextField(label: "한 번에 얼마나", text: field(\.dose, .dose), unit: MedRules.unitTitle(unit), keyboard: .decimalPad,
                                    error: errors[.dose])
                         .frame(maxWidth: 160, alignment: .leading)
+                        .id(MedSchedules.Field.dose)
                     frequency
                     OkcheMenuPicker(label: "먹이는 방법", note: "(선택)", options: MedSchedules.howTos, selection: $form.howTo, inline: false)
                     OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                    Button("저장하기", action: save).buttonStyle(.okchePrimary)
+                    Button("저장하기") { save(scroller) }.buttonStyle(.okchePrimary)
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, 8).padding(.bottom, OkcheSpacing.space6)
-            }
+            } }
         }
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
@@ -250,11 +254,12 @@ struct MedAddView: View {
             }
             switch form.frequency {
             case .everyNDays:
-                HStack(alignment: .top, spacing: 8) {
+                pair {
                     OkcheTextField(label: "간격", text: field(\.everyDays, .everyDays), unit: "일마다", keyboard: .numberPad, error: errors[.everyDays])
-                        .frame(width: 150)
+                        .frame(maxWidth: typeSize >= .xxxLarge ? .infinity : 150)
                     dateButton("시작하는 날", Self.day.string(from: form.startDate)) { pickingStart = true }
                 }
+                .id(MedSchedules.Field.everyDays)
                 note("이틀에 한 번이면 2, 일주일에 한 번이면 7. 먹는 날에만 일기 탕약 줄과 알림에 나와요.")
             case .weekdays:
                 FieldGroup(title: "먹는 요일") {
@@ -264,15 +269,16 @@ struct MedAddView: View {
                         errors[.weekdays] = nil
                     }
                 }
-                OkcheFieldError(message: errors[.weekdays])
+                OkcheFieldError(message: errors[.weekdays]).id(MedSchedules.Field.weekdays)
                 note(weekdayNote)
             case .everyNHours:
-                HStack(alignment: .top, spacing: 8) {
+                pair {
                     OkcheTextField(label: "간격", text: field(\.everyHours, .everyHours), unit: "시간마다", keyboard: .numberPad, error: errors[.everyHours])
-                        .frame(width: 160)
+                        .frame(maxWidth: typeSize >= .xxxLarge ? .infinity : 160)
                     dateButton("처음 먹일 때", Self.dateTime.string(from: form.firstAt)) { pickingFirst = true }
                 }
-                if let hours = PetRegistration.wholeNumber(form.everyHours), hours >= 1 {
+                .id(MedSchedules.Field.everyHours)
+                if let hours = PetRegistration.wholeNumber(form.everyHours.trimmingCharacters(in: .whitespaces)), hours >= 1 {
                     HoursPreview(lines: MedSchedules.hoursPreview(firstAt: form.firstAt, everyHours: hours))
                 }
                 note("시간이 날마다 바뀌어서 먹일 시간은 따로 정하지 않아요.")
@@ -291,11 +297,20 @@ struct MedAddView: View {
                 if form.frequency != .everyNHours {
                     OkcheFieldLabel(title: form.frequency == .daily ? "먹일 시간" : "먹는 날 먹일 시간").accessibilityAddTraits(.isHeader)
                     TimeFieldsRow(times: form.times, onTap: { editingTime = TimeIndex(id: $0) }, onAdd: addTime)
-                    OkcheFieldError(message: errors[.times])
+                    OkcheFieldError(message: errors[.times]).id(MedSchedules.Field.times)
                 }
                 OkcheSwitchRow(title: form.frequency == .everyNHours ? "차례마다 알림 보내기" : "시간마다 알림 보내기", isOn: $form.reminder)
                 OkcheMenuPicker(label: "알림 보낼 때", options: MedSchedules.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)
             }
+        }
+    }
+
+    /// 간격 + 날짜 칸: 나란히, 아주 큰 글자에선 위아래로.
+    @ViewBuilder private func pair<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if typeSize >= .xxxLarge {
+            VStack(alignment: .leading, spacing: 12) { content() }
+        } else {
+            HStack(alignment: .top, spacing: 8) { content() }
         }
     }
 
@@ -345,6 +360,7 @@ struct MedAddView: View {
 
     private func pick(_ med: Medication) {
         form.medicationId = med.id
+        pickedUnit = med.unit
         form.dose = MedRules.number(med.doseAmount) // 그 약의 '한 번에'
         errors[.med] = nil
         errors[.dose] = nil
@@ -369,16 +385,22 @@ struct MedAddView: View {
             let text = String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
             guard form.times.indices.contains(index) else { return }
             // 같은 시간이 이미 있으면 그 칸을 빼서 겹치지 않게.
-            if let dup = form.times.firstIndex(of: text), dup != index { form.times.remove(at: index) } else { form.times[index] = text }
+            if let dup = form.times.firstIndex(of: text), dup != index {
+                form.times.remove(at: index) // 칸이 사라지는 게 보이고, 화면 읽기에도 알린다.
+                AccessibilityNotification.Announcement("이미 있는 시간이라 하나로 합쳤어요").post()
+            } else {
+                form.times[index] = text
+            }
         })
     }
 
-    private func save() {
+    private func save(_ scroller: ScrollViewProxy) {
         guard !saving else { return }
         errors = MedSchedules.errors(form)
-        guard errors.isEmpty else {
-            let first = [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].lazy.compactMap { errors[$0] }.first
-            AccessibilityNotification.Announcement(first ?? "").post()
+        // 화면 위에서부터 첫 오류 칸으로 옮겨 가 눈에 보이게.
+        if let first = [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].first(where: { errors[$0] != nil }) {
+            withAnimation { scroller.scrollTo(first, anchor: .center) }
+            AccessibilityNotification.Announcement(errors.count == 1 ? errors[first]! : "고칠 곳 \(errors.count)개. \(errors[first]!)").post()
             return
         }
         saving = true

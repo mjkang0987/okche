@@ -104,6 +104,7 @@ fun RootTabs() {
     /** 기록 줄 연필로 연 아이 — 지금 보는 아이가 그 아이로 바뀌기 전엔 '볼 아이 없음'으로 닫지 않게. */
     var suraFor by rememberSaveable { mutableStateOf<String?>(null) }
     var foodPetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var snackListOpen by rememberSaveable { mutableStateOf(false) }
     val quickState = rememberQuickRecordState()
     // 이 기기만의 설정 쓰기(DataStore): 실패하면 말없이 넘기지 않고 알린다.
     fun saveSetting(block: suspend () -> Unit) {
@@ -159,6 +160,11 @@ fun RootTabs() {
     }
     if (registering) {
         PetRegisterScreen(onClose = { registering = false }, onSaved = { registering = false })
+        return
+    }
+    if (snackListOpen) {
+        app.okche.ui.food.SnackListScreen(current, seal = { if (pets != null) PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }) { snackListOpen = false }
+        switchSheet()
         return
     }
     if (suraOpen) {
@@ -258,16 +264,19 @@ fun RootTabs() {
             Tab.More -> MoreTab(modifier) {
                 if (pets != null) PetManageSection(pets, restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
                 // 더보기 메뉴(보드 More) — 다른 줄(다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
-                // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음).
-                current?.takeIf { it.memorializedAt == null }?.let { pet ->
-                    Column(
-                        Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(horizontal = OkcheSpacing.Space4)
-                            .semantics { isTraversalGroup = true },
-                    ) {
-                        FoodMenuRow(pet) { foodPetId = pet.id }
+                // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음). 다과는 모든 아이 공통이라 늘 있음.
+                val foodPet = current?.takeIf { it.memorializedAt == null }
+                Column(
+                    Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg)).padding(horizontal = OkcheSpacing.Space4)
+                        .semantics { isTraversalGroup = true },
+                ) {
+                    if (foodPet != null) {
+                        FoodMenuRow(foodPet) { foodPetId = foodPet.id }
+                        androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
                     }
-                    if (foodPetId == pet.id) FoodChangeSheet(pet) { foodPetId = null }
+                    app.okche.ui.food.MoreMenuRow("다과", note = "간식 목록") { snackListOpen = true }
                 }
+                if (foodPet != null && foodPetId == foodPet.id) FoodChangeSheet(foodPet) { foodPetId = null }
             }
         }
     }

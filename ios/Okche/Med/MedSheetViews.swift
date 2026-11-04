@@ -201,6 +201,10 @@ struct MedExtraSheet: View {
         .sheet(isPresented: $adding) {
             MedFormSheet(mode: .addAndPick) { pick($0) }
         }
+        // 새로 남길 땐 맨 위 약(이 아이의 필요할 때만 약)을 골라 둔다(보드 `MedExtra`).
+        .task(id: options.first?.med.id) {
+            if editing == nil, picked == nil, let first = options.first { pick(first.med) }
+        }
     }
 
     /// 고르면 '얼마나'는 그 약의 '한 번에'.

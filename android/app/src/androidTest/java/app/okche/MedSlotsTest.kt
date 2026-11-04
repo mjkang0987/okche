@@ -126,6 +126,8 @@ class MedSlotsTest {
         val late = row(MedFrequency.everyNHours, hours = 8, firstAt = at(27, 8), from = at(27, 7))
         // 늦게 줬을 때 밀림: #1 = 09:00 + 8 = 17:00, #2 = 01:00(새벽이라 같은 날).
         assertEquals(listOf(at(27, 17), at(28, 1)), remaining(listOf(late), listOf(given(late, "${late.id}|#0", at(27, 9)))))
+        // 처음 먹일 때가 저장한 순간보다 조금 앞이어도(분 올림) 0번 차례는 남음.
+        assertEquals(at(27, 8), remaining(listOf(row(MedFrequency.everyNHours, hours = 8, firstAt = at(27, 8), from = at(27, 8) + 30_000)), emptyList()).first())
         // 처음 정한 시간대로: 16:00, 00:00.
         val fixed = row(MedFrequency.everyNHours, hours = 8, firstAt = at(27, 8), shift = false, from = at(27, 7))
         assertEquals(listOf(at(27, 16), at(28, 0)), remaining(listOf(fixed), listOf(given(fixed, "${fixed.id}|#0", at(27, 9)))))

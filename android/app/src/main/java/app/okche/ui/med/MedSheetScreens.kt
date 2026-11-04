@@ -243,6 +243,10 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
         }
     }
 
+    // 새로 남길 땐 맨 위 약(이 아이의 필요할 때만 약)을 골라 둔다(보드 MedExtra).
+    androidx.compose.runtime.LaunchedEffect(options.firstOrNull()?.first?.id) {
+        if (editing == null && picked == null) options.firstOrNull()?.let { pick(it.first) }
+    }
     if (adding) MedFormSheet(null, listOf(pet), records, picking = true, onAdded = { pick(it) }) { adding = false }
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
         Column(

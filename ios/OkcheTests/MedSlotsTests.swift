@@ -77,6 +77,8 @@ final class MedSlotsTests: XCTestCase {
         let g = given(late, key: "\(late.id.uuidString.lowercased())|#0", at: at(27, 9))
         // 늦게 줬을 때 밀림: #1 = 09:00 + 8 = 17:00, #2 = 01:00(새벽이라 같은 날).
         XCTAssertEqual(remaining([late], [g]), [at(27, 17), at(28, 1)])
+        // 처음 먹일 때가 저장한 순간보다 조금 앞이어도(분 올림) 0번 차례는 남음.
+        XCTAssertEqual(remaining([row(.everyNHours, hours: 8, firstAt: first, from: at(27, 8, 0) + 30)], []).first, first)
         // 처음 정한 시간대로: 16:00, 00:00.
         let fixed = row(.everyNHours, hours: 8, firstAt: first, shift: false, from: at(27, 7))
         XCTAssertEqual(remaining([fixed], [given(fixed, key: "\(fixed.id.uuidString.lowercased())|#0", at: at(27, 9))]), [at(27, 16), at(28, 0)])

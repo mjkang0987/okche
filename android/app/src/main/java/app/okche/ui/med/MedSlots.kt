@@ -50,7 +50,8 @@ private fun hoursSlots(row: MedSchedule, given: Map<String, Long>, through: Stri
         if (day > through) break
         if (row.activeUntil?.let { due >= it } == true) break
         val key = "${row.id}|#$n"
-        if (due >= row.activeFrom) slots += MedSlot(row, key, due, day)
+        // `firstAt`은 보호자가 정한 0번 차례 — 분 올림 때문에 저장한 순간(`activeFrom`)보다 조금 앞이어도 남긴다.
+        if (due >= minOf(row.activeFrom, first)) slots += MedSlot(row, key, due, day)
         due = if (row.shiftOnLate) (given[key] ?: due) + step else first + (n + 1) * step
     }
     return slots

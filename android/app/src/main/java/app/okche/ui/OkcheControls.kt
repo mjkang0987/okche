@@ -364,9 +364,11 @@ fun <T> OkcheChoiceCards(
     hint: String? = null,
     icons: Map<T, ImageVector> = emptyMap(),
     onDeselect: (() -> Unit)? = null,
+    /** 묶음 이름을 화면에선 숨기고 TalkBack만 읽게(수라 끼니 칸 '아침 식사량' — 보드 legend sr-only). */
+    hideLabel: Boolean = false,
 ) {
     Column(modifier) {
-        OkcheFieldLabel(label, Modifier.padding(bottom = OkcheSpacing.Space2), hint = hint)
+        OkcheFieldLabel(label, if (hideLabel) Modifier.visuallyHidden() else Modifier.padding(bottom = OkcheSpacing.Space2), hint = hint)
         // 아이콘 카드는 큰 글자에서 나란히 두면 낱말이 끊기니 세로로 쌓는다(iOS ViewThatFits와 같은 결과).
         val stacked = icons.isNotEmpty() && LocalDensity.current.fontScale >= 1.3f
         val card = @Composable { value: T, text: String, cardModifier: Modifier ->

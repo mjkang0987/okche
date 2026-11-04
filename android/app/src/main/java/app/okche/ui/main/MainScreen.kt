@@ -24,7 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +72,9 @@ import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import java.time.Instant
 import java.time.ZoneId
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 
 /** 문안 탭(보드 Main·MainEmpty·MainNoPet): 인사, 아이 카드, '기록하기', 오늘의 승정원일기. 추억 아이는 RootTabs에서 추억 화면(6-4). */
@@ -83,12 +88,19 @@ fun MainTab(
     onRegister: () -> Unit = {},
     onOpenSura: (String) -> Unit = {},
 ) {
-    // 1분마다 — 켜 둔 채 6시를 넘기면 날짜·오늘 기록이 새 날로.
-    val now by produceState(System.currentTimeMillis()) {
+    // 1분마다·앱으로 돌아올 때 — 켜 둔 채 6시를 넘기면 날짜·오늘 기록이 새 날로.
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
         while (true) {
             delay(60_000)
-            value = System.currentTimeMillis()
+            now = System.currentTimeMillis()
         }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) now = System.currentTimeMillis() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
     val day = OkcheDay.of(now)
     val today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -114,7 +126,7 @@ fun MainTab(
                     color = OkcheColor.NamsaekDeep,
                     style = OkcheType.Display.toTextStyle(FontWeight.Normal).copy(fontSize = 16.sp, lineHeight = 22.sp),
                 )
-                PetCard(current, day, today)
+                PetCard(current, today)
                 // '사료 다 바꿨나요?' 카드 자리(7-4).
                 OkchePrimaryButton("기록하기", onRecord)
                 TodayRecords(pets, current, day, onOpenSura)
@@ -125,7 +137,7 @@ fun MainTab(
 
 /** 아이 카드(보드 Main): 남색 바탕 금테 148, 프로필 사진 자리 96(사진은 11단계), 표시 알약·호칭·동행·종 줄. 큰 글자에선 사진 아래로 글자. */
 @Composable
-private fun PetCard(pet: Pet, day: String, today: java.time.LocalDate) {
+private fun PetCard(pet: Pet, today: java.time.LocalDate) {
     val modifier = Modifier
         .fillMaxWidth()
         .heightIn(min = 148.dp)
@@ -159,7 +171,7 @@ private fun PetCard(pet: Pet, day: String, today: java.time.LocalDate) {
     }
     val texts = @Composable {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            mainPill(pet.birthDate, pet.birthEstimated, pet.familyDate, day)?.let {
+            mainPill(pet.birthDate, pet.birthEstimated, pet.familyDate, today.toString())?.let {
                 Text(
                     it,
                     Modifier.background(OkcheColor.Geum, CircleShape).padding(horizontal = 10.dp, vertical = 2.dp),
@@ -185,10 +197,11 @@ private fun PetCard(pet: Pet, day: String, today: java.time.LocalDate) {
 private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (String) -> Unit) {
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
-    val records by remember(day) { dao.dayRecordsFlow(day) }.collectAsState(emptyList())
+    // 처음 읽기 전(null)엔 줄도 안내도 그리지 않는다('아직 오늘 남긴 기록이 없어요'가 스치지 않게).
+    val records by remember(day) { dao.dayRecordsFlow(day) }.collectAsState<List<Record>, List<Record>?>(null)
     var editing by remember { mutableStateOf<DetailTarget?>(null) }
     editing?.let { RecordDetailSheet(it, pets, onSaved = { _, _ -> }, onClose = { editing = null }) }
-    val rows = mainTodayRecords(records, pet.id, day)
+    val rows = records?.let { mainTodayRecords(it, pet.id, day) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -210,13 +223,13 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
             )
             Text("오늘 기록", Modifier.alignByBaseline(), color = OkcheColor.InkMuted, style = OkcheType.Caption.toTextStyle())
         }
-        if (rows.isEmpty()) {
+        if (rows?.isEmpty() == true) {
             Text(
                 "아직 오늘 남긴 기록이 없어요.",
                 Modifier.padding(top = 8.dp, bottom = 4.dp),
                 color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(),
             )
-        } else {
+        } else if (rows != null) {
             rows.forEachIndexed { index, record ->
                 RecordRow(record) {
                     if (record.kind == RecordKind.meal) onOpenSura(pet.id) else editing = DetailTarget(record.kind, editing = record)

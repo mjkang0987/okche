@@ -9,29 +9,29 @@ struct MainTab: View {
     @State private var registering = false
     /// 문안 안 화면 쌓기(수라 줄 → 그 아이 수라 화면). 일기 탭과 같은 까닭으로 경로로.
     @State private var path: [RecordRoute] = []
+    @State private var now = Date.now
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         if let pet = PetTitle.current(pets, lastPetId: lastPetId), pet.memorializedAt != nil {
-            MemorialView(pet: pet)
+            // 추억 화면으로 바뀌면 문안 안 화면(수라)을 비운다 — 다시 돌아왔을 때 수라가 저절로 뜨지 않게.
+            MemorialView(pet: pet).onAppear { path = [] }
         } else {
             NavigationStack(path: $path) {
-                // 켜 둔 채 6시를 넘기면 날짜·오늘 기록이 새 날로.
-                TimelineView(.everyMinute) { context in
-                    let day = OkcheDay.of(context.date)
-                    TabScreen(title: "문안", subtitle: MainCard.dayTitle(day), trailing: { PetSeal() }) {
-                        if let pet = PetTitle.current(pets, lastPetId: lastPetId) {
-                            Text("\(PetTitle.name(pet, today: context.date)), 오늘도 강녕하시옵소서")
-                                .okcheText(greeting).foregroundStyle(OkcheColor.namsaekDeep)
-                                .padding(.top, -6)
-                            MainPetCard(pet: pet, day: day, today: context.date)
-                            // '사료 다 바꿨나요?' 카드 자리(7-4).
-                            Button("기록하기") { openTab(.record) }.buttonStyle(.okchePrimary)
-                            TodayRecordSection(petId: pet.id, day: day)
-                        } else {
-                            Text("아직 모신 아이가 없어요. 아기씨를 모시면 여기에서 날마다 안부를 여쭤요.")
-                                .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
-                            Button("+ 새 아기씨 모시기") { registering = true }.buttonStyle(.okchePrimary(.dashed))
-                        }
+                let day = OkcheDay.of(now)
+                TabScreen(title: "문안", subtitle: MainCard.dayTitle(day), trailing: { PetSeal() }) {
+                    if let pet = PetTitle.current(pets, lastPetId: lastPetId) {
+                        Text("\(PetTitle.name(pet, today: now)), 오늘도 강녕하시옵소서")
+                            .okcheText(greeting).foregroundStyle(OkcheColor.namsaekDeep)
+                            .padding(.top, -6)
+                        MainPetCard(pet: pet, today: now)
+                        // '사료 다 바꿨나요?' 카드 자리(7-4).
+                        Button("기록하기") { openTab(.record) }.buttonStyle(.okchePrimary)
+                        TodayRecordSection(petId: pet.id, day: day)
+                    } else {
+                        Text("아직 모신 아이가 없어요. 아기씨를 모시면 여기에서 날마다 안부를 여쭤요.")
+                            .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                        Button("+ 새 아기씨 모시기") { registering = true }.buttonStyle(.okchePrimary(.dashed))
                     }
                 }
                 .toolbar(.hidden, for: .navigationBar)
@@ -43,6 +43,14 @@ struct MainTab: View {
                 }
             }
             .fullScreenCover(isPresented: $registering) { PetRegisterView() }
+            // 켜 둔 채 6시를 넘기면 날짜·오늘 기록이 새 날로, 앱으로 돌아오면 바로.
+            .task {
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(60)) } catch { break }
+                    now = .now
+                }
+            }
+            .onChange(of: scenePhase) { if scenePhase == .active { now = .now } }
         }
     }
 
@@ -53,7 +61,6 @@ struct MainTab: View {
 /// 아이 카드(보드 `Main`): 남색 바탕 금테 148, 프로필 사진 자리 96(사진은 11단계), 표시 알약·호칭·동행·종 줄. 큰 글자에선 사진 아래로 글자.
 struct MainPetCard: View {
     let pet: Pet
-    let day: String
     let today: Date
 
     var body: some View {
@@ -86,7 +93,8 @@ struct MainPetCard: View {
 
     private var texts: some View {
         VStack(alignment: .leading, spacing: 3) {
-            if let pill = MainCard.pill(birthDate: pet.birthDate, birthEstimated: pet.birthEstimated, familyDate: pet.familyDate, day: day) {
+            if let pill = MainCard.pill(birthDate: pet.birthDate, birthEstimated: pet.birthEstimated, familyDate: pet.familyDate,
+                                     day: PetRegistration.day(today, .okcheDevice)) {
                 Text(pill).okcheText(OkcheType.caption, weight: .bold).foregroundStyle(OkcheColor.ink)
                     .padding(.vertical, 2).padding(.horizontal, 10)
                     .background(OkcheColor.geum, in: Capsule())

@@ -2,7 +2,7 @@ import Foundation
 
 /// 문안 탭 규칙(plan.md 7-0): 표시 알약·아이 카드 줄·오늘 기록. 안드로이드 `MainCard.kt`와 같은 규칙.
 enum MainCard {
-    /// 표시 알약: '오늘 생일'(어림잡은 생일은 안 띄움) > '가족 된 날'(그날이 아닌 해). 2/29는 평년엔 2/28. `day`는 6시 기준 오늘.
+    /// 표시 알약: '오늘 생일'(어림잡은 생일은 안 띄움) > '가족 된 날'(그날이 아닌 해). 2/29는 평년엔 2/28. `day`는 기기 달력 오늘(나이·동행과 같은 기준).
     static func pill(birthDate: String?, birthEstimated: Bool, familyDate: String?, day: String) -> String? {
         if !birthEstimated, sameMonthDay(birthDate, day) { return "오늘 생일" }
         if sameMonthDay(familyDate, day), familyDate?.prefix(4) != day.prefix(4) { return "가족 된 날" }

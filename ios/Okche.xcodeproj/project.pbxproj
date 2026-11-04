@@ -46,6 +46,7 @@
 		D5910D9C77B07EDE346F91B4 /* ConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CE93E88BDC4151CA307E93 /* ConfirmDialog.swift */; };
 		D941072A8BFE61DCBA371477 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062F522F90EA709F319790DF /* OnboardingView.swift */; };
 		DC4FCDE9A79D8A3AE1C347B1 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC982B8A4E56FC21697A2A95 /* Medication.swift */; };
+		E52129240533DA44A780F69B /* SuraViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A30483ED372C0D7CC3D663 /* SuraViews.swift */; };
 		EA602DD64B1EFC19974AB3AD /* InsulinSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD19586ECCA53AEA01EFA244 /* InsulinSetupView.swift */; };
 		F02A3EB66234742FBF5D0A31 /* Record.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5119E23AD833065A0FAF7789 /* Record.swift */; };
 		F0469C41CFF59B6E42281B57 /* RecordDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEB6C7DDAA30D8B29AA1153 /* RecordDetail.swift */; };
@@ -110,6 +111,7 @@
 		C8AB360783EF98AB5867AB5C /* PetRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistration.swift; sourceTree = "<group>"; };
 		CC982B8A4E56FC21697A2A95 /* Medication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Medication.swift; sourceTree = "<group>"; };
 		CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheApp.swift; sourceTree = "<group>"; };
+		D1A30483ED372C0D7CC3D663 /* SuraViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuraViews.swift; sourceTree = "<group>"; };
 		D1A3F2256A1A50E4C05ADCC8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetMemorialTests.swift; sourceTree = "<group>"; };
 		D7D6C2E378358E8E76912918 /* Pet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pet.swift; sourceTree = "<group>"; };
@@ -250,6 +252,7 @@
 				EAEB6C7DDAA30D8B29AA1153 /* RecordDetail.swift */,
 				587A130CDC735508E9872722 /* RecordDetailViews.swift */,
 				026A0B16D0F9C96FEAC020DC /* RecordViews.swift */,
+				D1A30483ED372C0D7CC3D663 /* SuraViews.swift */,
 			);
 			path = Record;
 			sourceTree = "<group>";
@@ -419,6 +422,7 @@
 				FE18E521C864672FBCE55E22 /* RootTabView.swift in Sources */,
 				B88C149326EAB1ADB28C0020 /* RootView.swift in Sources */,
 				0A5E36DE8810DCDF3082C112 /* Setting.swift in Sources */,
+				E52129240533DA44A780F69B /* SuraViews.swift in Sources */,
 				33ABCD9E369A3EE6CD8276DB /* TabScreen.swift in Sources */,
 				AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */,
 			);

@@ -233,8 +233,7 @@ struct InsulinSlotsEditor: View {
     }
 
     private func slotRow(index: Int, id: UUID) -> some View {
-        let order = ["첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
-        let nth = index < order.count ? order[index] : "\(index + 1)번째"
+        let nth = Self.ordinal(index + 1)
         let error = errors[.insulinUnits(id)]
         // 기본 compact 시간 고르기는 안쪽 버튼 이름이 '시간 선택기'로 고정돼 몇 번째 시간인지 못 읽는다 — 칸 + 시트로.
         let shown = timeBinding(index).wrappedValue.formatted(date: .omitted, time: .shortened)
@@ -283,6 +282,12 @@ struct InsulinSlotsEditor: View {
         .id(PetRegistration.Field.insulinUnits(id))
     }
 
+    /// '첫 번째'…'열 번째', 그 뒤는 '11 번째'(안드로이드 `ordinal`과 같음).
+    static func ordinal(_ n: Int) -> String {
+        let words = ["첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"]
+        return (n >= 1 && n <= words.count ? words[n - 1] : String(n)) + " 번째"
+    }
+
     /// 새 줄 시각: 12:00부터 한 시간씩 넘겨 아직 없는 시각(두 번 눌러도 같은 시간이 생기지 않게).
     private func nextFreeTime() -> String {
         let used = Set(slots.map(\.time))
@@ -293,6 +298,7 @@ struct InsulinSlotsEditor: View {
     private func timeBinding(_ index: Int) -> Binding<Date> {
         Binding {
             let parts = slots[index].time.split(separator: ":").compactMap { Int($0) }
+            guard parts.count == 2 else { return .now } // 다른 기기에서 온 틀린 글자
             return Calendar.okcheDevice.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: .now) ?? .now
         } set: { date in
             let c = Calendar.okcheDevice.dateComponents([.hour, .minute], from: date)
@@ -349,24 +355,38 @@ struct FormHeader: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
-            Button(action: action) {
-                Image(systemName: icon).font(.title2.weight(.medium)).foregroundStyle(OkcheColor.ink)
-                    .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        // 오른쪽 낙관과 한 줄에 안 들어가면(큰 글자) 낙관을 아래 줄로.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                leading
+                Spacer(minLength: 0)
+                trailing
             }
-            .accessibilityLabel(iconLabel)
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) { titleText; noteText }
-                titleText
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    leading
+                    Spacer(minLength: 0)
+                }
+                trailing.padding(.leading, 48)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            trailing
         }
         .padding(.leading, 8)
         .padding(.trailing, trailing == nil ? 8 : 16) // 오른쪽 낙관은 보드처럼 16
         .frame(minHeight: 56)
+    }
+
+    @ViewBuilder private var leading: some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.title2.weight(.medium)).foregroundStyle(OkcheColor.ink)
+                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        }
+        .accessibilityLabel(iconLabel)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) { titleText; noteText }
+            titleText
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private var titleText: some View {

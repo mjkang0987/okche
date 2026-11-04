@@ -4,6 +4,7 @@ import android.util.Log
 import app.okche.store.InsulinPlan
 import app.okche.store.OkcheDao
 import app.okche.store.RecordKind
+import app.okche.ui.record.kgText
 import app.okche.store.RestPeriod
 import app.okche.store.Sex
 import app.okche.store.Species
@@ -93,8 +94,8 @@ suspend fun savePetEdit(
         if (form.familyDate != null && form.familyDate > today) errors["familyDate"] = FUTURE_DAY_ERROR
 
         val plans = dao.openInsulinPlans(pet.id)
-        // 원래 당뇨였던 추억 아이는 간직할 때 인슐린 계획을 닫아 두므로 검사하지 않는다(6-4). 새로 켜는 건 그대로 검사.
-        if (form.hasDiabetes && plans.isEmpty() && !(pet.memorializedAt != null && pet.hasDiabetes)) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
+        // 추억 아이는 인슐린 계획 없이 둔다(간직할 때 닫고, 새로 열지 않음 — 되돌릴 때 6-4 규칙). 그래서 검사하지 않는다.
+        if (form.hasDiabetes && plans.isEmpty() && pet.memorializedAt == null) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
         if (errors.isNotEmpty()) return errors
 
         val edited = pet.copy(
@@ -143,10 +144,10 @@ fun companionDays(familyDate: String?, today: LocalDate = LocalDate.now()): Long
 suspend fun latestWeightText(dao: OkcheDao, petId: String): String? {
     val record = dao.latestRecord(petId, RecordKind.weight) ?: return null
     val grams = JSONObject(record.data).optLong("grams", -1).takeIf { it >= 0 } ?: return null
-    val kg = BigDecimal.valueOf(grams, 3).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    val kg = kgText(grams)
     // 기록 날짜는 6시 기준 day가 아니라 잰 시각의 달력 날짜(iOS와 같음).
     val day = Instant.ofEpochMilli(record.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate()
-    return "${kg}kg · ${day.monthValue}월 ${day.dayOfMonth}일"
+    return "$kg · ${day.monthValue}월 ${day.dayOfMonth}일"
 }
 
 /** 알림 보낼 때 고르기(문서 7장 leadMinutes). */

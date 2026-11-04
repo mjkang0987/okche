@@ -112,17 +112,19 @@ internal fun FormHeader(
     /** 머리 오른쪽(수라 화면의 낙관 — 7-3). 있으면 오른쪽 여백 16(보드). */
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Row(
+    // 오른쪽 낙관과 한 줄에 안 들어가면(큰 글자) 낙관이 아래 줄로(FlowRow).
+    FlowRow(
         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = OkcheSpacing.Space2, end = if (trailing == null) OkcheSpacing.Space2 else OkcheSpacing.Space4),
-        horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
+      Row(Modifier.weight(1f, fill = false), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick, Modifier.size(44.dp), enabled = enabled) {
             Icon(icon, iconLabel, Modifier.size(22.dp), tint = OkcheColor.Ink)
         }
         // TalkBack은 한 머리말로 읽는다.
         FlowRow(
-            Modifier.weight(1f).semantics(mergeDescendants = true) { heading() },
+            Modifier.weight(1f, fill = false).semantics(mergeDescendants = true) { heading() },
             horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
@@ -130,7 +132,8 @@ internal fun FormHeader(
             Text(title, Modifier.singleLineHeight(style.lineHeight), color = OkcheColor.Ink, style = style, maxLines = 1)
             Text(note, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
-        trailing?.invoke()
+      }
+        trailing?.let { Box(Modifier.padding(start = OkcheSpacing.Space1)) { it() } }
     }
 }
 
@@ -305,9 +308,9 @@ internal fun InsulinRowsEditor(
                     val n = ordinal(i + 1)
                     val timeField: @Composable (Modifier) -> Unit = { m ->
                         OkchePickerField(
-                            LocalTime.parse(row.time).format(timeFormat), "$n 시간",
+                            runCatching { LocalTime.parse(row.time).format(timeFormat) }.getOrDefault(row.time), "$n 시간",
                             onClick = {
-                                val t = LocalTime.parse(row.time)
+                                val t = runCatching { LocalTime.parse(row.time) }.getOrDefault(LocalTime.NOON) // 다른 기기에서 온 틀린 글자
                                 TimePickerDialog(context, { _, h, min ->
                                     val time = "%02d:%02d".format(h, min)
                                     // 시간 하나를 바꾸면 다른 줄의 '같은 시간' 오류도 풀릴 수 있어 시간 오류를 모두 지운다.

@@ -236,6 +236,14 @@ enum MedSchedules {
     /// 저장: 고른 아이마다 한 줄(같은 설정·같은 `activeFrom`, `seriesId` = 자기 `id`). 같은 약이 이미 열려 있어도 막지 않음.
     @discardableResult
     static func add(_ f: Form, unit: DoseUnit, now: Date = .now, in context: ModelContext) throws -> [MedSchedule] {
+        let made = rows(f, unit: unit, now: now)
+        made.forEach(context.insert)
+        try save(context)
+        return made
+    }
+
+    /// 고른 아이마다 새 줄(넣지는 않음).
+    private static func rows(_ f: Form, unit: DoseUnit, now: Date) -> [MedSchedule] {
         guard let medId = f.medicationId else { return [] }
         let usesTimes = [.daily, .everyNDays, .weekdays].contains(f.frequency)
         let hours = f.frequency == .everyNHours
@@ -250,9 +258,119 @@ enum MedSchedules {
                         firstAt: hours ? f.firstAt : nil, shiftOnLate: f.shiftOnLate, howTo: f.howTo,
                         reminder: f.frequency == .asNeeded ? false : f.reminder, leadMinutes: f.leadMinutes, activeFrom: now)
         }
-        made.forEach(context.insert)
-        try save(context)
         return made
+    }
+
+    // MARK: 고치기·그만 먹이기(8-2b)
+
+    /// 고치기 처음 값: 그 줄의 지금 값. 몇 시간마다가 아니면 '처음 먹일 때'는 미리 채운 값.
+    static func form(_ s: MedSchedule, firstAt: Date) -> Form {
+        var f = Form()
+        f.petIds = [s.petId]
+        f.medicationId = s.medicationId
+        f.dose = MedRules.number(s.amount)
+        f.frequency = s.frequency
+        f.everyDays = String(s.everyDays ?? 2)
+        f.startDate = s.startDate.flatMap { PetRegistration.date($0, .okcheDevice) } ?? f.startDate
+        f.weekdays = s.weekdays.sorted()
+        f.times = s.times.isEmpty ? ["08:00"] : s.times.sorted()
+        f.everyHours = String(s.everyHours ?? 8)
+        f.firstAt = firstAt
+        f.shiftOnLate = s.shiftOnLate
+        f.reminder = s.reminder
+        f.leadMinutes = s.leadMinutes
+        f.howTo = s.howTo ?? .plain
+        return f
+    }
+
+    /// '처음 먹일 때' 미리 채우는 값(6-1): 새 줄이 '준 시각부터'이거나 옛 줄이 시간 주기면 마지막 준 기록 + 새 간격(없으면 옛 줄 다음 차례),
+    /// '처음 정한 시간대로'면 옛 `firstAt` + m × 새 간격 중 지금 이후 첫 시각. 지금보다 이르면 지금(분 올림).
+    static func firstAtPrefill(_ old: MedSchedule, everyHours: Int, shiftOnLate: Bool, series: [MedSchedule], records: [Record], now: Date = .now) -> Date {
+        let step = TimeInterval(max(everyHours, 1) * 3600)
+        var value: Date?
+        if shiftOnLate || old.frequency != .everyNHours {
+            let ids = Set(series.filter { $0.seriesId == old.seriesId }.map { $0.id.uuidString.lowercased() })
+            let last = records.filter { r in
+                guard r.kind == RecordKind.med.rawValue, r.deletedAt == nil,
+                      let json = try? JSONSerialization.jsonObject(with: Data(r.data.utf8)) as? [String: Any],
+                      let id = json["scheduleId"] as? String, ids.contains(id) else { return false }
+                return ["given", "vomited"].contains(json["status"] as? String ?? "")
+            }.map(\.occurredAt).max()
+            value = last.map { $0.addingTimeInterval(step) } ?? nextDue(old, now: now)
+        } else if let first = old.firstAt {
+            value = first >= now ? first : first.addingTimeInterval(ceil(now.timeIntervalSince(first) / step) * step)
+        }
+        guard let value, value >= now else { return roundedUp(now) }
+        return value
+    }
+
+    /// 줄의 셈에 드는 칸(바뀌면 새 줄 — 5장). 주기마다 쓰는 칸만.
+    private struct Core: Equatable {
+        var frequency: MedFrequency
+        var amount: Double?
+        var times: [String] = []
+        var everyDays: Int?
+        var startDate: String?
+        var weekdays: [Int] = []
+        var everyHours: Int?
+        var firstAt: Date?
+        var shiftOnLate: Bool?
+    }
+
+    private static func core(_ f: Form) -> Core {
+        var c = Core(frequency: f.frequency, amount: PetRegistration.number(f.dose.trimmingCharacters(in: .whitespaces)))
+        switch f.frequency {
+        case .daily: c.times = Array(Set(f.times)).sorted()
+        case .everyNDays:
+            c.times = Array(Set(f.times)).sorted()
+            c.everyDays = PetRegistration.wholeNumber(f.everyDays.trimmingCharacters(in: .whitespaces))
+            c.startDate = PetRegistration.day(f.startDate, .okcheDevice)
+        case .weekdays:
+            c.times = Array(Set(f.times)).sorted()
+            c.weekdays = f.weekdays.sorted()
+        case .everyNHours:
+            c.everyHours = PetRegistration.wholeNumber(f.everyHours.trimmingCharacters(in: .whitespaces))
+            c.firstAt = f.firstAt
+            c.shiftOnLate = f.shiftOnLate
+        case .asNeeded: break
+        }
+        return c
+    }
+
+    enum ChangeResult: Equatable { case none, sameRow, newRow }
+
+    /// 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로.
+    @discardableResult
+    static func change(_ s: MedSchedule, from original: Form, to f: Form, now: Date = .now, in context: ModelContext) throws -> ChangeResult {
+        guard f != original else { return .none }
+        if core(f) != core(original) {
+            s.activeUntil = now
+            s.updatedAt = now
+            var next = f
+            next.petIds = [s.petId]
+            next.medicationId = s.medicationId
+            if next.frequency == .everyNHours, next.firstAt < now { next.firstAt = roundedUp(now) } // 지금보다 이르면 지금
+            // 닫기와 새 줄을 한 번에 저장(반쯤 바뀐 채 남지 않게).
+            for row in rows(next, unit: s.unit, now: now) {
+                row.seriesId = s.seriesId
+                context.insert(row)
+            }
+            try save(context)
+            return .newRow
+        }
+        s.reminder = f.frequency == .asNeeded ? false : f.reminder
+        s.leadMinutes = f.leadMinutes
+        s.howTo = f.howTo
+        s.updatedAt = now
+        try save(context)
+        return .sameRow
+    }
+
+    /// 이 약 그만 먹이기: 그 줄만 닫음(다른 아이가 먹는 같은 약·약방은 그대로).
+    static func stop(_ s: MedSchedule, now: Date = .now, in context: ModelContext) throws {
+        s.activeUntil = now
+        s.updatedAt = now
+        try save(context)
     }
 
     /// 알림 스위치(바로 저장 — 그 줄을 고침, 5장).

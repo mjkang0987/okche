@@ -127,3 +127,77 @@ final class MedSchedulesTests: XCTestCase {
         XCTAssertEqual(MedSchedules.errors(f), [.weekdays: "요일을 하나 이상 골라 주세요"])
     }
 }
+
+/// 약 고치기·그만 먹이기(plan.md 8-2b). 안드로이드 MedChangeTest와 같은 경우.
+@MainActor
+final class MedChangeTests: XCTestCase {
+    private var container: ModelContainer!
+    private var context: ModelContext { container.mainContext }
+    private func at(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int = 0) -> Date {
+        Calendar.okcheDevice.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+    private func all() throws -> [MedSchedule] { try context.fetch(FetchDescriptor<MedSchedule>()) }
+
+    override func setUp() async throws {
+        container = try OkcheStore.container(inMemory: true)
+    }
+
+    private func make(_ freq: MedFrequency, pets: [UUID], now: Date) throws -> [MedSchedule] {
+        var f = MedSchedules.Form()
+        f.petIds = pets
+        f.medicationId = UUID()
+        f.frequency = freq
+        f.everyDays = "2"
+        f.startDate = at(2026, 10, 27, 0)
+        f.times = ["08:00", "21:00"]
+        f.everyHours = "8"
+        f.firstAt = at(2026, 10, 27, 8)
+        return try MedSchedules.add(f, unit: .pill, now: now, in: context)
+    }
+
+    func testNoChangeSameRowAndNewRow() throws {
+        let t0 = at(2026, 10, 27, 7)
+        let kong = UUID(), bori = UUID()
+        let rows = try make(.everyNDays, pets: [kong, bori], now: t0)
+        let s = rows[0]
+        let original = MedSchedules.form(s, firstAt: t0)
+        XCTAssertEqual(try MedSchedules.change(s, from: original, to: original, now: at(2026, 10, 27, 9), in: context), .none)
+        var reminder = original
+        reminder.reminder = false
+        reminder.howTo = .inFood
+        reminder.leadMinutes = 30
+        XCTAssertEqual(try MedSchedules.change(s, from: original, to: reminder, now: at(2026, 10, 27, 9), in: context), .sameRow) // 그 줄 고침
+        XCTAssertEqual(try all().count, 2)
+        XCTAssertEqual([s.reminder, s.howTo == .inFood, s.leadMinutes == 30], [false, true, true])
+        var times = reminder
+        times.times = ["09:00", "21:00"]
+        let t1 = at(2026, 10, 27, 10)
+        XCTAssertEqual(try MedSchedules.change(s, from: reminder, to: times, now: t1, in: context), .newRow)
+        XCTAssertEqual(s.activeUntil, t1) // 닫음
+        let next = try all().first { $0.activeUntil == nil && $0.petId == kong }!
+        XCTAssertEqual(next.seriesId, s.seriesId)
+        XCTAssertEqual(next.activeFrom, t1)
+        XCTAssertEqual(next.times, ["09:00", "21:00"])
+        XCTAssertEqual(next.startDate, "2026-10-27") // 며칠마다 셈 그대로
+        XCTAssertNil(rows[1].activeUntil) // 다른 아이 줄 그대로
+        XCTAssertEqual(MedSchedules.cards(try all(), pets: []).count, 0)
+    }
+
+    func testStopAndFirstAtPrefill() throws {
+        let t0 = at(2026, 10, 27, 7)
+        let hours = try make(.everyNHours, pets: [UUID()], now: t0)[0]
+        // 기록이 없으면 옛 줄 다음 차례, 처음 정한 시간대로면 옛 firstAt + m × 새 간격
+        XCTAssertEqual(MedSchedules.firstAtPrefill(hours, everyHours: 8, shiftOnLate: true, series: [hours], records: [], now: at(2026, 10, 27, 9)),
+                       at(2026, 10, 27, 16))
+        XCTAssertEqual(MedSchedules.firstAtPrefill(hours, everyHours: 6, shiftOnLate: false, series: [hours], records: [], now: at(2026, 10, 27, 9)),
+                       at(2026, 10, 27, 14))
+        let data = try JSONSerialization.data(withJSONObject: ["scheduleId": hours.id.uuidString.lowercased(), "status": "given",
+                                                               "medicationId": hours.medicationId.uuidString.lowercased(), "amount": 1, "unit": "pill"])
+        let given = Record(petId: hours.petId, kind: .med, occurredAt: at(2026, 10, 27, 8, 30), data: String(decoding: data, as: UTF8.self))
+        XCTAssertEqual(MedSchedules.firstAtPrefill(hours, everyHours: 4, shiftOnLate: true, series: [hours], records: [given], now: at(2026, 10, 27, 9)),
+                       at(2026, 10, 27, 12, 30)) // 마지막 준 기록 + 새 간격
+        try MedSchedules.stop(hours, now: at(2026, 10, 27, 9), in: context)
+        XCTAssertEqual(hours.activeUntil, at(2026, 10, 27, 9))
+        XCTAssertTrue(MedSchedules.openSeries(try all()).isEmpty)
+    }
+}

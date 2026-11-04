@@ -291,8 +291,9 @@ fun FoodCheckCard(pet: Pet, day: String) {
     val changes by remember { dao.foodChangesFlow() }.collectAsState(emptyList())
     val foods by remember { dao.foodsFlow() }.collectAsState(emptyList())
     var guiding by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
+    // 아이·날이 바뀌면 새 카드(누른 뒤 막아 둔 버튼이 다른 아이·다음 단계 카드에 남지 않게).
+    var failed by remember(pet.id, day) { mutableStateOf(false) }
+    var busy by remember(pet.id, day) { mutableStateOf(false) }
     val change = foodChangeAt(day, pet.id, changes) ?: return
     val (step, dayNumber) = foodCheck(change, day) ?: return
 

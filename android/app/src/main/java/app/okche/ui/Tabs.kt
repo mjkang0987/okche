@@ -19,7 +19,7 @@ fun AlbumTab(modifier: Modifier = Modifier, seal: @Composable () -> Unit = {}) {
     TabScreen(stringResource(R.string.tab_album), modifier, stringResource(R.string.album_subtitle), trailing = seal)
 }
 
-/** 더보기. 지금은 아이 관리(6-3)만 — 다른 줄(사료·다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서. */
+/** 더보기: 아이 관리(6-3) + 메뉴 줄(RootTabs). */
 @Composable
 fun MoreTab(modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
     TabScreen(stringResource(R.string.tab_more), modifier, content = content)

@@ -9,24 +9,29 @@ import app.okche.store.Record
 import app.okche.store.RestPeriod
 import app.okche.ui.med.amountText
 import app.okche.ui.med.clockText
+import app.okche.ui.med.daysLeft
+import app.okche.ui.med.withSubjectParticle
+import app.okche.store.QuietHours
 import app.okche.ui.med.remainingSlots
 import app.okche.ui.record.shiftDay
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 
 // 탕약 알림 목록 계산(plan.md 8-4a 계산 규칙, 데이터 5장 `leadMinutes`·`remindAgainMinutes`). 휴대폰에 거는 일은 8-4b.
 
-enum class MedAlertKind { due, again, more }
+enum class MedAlertKind { due, again, more, low }
 
-data class MedAlert(val id: String, val kind: MedAlertKind, val fireAt: Long, val title: String, val body: String, val petId: String?)
+data class MedAlert(val id: String, val kind: MedAlertKind, val fireAt: Long, val title: String, val body: String, val petId: String?, val medId: String? = null)
 
 private const val MINUTE = 60_000L
 private const val WINDOW = 72 * 3_600_000L
-private const val LIMIT = 63
+internal const val LIMIT = 63
 
-/** 오늘(6시 기준)부터 3일 뒤까지 남은 차례의 알림. 같은 시각·같은 종류는 하나로, 이른 것부터 63개 + 이어짐 알림. 밤 알림 쉬기와 상관없음. */
+/** 오늘(6시 기준)부터 3일 뒤까지 남은 차례의 알림. 같은 시각·같은 종류는 하나로, 이른 것부터 [limit]개(처음 값 63) + 이어짐 알림. 밤 알림 쉬기와 상관없음. */
 fun medAlerts(
     schedules: List<MedSchedule>, medRecords: List<Record>, pets: List<Pet>, rests: List<RestPeriod>, meds: List<Medication>,
-    medTimeOn: Boolean, now: Long, zone: ZoneId = ZoneId.systemDefault(),
+    medTimeOn: Boolean, now: Long, zone: ZoneId = ZoneId.systemDefault(), limit: Int = LIMIT,
 ): List<MedAlert> {
     if (!medTimeOn) return emptyList()
     val today = OkcheDay.of(now, zone)
@@ -66,9 +71,47 @@ fun medAlerts(
             MedAlert("med.${kind.name}.${fireAt / 1000}", kind, fireAt, title, body, entries.first().pet.id)
         }
         .sortedWith(compareBy({ it.fireAt }, { it.kind.ordinal }))
-        .take(LIMIT)
+        .take(limit)
     val last = alerts.lastOrNull() ?: return alerts
     return alerts + MedAlert("med.more", MedAlertKind.more, last.fireAt + MINUTE, "옥체", "옥체를 열면 알림이 이어져요", null)
 }
 
 private fun minute(ms: Long): Long = Math.floorDiv(ms, MINUTE) * MINUTE
+
+/**
+ * 남은 약 알림(plan.md 8-4 '남은 약 알림'): 약방 '○일분'이 [lowMedDays] 이하가 되는 날 오전 10시에 약마다 한 번.
+ * 이미 기준 이하면 오늘 10시(지났으면 내일). [sent]는 이미 울린 '약 id|stockCountedAt' — 남은 양을 다시 적으면 다시 보낸다.
+ * 밤 알림 쉬기가 10시에 걸리면 보내지 않는다. 지금 뒤 72시간 안만.
+ */
+fun lowMedAlerts(
+    meds: List<Medication>, schedules: List<MedSchedule>, medRecords: List<Record>,
+    lowMedOn: Boolean, lowMedDays: Int, quiet: QuietHours?, sent: Set<String>,
+    now: Long, zone: ZoneId = ZoneId.systemDefault(),
+): List<MedAlert> {
+    if (!lowMedOn) return emptyList()
+    val ten = LocalTime.of(10, 0)
+    if (quiet != null && quiet.enabled && inQuiet(ten, quiet)) return emptyList()
+    val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    fun at(day: LocalDate) = day.atTime(ten).atZone(zone).toInstant().toEpochMilli()
+    return meds.filter { it.deletedAt == null && it.stockAmount != null }.mapNotNull { med ->
+        val d = daysLeft(med, schedules, medRecords) ?: return@mapNotNull null
+        if (lowMedKey(med) in sent) return@mapNotNull null
+        val (fireAt, left) = if (d <= lowMedDays) {
+            at(today).let { if (it > now) it else at(today.plusDays(1)) } to d
+        } else {
+            at(today.plusDays((d - lowMedDays).toLong())) to lowMedDays
+        }
+        if (fireAt <= now || fireAt > now + WINDOW) return@mapNotNull null
+        MedAlert("low.${med.id}", MedAlertKind.low, fireAt, "약방", "${withSubjectParticle(med.name)} ${left}일분 남았어요", null, med.id)
+    }.sortedBy { it.fireAt }
+}
+
+/** 남은 약 알림을 한 번만 보내려고 기억하는 열쇠 — 남은 양을 다시 적으면 바뀐다. */
+fun lowMedKey(med: Medication) = "${med.id}|${med.stockCountedAt}"
+
+/** `HH:mm` 쉬는 시간 안인지(자정을 넘는 22:00~07:00도). 시작 = 끝이면 비어 있음. */
+private fun inQuiet(t: LocalTime, quiet: QuietHours): Boolean {
+    val start = runCatching { LocalTime.parse(quiet.start) }.getOrNull() ?: return false
+    val end = runCatching { LocalTime.parse(quiet.end) }.getOrNull() ?: return false
+    return if (start <= end) t >= start && t < end else t >= start || t < end
+}

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -129,6 +130,13 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제 차례가 보임, 일기 탭과 같이 날 바뀜을 다룰 때 함께.
     // 일정·기록을 다 읽기 전엔 띠를 그리지 않음(이미 준 차례가 잠깐 남은 차례로 보이지 않게).
     val next = if (loadedSchedules == null || loadedRecords == null) null else nextSlot(schedules, records, pets, OkcheDay.of(System.currentTimeMillis()))
+    // 휴대폰 알림이 켜졌는지 — 설정에서 바꾸고 돌아올 때마다 다시 본다.
+    var notifyEnabled by remember { mutableStateOf(true) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        notifyEnabled = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+        onPauseOrDispose {}
+    }
+    val notifyOff = loadedSchedules != null && showNotifyOff(schedules, notifyEnabled)
     /** 기록 직후 1초는 띠를 막는다(두 번 눌러 같은 차례·다음 차례가 또 기록되지 않게). */
     var giving by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
@@ -137,8 +145,16 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
             Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
-            // 다음 탕약 띠(보드 Tangyak, 2026-11-05 승인) — 오늘 남은 차례가 없으면 숨김.
-            next?.let { (slot, pet) ->
+            if (notifyOff) {
+                TangyakNotifyOff {
+                    context.startActivity(
+                        android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+                    )
+                }
+            }
+            // 다음 탕약 띠(보드 Tangyak, 2026-11-05 승인) — 오늘 남은 차례가 없거나 알림 꺼짐 띠가 있으면 숨김.
+            next?.takeUnless { notifyOff }?.let { (slot, pet) ->
                 val med = meds.firstOrNull { it.id == slot.schedule.medicationId } ?: return@let
                 val amount = amountText(slot.schedule.amount, slot.schedule.unit)
                 val time = clockText(slot.due)
@@ -190,6 +206,31 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
         }
     }
     deleting?.let { app.okche.ui.record.DeleteRecordDialog(dao, it, pets) { deleting = null } }
+}
+
+/** 알림 꺼짐 띠를 보일지: 알림 켠 열린 약 주기(필요할 때만 빼고)가 있는데 휴대폰 알림이 꺼져 있을 때. */
+fun showNotifyOff(schedules: List<MedSchedule>, enabled: Boolean): Boolean =
+    !enabled && schedules.any { it.deletedAt == null && it.activeUntil == null && it.frequency != MedFrequency.asNeeded && it.reminder }
+
+/** 알림 꺼짐 띠(보드 TangyakNotifyOff, 2026-11-05 승인): 흰 카드 연지 테두리, 제목·안내 + '설정 열기'(이 앱 알림 설정). */
+@Composable
+private fun TangyakNotifyOff(onOpenSettings: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        Modifier.fillMaxWidth().background(OkcheColor.Paper, shape).border(1.5.dp, OkcheColor.Yeonji, shape).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("휴대폰 알림이 꺼져 있어요", Modifier.semantics { heading() }, color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
+        Text(
+            "그래서 탕약 알림이 오지 않아요. 휴대폰 설정에서 옥체 알림을 켜 주세요.",
+            color = OkcheColor.Ink, style = OkcheType.Label.toTextStyle(FontWeight.Normal).copy(lineHeight = 21.sp),
+        )
+        Text(
+            "설정 열기",
+            Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onOpenSettings).wrapContentHeight(Alignment.CenterVertically),
+            color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Bold).copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+        )
+    }
 }
 
 /** 다음 탕약 띠(보드 Tangyak): 남색 바탕 금테 112, '다음 탕약 / 오후 9:00 / 콩이 · 프레드니솔론 1알' + 한지색 '줬어요'. 큰 글자에선 버튼을 아래로. */

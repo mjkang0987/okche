@@ -87,9 +87,10 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
 /**
  * 하단 탭 5개 + 앱 하나의 되돌리기 알림 자리(탭 막대가 보이면 그 위, 없으면 화면 아래).
  * [openMedPetId]: 탕약 알림을 눌러 연 아이 — 그 아이의 오늘 먹일 약 시트를 띄우고 [onMedOpened]로 비운다(8-4b).
+ * [openMedId]: 남은 약 알림을 눌러 연 약 — 더보기 → 약방 → 그 약 고치기, [onMedIdOpened]로 비운다(8-4c).
  */
 @Composable
-fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}) {
+fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMedId: String? = null, onMedIdOpened: () -> Unit = {}) {
     var item by remember { mutableStateOf<UndoToastItem?>(null) }
     var toastHeight by remember { mutableStateOf(0.dp) }
     val barHeight = remember { mutableStateOf(0.dp) }
@@ -99,7 +100,7 @@ fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}) {
     val toasts = remember { UndoToasts({ item = it }, { item }, appScope, view) }
     androidx.compose.runtime.CompositionLocalProvider(LocalUndoToasts provides toasts, LocalUndoInset provides if (item != null) toastHeight else 0.dp) {
         Box(Modifier.fillMaxSize()) {
-            RootTabsContent(barHeight, openMedPetId, onMedOpened)
+            RootTabsContent(barHeight, openMedPetId, onMedOpened, openMedId, onMedIdOpened)
             UndoToast(
                 item, onDismiss = { item = null }, onUndo = { item?.undo?.invoke() },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -118,7 +119,10 @@ fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}) {
 
 /** 하단 탭 5개. 순서는 디자인 기준(일기 → 문안 → 실록 → 어진첩 → 더보기), 첫 화면은 일기. */
 @Composable
-private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>, openMedPetId: String?, onMedOpened: () -> Unit) {
+private fun RootTabsContent(
+    barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>, openMedPetId: String?, onMedOpened: () -> Unit,
+    openMedId: String?, onMedIdOpened: () -> Unit,
+) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val toasts = LocalUndoToasts.current
@@ -148,6 +152,21 @@ private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<and
     var tangyakOpen by rememberSaveable { mutableStateOf(false) }
     var medAddOpen by rememberSaveable { mutableStateOf(false) }
     var medEditId by rememberSaveable { mutableStateOf<String?>(null) }
+    var notifyOpen by rememberSaveable { mutableStateOf(false) }
+    /** 남은 약 알림으로 연 약 — 약방이 그 약 고치기를 열면 비운다. */
+    var yakbangMedId by rememberSaveable { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(openMedId) {
+        if (openMedId == null) return@LaunchedEffect
+        // 약방이 보이게 그 앞에 그려지는 탕약 화면들은 닫는다.
+        medEditId = null
+        medAddOpen = false
+        tangyakOpen = false
+        notifyOpen = false
+        selected = Tab.More.ordinal
+        yakbangOpen = true
+        yakbangMedId = openMedId
+        onMedIdOpened()
+    }
     val quickState = rememberQuickRecordState()
     // 탕약 알림으로 연 아이: 아이 목록을 읽은 뒤, 지웠거나 추억이면 앱만 연다.
     var medSheetPetId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -231,8 +250,15 @@ private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<and
         return
     }
     if (yakbangOpen && pets != null) {
-        app.okche.ui.med.YakbangScreen(pets, seal = { PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) }) { yakbangOpen = false }
+        app.okche.ui.med.YakbangScreen(
+            pets, seal = { PetSeal(current, onSwitch = { switching = true }, onRegister = { registering = true }) },
+            openMedId = yakbangMedId, onMedOpened = { yakbangMedId = null },
+        ) { yakbangOpen = false }
         switchSheet()
+        return
+    }
+    if (notifyOpen) {
+        NotifyScreen { notifyOpen = false }
         return
     }
     if (snackListOpen) {
@@ -338,7 +364,7 @@ private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<and
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {
                 if (pets != null) PetManageSection(pets, restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })
-                // 더보기 메뉴(보드 More) — 다른 줄(다과·탕약·약방·등사·백업·의서·기별·결제)은 각 단계에서.
+                // 더보기 메뉴(보드 More) — 다른 줄(등사·백업·의서·결제)은 각 단계에서.
                 // 아이가 없거나 지금 보는 아이가 추억이면 사료 줄 없음(바꿀 아이가 없음). 다과는 모든 아이 공통이라 늘 있음.
                 val foodPet = current?.takeIf { it.memorializedAt == null }
                 Column(
@@ -354,6 +380,8 @@ private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<and
                     app.okche.ui.food.MoreMenuRow("탕약", note = "약 알림") { tangyakOpen = true }
                     androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
                     app.okche.ui.food.MoreMenuRow("약방", note = "약 목록") { yakbangOpen = true }
+                    androidx.compose.material3.HorizontalDivider(color = OkcheColor.Line)
+                    app.okche.ui.food.MoreMenuRow("기별", note = "알림 설정") { notifyOpen = true }
                 }
                 if (foodPet != null && foodPetId == foodPet.id) FoodChangeSheet(foodPet) { foodPetId = null }
             }

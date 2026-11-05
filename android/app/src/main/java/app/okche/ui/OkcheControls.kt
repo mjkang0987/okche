@@ -78,6 +78,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import app.okche.ui.theme.OkcheColor
 import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheSpacing
@@ -433,7 +434,10 @@ fun <T> OkcheChoiceCards(
     }
 }
 
-/** 스위치 줄: 제목 16 + 설명 14 + 스위치. 줄 전체가 하나의 스위치(누르는 자리·읽기 모두). */
+/**
+ * 스위치 줄: 제목 16 + 설명 14 + 스위치. 줄 전체가 하나의 스위치(누르는 자리·읽기 모두).
+ * [note]는 제목 뒤 ' · 남은 약'(더보기 줄과 같은 흐린 글자). [framed]가 false면 테두리·바탕 없이(카드 안 줄 — 기별).
+ */
 @Composable
 fun OkcheSwitchRow(
     title: String,
@@ -441,22 +445,28 @@ fun OkcheSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    note: String? = null,
+    framed: Boolean = true,
 ) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = FieldHeight)
-            .background(OkcheColor.Paper, shape)
-            .border(1.5.dp, OkcheColor.Line, shape)
-            .clip(shape)
+            .then(if (framed) Modifier.background(OkcheColor.Paper, shape).border(1.5.dp, OkcheColor.Line, shape).clip(shape) else Modifier)
             .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
-            .padding(horizontal = OkcheSpacing.Space4, vertical = FieldPadding),
+            .padding(horizontal = if (framed) OkcheSpacing.Space4 else 0.dp, vertical = FieldPadding),
         horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
-            Text(title, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
+            Text(
+                buildAnnotatedString {
+                    append(title)
+                    note?.let { withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 0.85.em, fontWeight = FontWeight.Normal)) { append(" · $it") } }
+                },
+                color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
+            )
             if (description.isNotEmpty()) Text(description, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
         Switch(checked, onCheckedChange = null, colors = okcheSwitchColors())

@@ -23,6 +23,7 @@ import app.okche.store.CelebrateTone
 import app.okche.store.HowTo
 import app.okche.store.OkcheDatabase
 import app.okche.store.OkcheDay
+import app.okche.store.QuietHours
 import app.okche.store.Pet
 import app.okche.store.Photo
 import app.okche.store.PhotoKind
@@ -41,7 +42,6 @@ import app.okche.store.fixedId
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -196,7 +196,7 @@ class StoreTest {
         assertEquals(FixedIds.SETTING, setting.id)
         assertEquals(WeightReminder(7, "10:00"), setting.weightReminder)
         assertEquals(3, setting.lowMedDays)
-        assertFalse(setting.quietHours.enabled)
+        assertEquals(QuietHours(true, "22:00", "08:00"), setting.quietHours)
         assertTrue(setting.notify.lastYearToday)
     }
 

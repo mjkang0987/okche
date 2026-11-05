@@ -14,6 +14,10 @@ struct TangyakView: View {
     @State private var failed = false
     /// 띠의 '줬어요' 알림에서 되돌리기 = 그 기록 지우기 확인 창.
     @State private var deleting: Record?
+    /// 기록 직후 1초는 띠를 막는다(두 번 눌러 같은 차례·다음 차례가 또 기록되지 않게).
+    @State private var giving = false
+    /// 띄운 알림이 있으면 화면을 떠날 때 닫는다(되돌리기가 이 화면의 확인 창을 쓰므로).
+    @State private var posted = false
 
     var body: some View {
         let cards = MedSchedules.cards(schedules, pets: pets)
@@ -27,7 +31,7 @@ struct TangyakView: View {
                     if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
                         let amount = MedSchedules.amountText(next.slot.schedule.amount, next.slot.schedule.unit)
                         NextMedBand(time: MedSlots.clockText(next.slot.due), detail: "\(next.pet.name) · \(med.name) \(amount)",
-                                    label: "\(MedSlots.clockText(next.slot.due)) \(next.pet.name) \(med.name) \(amount) 줬어요") { give(next.slot, med: med) }
+                                    label: "\(MedSlots.clockText(next.slot.due)) \(next.pet.name) \(med.name) \(amount) 줬어요", busy: giving) { give(next.slot, med: med) }
                     }
                     if cards.isEmpty {
                         Text("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요.")
@@ -67,10 +71,14 @@ struct TangyakView: View {
         .deleteRecordDialog($deleting, pets: pets)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .onDisappear { if posted { showUndo(nil); posted = false } }
     }
 
     /// 띠 '줬어요': 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
     private func give(_ slot: MedSlots.Slot, med: Medication) {
+        guard !giving else { return }
+        giving = true
+        Task { try? await Task.sleep(for: .seconds(1)); giving = false }
         do {
             let saved = try MedSlots.record(slot, in: context)
             failed = false
@@ -78,6 +86,7 @@ struct TangyakView: View {
                 deleting = saved
                 return true
             })
+            posted = true
         } catch {
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
@@ -634,6 +643,7 @@ struct NextMedBand: View {
     let time: String
     let detail: String
     let label: String
+    var busy = false
     let onGive: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -663,17 +673,18 @@ struct NextMedBand: View {
             Text(time).okcheText(OkcheTextStyle(family: .sans, size: 22, lineHeight: 30, weight: .bold)).foregroundStyle(OkcheColor.geumLight)
             Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.hanji)
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var button: some View {
         Button(action: onGive) {
             Text("줬어요").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaekDeep)
+                .fixedSize()
                 .padding(.horizontal, 18).frame(minHeight: 52)
                 .background(OkcheColor.hanji, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(busy)
         .accessibilityLabel(label)
     }
 }

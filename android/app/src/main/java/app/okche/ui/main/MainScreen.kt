@@ -213,6 +213,7 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
     val schedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
     // 몇 시간마다 밀림은 앞날 기록도 보니 탕약 기록 전체로.
     val medRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
+    val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
     // 오늘 남은 탕약 차례는 '21:00  탕약 · 약 … 예정' 줄로 기록 사이에 시간 순(보드 Main). 다 읽기 전엔 그리지 않음.
     val rows: List<Pair<Long, Any>>? = records?.let { recs ->
         val s = schedules ?: return@let null
@@ -249,7 +250,7 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
             )
         } else if (rows != null) {
             rows.forEachIndexed { index, (_, item) ->
-                if (item is app.okche.ui.med.MedSlot) PendingRow(item) { medSheet = true }
+                if (item is app.okche.ui.med.MedSlot) PendingRow(item, meds.firstOrNull { it.id == item.schedule.medicationId }?.name) { medSheet = true }
                 else if (item is Record) RecordRow(item) {
                     val record = item
                     when (record.kind) {
@@ -267,14 +268,16 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
 
 /** 예정 줄 52: '21:00  탕약 · 약 … 예정 ›', 누르면 오늘 먹일 약 시트. */
 @Composable
-private fun PendingRow(slot: app.okche.ui.med.MedSlot, onClick: () -> Unit) {
+private fun PendingRow(slot: app.okche.ui.med.MedSlot, medName: String?, onClick: () -> Unit) {
     val time = app.okche.ui.med.hhmm(slot.due)
+    // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
+    val name = medName?.let { "$it " }.orEmpty()
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .clickable(role = Role.Button, onClick = onClick)
-            .clearAndSetSemantics { contentDescription = "$time 탕약 예정 · 오늘 먹일 약 보기"; role = Role.Button },
+            .clearAndSetSemantics { contentDescription = "$time ${name}탕약 예정 · 오늘 먹일 약 보기"; role = Role.Button },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -288,7 +291,7 @@ private fun PendingRow(slot: app.okche.ui.med.MedSlot, onClick: () -> Unit) {
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
         Text("예정", color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = OkcheColor.Namsaek)
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = OkcheColor.Namsaek)
     }
 }
 

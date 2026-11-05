@@ -125,6 +125,7 @@ struct TodayRecordSection: View {
     @State private var snackEditing: Record?
     @State private var medEditing: Record?
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
+    @Query private var meds: [Medication]
     /// '예정' 줄을 누르면 오늘 먹일 약 시트(8-3c).
     @State private var medSheet: Pet?
     @ScaledMetric(relativeTo: .body) private var plainSize: CGFloat = 13.6
@@ -207,6 +208,8 @@ struct TodayRecordSection: View {
     /// 예정 줄: '21:00  탕약 · 약 … 예정 ›', 누르면 오늘 먹일 약 시트.
     private func pendingRow(_ slot: MedSlots.Slot) -> some View {
         let time = MedSlots.hhmm(slot.due)
+        // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
+        let name = meds.first { $0.id == slot.schedule.medicationId }.map { "\($0.name) " } ?? ""
         return Button { medSheet = pets.first { $0.id == petId } } label: {
             HStack(spacing: 8) {
                 (Text(time).foregroundColor(OkcheColor.inkMuted) + Text("  탕약")
@@ -220,7 +223,7 @@ struct TodayRecordSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(time) 탕약 예정 · 오늘 먹일 약 보기")
+        .accessibilityLabel("\(time) \(name)탕약 예정 · 오늘 먹일 약 보기")
     }
 
     private func rowContent(_ record: Record, _ value: String) -> some View {

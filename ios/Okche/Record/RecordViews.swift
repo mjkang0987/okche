@@ -169,7 +169,7 @@ struct QuickRecordCard: View {
     /// 탕약 줄(소피 다음) — 없으면 줄 없음(보드 `RecordNoMed`).
     var med: MedLine? = nil
     var onGive: (MedSlots.Slot) -> Void = { _ in }
-    @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
+    @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 

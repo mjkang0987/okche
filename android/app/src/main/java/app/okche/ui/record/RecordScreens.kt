@@ -360,7 +360,7 @@ private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit, mor
     }
     val content = @Composable { modifier: Modifier ->
         if (line.checked == null && line.buttons.isEmpty()) {
-            Box(modifier.heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
+            Box(modifier.heightIn(min = 44.dp), contentAlignment = Alignment.CenterStart) {
                 Text("오늘 줄 약을 다 줬어요", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
         } else {
@@ -368,7 +368,7 @@ private fun MedRow(line: MedLine, large: Boolean, onGive: (MedSlot) -> Unit, mor
                 line.checked?.let { checked ->
                     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
                     Box(
-                        Modifier.widthIn(min = 52.dp).heightIn(min = 56.dp).background(OkcheColor.Namsaek, shape)
+                        Modifier.widthIn(min = 52.dp).heightIn(min = 44.dp).background(OkcheColor.Namsaek, shape)
                             .semantics { contentDescription = "탕약 ${checked.name} 줬어요 · 기록됨" }.padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -402,7 +402,7 @@ private fun QuickButton(title: String, label: String, softWrap: Boolean = true, 
     Box(
         Modifier
             .widthIn(min = 52.dp)
-            .heightIn(min = 56.dp)
+            .heightIn(min = 44.dp)
             .clip(shape)
             .background(OkcheColor.Paper, shape)
             .border(1.5.dp, OkcheColor.LineStrong, shape)

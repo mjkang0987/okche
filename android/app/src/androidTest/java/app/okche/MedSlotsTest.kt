@@ -123,6 +123,9 @@ class MedSlotsTest {
         // 추억으로 간직(10:00)했다가 같은 날 되돌려(11:00) 다시 연 줄이 있으면 그만 먹인 게 아님 — 안 준 08:00은 남음.
         val kept = row(times = listOf("08:00", "20:00"), from = at(20, 9), until = at(27, 10))
         assertEquals(listOf(at(27, 8), at(27, 20)), remaining(listOf(kept, row(times = listOf("08:00", "20:00"), series = kept, from = at(27, 11))), emptyList()))
+        // 추억 되돌린 날 다시 그만 먹이면(12:00) 옛 줄의 안 준 08:00도 빠짐.
+        val reopened = row(times = listOf("08:00", "20:00"), series = kept, from = at(27, 11), until = at(27, 12))
+        assertTrue(remaining(listOf(kept, reopened), emptyList()).isEmpty())
         // 바꾼 다음 날은 새 줄 그대로.
         assertEquals(listOf(at(28, 9), at(28, 21)), remainingSlots(listOf(s1, s2), listOf(g), pet, "2026-10-28").map { it.due })
     }

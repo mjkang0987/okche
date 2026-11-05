@@ -61,6 +61,10 @@ abstract class OkcheDao {
     @Query("SELECT * FROM medication") abstract fun medicationsFlow(): Flow<List<Medication>>
     @Query("SELECT * FROM record WHERE kind = 'med' AND deleted_at IS NULL") abstract fun medRecordsFlow(): Flow<List<Record>>
     @Query("SELECT * FROM med_schedule WHERE deleted_at IS NULL") abstract fun medSchedulesFlow(): Flow<List<MedSchedule>>
+    // 탕약 알림 걸기(8-4b): 휴양은 끝난 것도(차례 시각에 휴양 중인지 봄).
+    @Query("SELECT * FROM medication") abstract suspend fun medications(): List<Medication>
+    @Query("SELECT * FROM record WHERE kind = 'med' AND deleted_at IS NULL") abstract suspend fun medRecords(): List<Record>
+    @Query("SELECT * FROM rest_period WHERE deleted_at IS NULL") abstract suspend fun restPeriods(): List<RestPeriod>
 
     // 다과(7-4b): 목록에서 뺀 다과도 이름은 지난 기록 글자에 쓰여서 모두 읽는다.
     @Query("SELECT * FROM snack") abstract fun snacksFlow(): Flow<List<Snack>>

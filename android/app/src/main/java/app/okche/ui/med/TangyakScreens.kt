@@ -3,6 +3,8 @@ package app.okche.ui.med
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -69,6 +71,8 @@ import app.okche.store.Medication
 import app.okche.store.OkcheDatabase
 import app.okche.store.OkcheDay
 import app.okche.store.Pet
+import app.okche.store.notifyAsked
+import app.okche.store.setNotifyAsked
 import app.okche.ui.OkcheChoiceCards
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheErrorText
@@ -303,6 +307,22 @@ private fun TangyakCard(s: MedSchedule, pet: Pet, med: Medication, stock: String
     }
 }
 
+/** 거짓이면 허락 안내 창을 띄우지 않음 — 화면 테스트는 처음부터 끔(androidTest `NotifyAskOff`), 안내 창 테스트만 켬. */
+@androidx.annotation.VisibleForTesting
+internal var notifyAskOn = true
+
+/** 알림 켠 약을 저장했고 안드로이드 13 이상에서 아직 허락도, 안내 창도 없었으면 안내 창(8-4 '허락'). */
+private suspend fun shouldAskNotify(context: android.content.Context, f: ScheduleFields): Boolean =
+    notifyAskOn && f.reminder && f.frequency != MedFrequency.asNeeded && (needsNotifyPermission(context) || needsExactAlarm(context)) &&
+        !context.notifyAsked()
+
+private fun needsNotifyPermission(context: android.content.Context) = android.os.Build.VERSION.SDK_INT >= 33 &&
+    context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+
+/** '알람 및 리마인더'가 꺼져 있으면 알림이 최대 1시간 늦을 수 있어 함께 묻는다(2026-11-06 사용자). 안드로이드 14부터 처음엔 꺼짐. */
+private fun needsExactAlarm(context: android.content.Context) = android.os.Build.VERSION.SDK_INT >= 31 &&
+    !context.getSystemService(android.app.AlarmManager::class.java).canScheduleExactAlarms()
+
 /**
  * 약 추가(보드 MedAdd·MedAddWeekday·MedAddHours·MedAddAsNeeded): 누가 먹나요(여럿), 약방에서 고르기, 한 번에 얼마나,
  * 얼마나 자주 5가지(주기마다 칸), 알림, 먹이는 방법, '저장하기' — 고른 아이마다 한 줄.
@@ -342,7 +362,8 @@ fun MedAddScreen(
     val anchors = remember { app.okche.ui.pet.Anchors() }
     var adding by rememberSaveable { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
+    // 안내 창이 뜬 채 화면을 다시 만들어도(다크 모드·글자 크기) 다시 저장되지 않게 saveable.
+    var busy by rememberSaveable { mutableStateOf(false) }
     val listed = meds.filter { it.deletedAt == null }.sortedBy { it.createdAt }
     // 고른 약의 단위 — 고를 때 기억해 둔다(방금 들인 약이 목록에 아직 안 떠도 맞게).
     var pickedUnit by remember { mutableStateOf(editing?.unit) }
@@ -368,14 +389,48 @@ fun MedAddScreen(
         touched = touched + "med" + "dose"
     }
 
+    var asking by rememberSaveable { mutableStateOf(false) }
+    // 허락 창의 답과 상관없이 약은 이미 저장됨 — 답이 오면 저장 뒤처럼 나감.
+    // 알림 허락 다음 '알람 및 리마인더'가 꺼져 있으면 그 설정 화면으로 — 돌아오면 다시 걸기(onResume)가 정시로 건다.
+    fun exactThenBack() {
+        if (needsExactAlarm(context)) {
+            runCatching {
+                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}")))
+            }
+        }
+        onBack()
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { exactThenBack() }
+
     fun save() {
         if (busy || missing != null) return
         busy = true
         scope.launch {
             failed = runCatching { if (editing != null && original != null) changeSchedule(dao, editing, original, f) else addSchedules(dao, f, unit) }.isFailure
+            if (!failed && runCatching { shouldAskNotify(context, f) }.getOrDefault(false)) {
+                // 띄울 때 바로 표시(나가며 화면 범위가 닫혀도 남게) — busy는 그대로 두어 다시 저장되지 않게.
+                runCatching { context.setNotifyAsked(true) }
+                asking = true
+                return@launch
+            }
             busy = false
             if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.") else onBack()
         }
+    }
+
+    // 허락 안내 창(보드 NotifyAsk): 바깥을 누르거나 뒤로 가면 '나중에'와 같음.
+    if (asking) {
+        app.okche.ui.OkcheConfirmDialog(
+            "약 먹일 시간을 알려 드릴까요?", "계속하기",
+            onCancel = { asking = false; onBack() },
+            onConfirm = {
+                asking = false
+                if (needsNotifyPermission(context)) permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else exactThenBack()
+            },
+            text = "알림을 허락하면 정해 둔 시간에 탕약 알림이 와요. 다음 창에서 '허용'을 눌러 주세요.",
+            message = "나중에 휴대폰 설정에서도 켤 수 있어요.",
+            cancel = "나중에",
+        )
     }
 
     if (adding) MedFormSheet(null, pets, records, picking = true, onAdded = { pick(it) }) { adding = false }

@@ -210,6 +210,9 @@ struct MedAddView: View {
     @State private var original: MedSchedules.Form?
     @State private var firstAtTouched = false
     @State private var stopping = false
+    /// 알림 켠 약을 처음 저장하면 허락 안내 창(`NotifyAsk`, 8-4b) — 약은 이미 저장됨.
+    @State private var asking = false
+    @State private var requesting = false
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
     @Query private var meds: [Medication]
@@ -303,7 +306,22 @@ struct MedAddView: View {
                     .presentationBackground(.clear)
             }
         }
-        .transaction { $0.disablesAnimations = stopping }
+        .fullScreenCover(isPresented: $asking) {
+            OkcheConfirmDialog(title: "약 먹일 시간을 알려 드릴까요?", confirm: "계속하기", cancel: "나중에",
+                               onCancel: { asking = false; dismiss() },
+                               onConfirm: {
+                                   guard !requesting else { return } // 두 번 눌러도 한 번만
+                                   requesting = true
+                                   Task { await MedReminders.requestPermission(); asking = false; dismiss() }
+                               }) {
+                Text("알림을 허락하면 정해 둔 시간에 탕약 알림이 와요. 다음 창에서 '허용'을 눌러 주세요.")
+                    .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                Text("나중에 휴대폰 설정에서도 켤 수 있어요.")
+                    .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+            }
+            .presentationBackground(.clear)
+        }
+        .transaction { $0.disablesAnimations = stopping || asking }
         .sheet(isPresented: $adding) {
             MedFormSheet(mode: .addAndPick) { med in pick(med) }
         }
@@ -573,7 +591,12 @@ struct MedAddView: View {
             } else {
                 try MedSchedules.add(form, unit: unit, in: context)
             }
-            dismiss()
+            guard form.reminder, form.frequency != .asNeeded else { return dismiss() }
+            Task {
+                guard await MedReminders.shouldAsk() else { return dismiss() }
+                MedReminders.markAsked()
+                asking = true
+            }
         } catch {
             saving = false
             failed = true

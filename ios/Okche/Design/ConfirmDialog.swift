@@ -11,6 +11,8 @@ struct OkcheConfirmDialog<Extra: View>: View {
     var confirmLook: OkchePrimaryButtonStyle.Look = .filled
     /// 거짓이면 '그냥 둘게요' 없이 버튼 하나(안내 창 — '지금은 뺄 수 없어요', 8-1).
     var showsCancel = true
+    /// 닫기 버튼 글자(허락 안내 창은 '나중에', 8-4b).
+    var cancel = "그냥 둘게요"
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @ViewBuilder var extra: Extra
@@ -69,7 +71,7 @@ struct OkcheConfirmDialog<Extra: View>: View {
 
     @ViewBuilder private var buttons: some View {
         if showsCancel {
-            Button("그냥 둘게요", action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
+            Button(cancel, action: onCancel).buttonStyle(.okchePrimary(.outlined)).keyboardShortcut(.cancelAction)
         }
         // 버튼 하나면 그 버튼이 Esc(닫기)도 받는다.
         if showsCancel {

@@ -36,3 +36,12 @@ val Context.mealHintDismissed: Flow<Set<String>> get() = deviceSettings.data.map
 suspend fun Context.dismissMealHint(petId: String) {
     deviceSettings.edit { it[MEAL_HINT_DISMISSED] = it[MEAL_HINT_DISMISSED].orEmpty() + petId }
 }
+
+private val NOTIFY_ASKED = booleanPreferencesKey("notifyAsked")
+
+/** 알림 허락 안내 창(NotifyAsk, 8-4b)을 띄운 적 있는지 — '나중에'·'계속하기' 어느 쪽이든 다시 안 띄움. */
+suspend fun Context.notifyAsked(): Boolean = deviceSettings.data.first()[NOTIFY_ASKED] ?: false
+
+suspend fun Context.setNotifyAsked(asked: Boolean) {
+    deviceSettings.edit { it[NOTIFY_ASKED] = asked }
+}

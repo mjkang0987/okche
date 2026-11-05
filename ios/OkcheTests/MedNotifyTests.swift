@@ -1,4 +1,5 @@
 import SwiftData
+import UserNotifications
 import XCTest
 @testable import Okche
 
@@ -109,5 +110,19 @@ final class MedNotifyTests: XCTestCase {
         next.remindAgainMinutes = 60
         XCTAssertEqual(try MedSchedules.change(s, from: original, to: next, in: context), .sameRow)
         XCTAssertEqual(s.remindAgainMinutes, 60)
+    }
+
+    /// 8-4b: 휴대폰 알림 요청 — 같은 id·제목·내용, 그 분에 울림, 누르면 열 아이.
+    func testRequestFromAlert() throws {
+        let alert = MedNotify.Alert(id: "med.due.1", kind: .due, fireAt: at(27, 20, 50), title: "탕약 · 오후 9:00", body: "콩이 프레드니솔론 1알", petId: kong.id)
+        let request = MedReminders.request(alert)
+        XCTAssertEqual(request.identifier, "med.due.1")
+        XCTAssertEqual(request.content.title, "탕약 · 오후 9:00")
+        XCTAssertEqual(request.content.body, "콩이 프레드니솔론 1알")
+        XCTAssertEqual(request.content.userInfo["petId"] as? String, kong.id.uuidString)
+        let trigger = try XCTUnwrap(request.trigger as? UNCalendarNotificationTrigger)
+        XCTAssertEqual(Calendar.current.date(from: trigger.dateComponents), at(27, 20, 50))
+        XCTAssertFalse(trigger.repeats)
+        XCTAssertTrue(MedReminders.request(MedNotify.Alert(id: "med.more", kind: .more, fireAt: at(27, 21), title: "옥체", body: "", petId: nil)).content.userInfo.isEmpty)
     }
 }

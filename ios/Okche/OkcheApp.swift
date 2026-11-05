@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct OkcheApp: App {
+    @UIApplicationDelegateAdaptor(OkcheAppDelegate.self) private var appDelegate
     /// 못 열면 멈춘다 — 빈 저장소로 새로 만들어 기록을 덮어쓰는 것보다 낫다.
     private let container: ModelContainer = {
         do {
@@ -16,6 +17,7 @@ struct OkcheApp: App {
             if uiTesting, !ProcessInfo.processInfo.arguments.contains("-keep-settings") {
                 UserDefaults.standard.removeObject(forKey: "onboardingDone")
                 UserDefaults.standard.removeObject(forKey: "lastPetId")
+                UserDefaults.standard.removeObject(forKey: "notifyAsked")
             }
             let container = try OkcheStore.container(inMemory: uiTesting)
             _ = try Setting.loadOrCreate(in: container.mainContext)

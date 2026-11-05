@@ -147,15 +147,16 @@ internal fun BirthFields(
     onAge: (String) -> Unit,
     onBirthDate: (LocalDate?) -> Unit,
     onBirthUnknown: (Boolean) -> Unit,
+    anchor: (String) -> Modifier,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (birthUnknown) {
             OkcheTextField(
-                age, onAge, "나이", hint = "(대략)", suffix = "살쯤",
+                age, onAge, "나이", anchor("age"), hint = "(대략)", suffix = "살쯤",
                 error = errors["age"], keyboardOptions = numberKeys, description = AGE_HELP,
             )
         } else {
-            DateField(birthDate, "생일", onBirthDate, Modifier, errors["birthDate"], "생일 지우기")
+            DateField(birthDate, "생일", onBirthDate, anchor("birthDate"), errors["birthDate"], "생일 지우기")
         }
         Row(
             Modifier
@@ -292,6 +293,7 @@ internal fun InsulinRowsEditor(
     rows: List<InsulinRow>,
     errors: Map<String, String>,
     onRows: (String?, List<InsulinRow>) -> Unit,
+    anchor: (String) -> Modifier,
 ) {
     val context = LocalContext.current
     Column {
@@ -314,7 +316,7 @@ internal fun InsulinRowsEditor(
                                     onRows("times", rows.toMutableList().also { it[i] = it[i].copy(time = time) })
                                 }, t.hour, t.minute, DateFormat.is24HourFormat(context)).show()
                             },
-                            m,
+                            anchor("time$i").then(m),
                             showLabel = false,
                             error = errors["time$i"],
                             showError = false,
@@ -326,7 +328,7 @@ internal fun InsulinRowsEditor(
                             row.units,
                             { v -> onRows("units$i", rows.toMutableList().also { it[i] = it[i].copy(units = v) }) },
                             "$n 양 (단위)",
-                            (if (stacked) Modifier.weight(1f) else Modifier.width(104.dp)),
+                            anchor("units$i").then(if (stacked) Modifier.weight(1f) else Modifier.width(104.dp)),
                             showLabel = false,
                             error = errors["units$i"],
                             showError = false,

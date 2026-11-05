@@ -31,6 +31,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -137,6 +141,19 @@ fun PetEditFlow(petId: String, onClose: () -> Unit, onKept: () -> Unit = onClose
     }
 }
 
+/** 남은 것 줄을 누르면 그 칸으로 옮겨 가려고 칸마다 다는 표시(아이 등록·고치기·인슐린 설정·약 추가). */
+internal class Anchors {
+    val bring = mutableMapOf<String, BringIntoViewRequester>()
+    val focus = mutableMapOf<String, FocusRequester>()
+    fun of(key: String) =
+        Modifier.bringIntoViewRequester(bring.getOrPut(key) { BringIntoViewRequester() }).focusRequester(focus.getOrPut(key) { FocusRequester() })
+
+    suspend fun goTo(key: String, focusable: Boolean) {
+        bring[key]?.bringIntoView()
+        if (focusable) focus[key]?.requestFocus()
+    }
+}
+
 /**
  * 아이 정보 고치기(디자인 보드 PetEdit, 추억 아이는 PetEditMemorial). 사진 칸은 11단계.
  * 사료·체중 줄은 그 화면을 만드는 단계 전이라 보이기만 한다. 간직·되돌리기·지우기는 6-4.
@@ -157,6 +174,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     var saved by remember { mutableStateOf<Pet?>(null) }
     var weight by remember { mutableStateOf<String?>(null) }
     var hasPlan by remember { mutableStateOf<Boolean?>(null) }
+    val anchors = remember { Anchors() }
     LaunchedEffect(petId) {
         saved = dao.pet(petId)
         weight = latestWeightText(dao, petId)
@@ -184,14 +202,16 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
     }
     BackHandler(onBack = close)
 
-    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
+    // 되돌리기 알림이 떠 있으면 아래 고정 버튼이 가리지 않게 그만큼 위로.
+    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding().padding(bottom = app.okche.ui.LocalUndoInset.current)) {
         FormHeader(saved?.let { petTitle(it) }.orEmpty(), "아이 정보", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
         val f = form ?: return@Column
         // 지금 고칠 것 전부(저장 규칙과 같음). 계획을 읽기 전엔 있다고 본다(저장할 때 한 번 더 검사).
         val allErrors = saved?.let { petEditErrors(f, it, hasPlan ?: true) }.orEmpty()
         val errors = allErrors.filterKeys { it in touched }
         // 첫 번째로 남은 것(화면 위에서부터: name · birthDate · age · familyDate · insulinPlan) — 있으면 저장 버튼은 흐리게.
-        val missing = allErrors.values.firstOrNull()
+        val missingKey = allErrors.keys.firstOrNull()
+        val missing = allErrors.missingLine(missingKey)
         fun edit(key: String? = null, change: PetEditForm.() -> PetEditForm) {
             form = f.change()
             if (key != null) touched = touched + key
@@ -214,7 +234,7 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                     )
                 }
             }
-            OkcheTextField(f.name, { edit("name") { copy(name = it) } }, "이름", error = errors["name"])
+            OkcheTextField(f.name, { edit("name") { copy(name = it) } }, "이름", anchors.of("name"), error = errors["name"])
             OkcheChoiceCards("종", listOf(Species.cat to "고양이", Species.dog to "강아지"), f.species, { edit { withSpecies(it) } })
             BreedField(f.species, f.breed) { edit { copy(breed = it) } }
             FurColorPicker(f.species, f.furColor) { edit { copy(furColor = it) } }
@@ -231,11 +251,12 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                 onAge = { edit("age") { copy(age = it) } },
                 onBirthDate = { edit("birthDate") { copy(birthDate = it) } },
                 onBirthUnknown = { edit { copy(birthUnknown = it) } },
+                anchor = anchors::of,
             )
-            DateField(f.familyDate, "가족 된 날", { edit("familyDate") { copy(familyDate = it) } }, Modifier,
+            DateField(f.familyDate, "가족 된 날", { edit("familyDate") { copy(familyDate = it) } }, anchors.of("familyDate"),
                 errors["familyDate"], "가족 된 날 지우기")
             OkcheTextField(f.diagnosis, { edit { copy(diagnosis = it) } }, "진단명", hint = "(있을 때만)")
-            Column(verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
+            Column(anchors.of("insulinPlan"), verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space1)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", f.hasDiabetes, { edit("insulinPlan") { copy(hasDiabetes = it) } })
                 // 추억 아이는 인슐린을 새로 설정하지 않는다(간직하면 계획을 닫아 둠 — 되돌릴 때 6-4 규칙대로).
                 if (f.hasDiabetes && saved?.memorializedAt == null) {
@@ -261,7 +282,11 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
                         when (done) {
                             Lifecycle.Kept -> onKept()
                             Lifecycle.Deleted -> onDeleted()
-                            Lifecycle.Restored -> scope.launch { saved = dao.pet(petId) }
+                            // 되돌리면 닫아 둔 인슐린 계획도 다시 열려서 계획도 다시 읽는다.
+                            Lifecycle.Restored -> scope.launch {
+                                saved = dao.pet(petId)
+                                hasPlan = dao.openInsulinPlans(petId).isNotEmpty()
+                            }
                         }
                     },
                 )
@@ -270,7 +295,13 @@ private fun PetEditScreen(petId: String, onClose: () -> Unit, onInsulin: () -> U
         OkcheFooter {
             if (failed) OkcheErrorText(SAVE_ERROR)
             // 간직·되돌리기·지우기를 저장하는 동안엔 누르지 않는다(위 lifecycleBusy).
-            OkcheFooterButton("저장하기", { if (missing == null && !lifecycleBusy) saver.save { savePetEdit(dao, f) } }, missing)
+            OkcheFooterButton("저장하기", { if (missing == null && !lifecycleBusy) saver.save { savePetEdit(dao, f) } }, missing) {
+                // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                missingKey?.let { k ->
+                    touched = touched + k
+                    scope.launch { anchors.goTo(k, focusable = k == "name" || k == "age") }
+                }
+            }
         }
     }
 }
@@ -406,6 +437,8 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
     var touched by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var failed by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(petId) { if (form == null) form = InsulinSetupForm.load(dao, petId) }
+    val anchors = remember { Anchors() }
+    val scope = rememberCoroutineScope()
     val result = saver.result
     LaunchedEffect(result) {
         if (result == null) return@LaunchedEffect
@@ -422,13 +455,15 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
     }
     BackHandler(onBack = close)
 
-    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
+    // 되돌리기 알림이 떠 있으면 아래 고정 버튼이 가리지 않게 그만큼 위로.
+    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding().padding(bottom = app.okche.ui.LocalUndoInset.current)) {
         FormHeader("인슐린", "설정", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", close, enabled = !saver.saving)
         val f = form ?: return@Column
         val allErrors = checkInsulinRows(f.rows).first
         val errors = allErrors.touchedOnly(touched)
         // 첫 번째로 남은 것(양 칸들 → 시간) — 있으면 저장 버튼은 흐리게.
-        val missing = insulinOrder(f.rows.size).firstNotNullOfOrNull { allErrors[it] }
+        val missingKey = insulinOrder(f.rows.size).firstOrNull { it in allErrors }
+        val missing = allErrors.missingLine(missingKey)
         fun edit(key: String? = null, change: InsulinSetupForm.() -> InsulinSetupForm) {
             val next = f.change()
             form = next
@@ -457,7 +492,7 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
                         .background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusLg))
                         .padding(horizontal = 14.dp),
                 ) {
-                    InsulinRowsEditor(f.rows, errors, { key, rows -> edit(key) { copy(rows = rows) } })
+                    InsulinRowsEditor(f.rows, errors, { key, rows -> edit(key) { copy(rows = rows) } }, anchors::of)
                 }
                 HelpText(
                     "병원에서 정해 준 양을 넣어 주세요. 일기의 '맞음' 버튼이 그 시간의 양으로 바로 기록해요. 양을 바꿀 땐 수의사와 먼저 상의하길 권해요.",
@@ -471,7 +506,13 @@ private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
         }
         OkcheFooter {
             if (failed) OkcheErrorText(SAVE_ERROR)
-            OkcheFooterButton("저장하기", { if (missing == null) saver.save { saveInsulinSetup(dao, f) } }, missing)
+            OkcheFooterButton("저장하기", { if (missing == null) saver.save { saveInsulinSetup(dao, f) } }, missing) {
+                // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                missingKey?.let { k ->
+                    touched = touched + touchKey(k)
+                    scope.launch { anchors.goTo(k, focusable = k.startsWith("units")) }
+                }
+            }
         }
     }
 }

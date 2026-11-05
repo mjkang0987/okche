@@ -170,7 +170,7 @@ class SnackFlowTest {
         waitFor(hasText("짜 먹는 간식 · 이번 달 1번"))
         rule.onNode(hasText("연어 퓨레")).performClick()
         waitFor(hasText("다과 고치기"))
-        rule.onNode(hasText("목록에서 빼기")).performClick() // 시트 아래 고정 칸
+        rule.onNode(hasText("목록에서 빼기")).performScrollTo().performClick() // 시트 내용 맨 아래(고정 칸 밖)
         waitFor(hasText("연어 퓨레를 목록에서 뺄까요?"))
         rule.onNode(hasText("빼기").and(hasClickAction())).performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("짜 먹는 간식 · 이번 달 1번")).fetchSemanticsNodes().isEmpty() }

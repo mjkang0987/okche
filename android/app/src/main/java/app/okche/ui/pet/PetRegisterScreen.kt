@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -63,7 +66,10 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val allErrors = registerErrors(form)
     val errors = allErrors.touchedOnly(touched)
     // 첫 번째로 남은 것(화면 위에서부터) — 있으면 '모시기'는 흐리게.
-    val missing = (listOf("name", "birthDate", "age", "weight") + insulinOrder(form.insulinRows.size)).firstNotNullOfOrNull { allErrors[it] }
+    val missingKey = (listOf("name", "birthDate", "age", "weight") + insulinOrder(form.insulinRows.size)).firstOrNull { it in allErrors }
+    val missing = allErrors.missingLine(missingKey)
+    val anchors = remember { Anchors() }
+    val scope = rememberCoroutineScope()
     fun edit(key: String? = null, change: PetForm.() -> PetForm) {
         val rows = form.insulinRows.size
         form = form.change()
@@ -87,7 +93,8 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         }
     }
     BackHandler(onBack = close)
-    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding()) {
+    // 되돌리기 알림이 떠 있으면 아래 고정 버튼이 가리지 않게 그만큼 위로.
+    Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).safeDrawingPadding().padding(bottom = app.okche.ui.LocalUndoInset.current)) {
         FormHeader("새 아기씨 모시기", "아이 등록", Icons.Outlined.Close, "닫기", close, enabled = !saver.saving)
 
         Column(
@@ -97,7 +104,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                 .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space2, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(20.dp), // 보드 칸 사이 20(토큰에 없음)
         ) {
-            OkcheTextField(form.name, { edit("name") { copy(name = it) } }, "이름", error = errors["name"])
+            OkcheTextField(form.name, { edit("name") { copy(name = it) } }, "이름", anchors.of("name"), error = errors["name"])
             OkcheChoiceCards(
                 "종", listOf(Species.cat to "고양이", Species.dog to "강아지"), form.species,
                 { edit { withSpecies(it) } },
@@ -117,9 +124,10 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                 onAge = { edit("age") { copy(age = it) } },
                 onBirthDate = { edit("birthDate") { copy(birthDate = it) } },
                 onBirthUnknown = { edit { copy(birthUnknown = it) } },
+                anchor = anchors::of,
             )
             OkcheTextField(
-                form.weight, { edit("weight") { copy(weight = it) } }, "체중", hint = "(kg)",
+                form.weight, { edit("weight") { copy(weight = it) } }, "체중", anchors.of("weight"), hint = "(kg)",
                 error = errors["weight"], keyboardOptions = decimalKeys,
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -130,7 +138,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             }
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", form.hasDiabetes, { edit { copy(hasDiabetes = it) } })
-                if (form.hasDiabetes) InsulinBox(form, errors, ::edit)
+                if (form.hasDiabetes) InsulinBox(form, errors, ::edit, anchors::of)
             }
         }
         OkcheFooter {
@@ -141,7 +149,13 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                     val id = newId()
                     saver.save { registerPet(OkcheDatabase.get(context).dao(), form, petId = id).also { if (it.isEmpty()) runCatching { context.setLastPetId(id) } } }
                 }
-            }, missing)
+            }, missing) {
+                // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                missingKey?.let { k ->
+                    touched = touched + touchKey(k)
+                    scope.launch { anchors.goTo(k, focusable = k != "birthDate" && touchKey(k) != "times") }
+                }
+            }
         }
     }
 }
@@ -152,6 +166,7 @@ private fun InsulinBox(
     form: PetForm,
     errors: Map<String, String>,
     edit: (String?, PetForm.() -> PetForm) -> Unit,
+    anchor: (String) -> Modifier,
 ) {
     Column(
         Modifier
@@ -167,7 +182,7 @@ private fun InsulinBox(
         )
         Column {
             OkcheFieldLabel("맞는 시간과 양", Modifier.padding(bottom = OkcheSpacing.Space2))
-            InsulinRowsEditor(form.insulinRows, errors, { key, rows -> edit(key) { copy(insulinRows = rows) } })
+            InsulinRowsEditor(form.insulinRows, errors, { key, rows -> edit(key) { copy(insulinRows = rows) } }, anchor)
         }
         Column {
             OkcheChoiceChips(

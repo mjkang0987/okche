@@ -193,7 +193,7 @@ class YakbangFlowTest {
         waitFor(hasText("물약 · 1ml씩 · 남은 120ml"))
         rule.onNode(hasText("위장약 시럽")).performClick()
         waitFor(hasText("약 고치기"))
-        rule.onNode(hasText("약방에서 빼기")).performClick()
+        rule.onNode(hasText("약방에서 빼기")).performScrollTo().performClick() // 내용 맨 아래(고정 칸 밖)
         waitFor(hasText("위장약 시럽을 약방에서 뺄까요?"))
         rule.onNode(hasText("빼기").and(hasClickAction())).performClick()
         waitFor(hasText("아직 들인 약이 없어요."))

@@ -116,6 +116,25 @@ internal fun Map<String, String>.touchedOnly(touched: Set<String>) =
 internal fun Set<String>.afterRows(key: String?, before: Int, after: Int) =
     (if (before != after) filterNot { it.startsWith("units") }.toSet() + "times" else this) + listOfNotNull(key)
 
+/** 남은 것 줄의 칸 이름(iOS `petFieldLabel`과 같음) — 인슐린 양은 몇 번째인지까지. */
+internal fun petFieldLabel(key: String): String? = when {
+    key == "name" -> "이름"
+    key == "birthDate" -> "생일"
+    key == "age" -> "나이"
+    key == "weight" -> "체중"
+    key == "familyDate" -> "가족 된 날"
+    key.startsWith("units") -> "${key.removePrefix("units").toInt() + 1}번째 인슐린 양"
+    key.startsWith("time") || key == "insulinRows" -> "인슐린 시간"
+    else -> null
+}
+
+/** 남은 것 줄 문구: [key] 칸 오류 앞에 칸 이름. */
+internal fun Map<String, String>.missingLine(key: String?) =
+    key?.let { k -> getValue(k).let { m -> petFieldLabel(k)?.let { app.okche.ui.okcheNamed(it, m) } ?: m } }
+
+/** 남은 것 줄을 눌렀을 때 만진 것으로 둘 칸 — 시간 오류는 times 하나로 묶임([touchedOnly]). */
+internal fun touchKey(key: String) = if (key.startsWith("time") || key == "insulinRows") "times" else key
+
 /** 인슐린 줄의 남은 것 순서(iOS와 같음): 양 칸들 → 시간. */
 internal fun insulinOrder(rows: Int) = List(rows) { "units$it" } + List(rows) { "time$it" } + "insulinRows"
 

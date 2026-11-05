@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
@@ -91,13 +92,23 @@ class OnboardingTest {
         startRegister()
         // 이름이 없으면 '모시기'는 흐리고 못 누름 + 남은 것 안내.
         rule.onNode(hasText("모시기").and(hasClickAction())).assertIsNotEnabled()
-        waitFor(hasText("이름을 넣어 주세요"))
+        waitFor(hasText("이름을 넣어 주세요", substring = true)) // 남은 것 줄은 끝에 ' ›'(누르면 그 칸으로)
         rule.onNode(tabRecord).assertDoesNotExist()
         assertEquals(0, runBlocking { OkcheDatabase.get(context).dao().pets().size })
         // 이름을 넣으면 안내가 사라지고 누를 수 있다.
         rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput("콩")
-        rule.onNodeWithText("이름을 넣어 주세요").assertDoesNotExist()
+        rule.onNodeWithText("이름을 넣어 주세요", substring = true).assertDoesNotExist()
         rule.onNode(hasText("모시기").and(hasClickAction())).assertIsEnabled()
+    }
+
+    /** 남은 것 줄을 누르면 그 칸을 만진 것으로(칸 아래 오류가 보임) + 그 칸에 커서. 화면 읽기는 '›' 없이 읽는다. */
+    @Test fun missingLineGoesToField() {
+        startRegister()
+        val name = rule.onNode(hasSetTextAction().and(hasText("이름")))
+        name.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
+        rule.onNode(hasContentDescription("이름을 넣어 주세요").and(hasClickAction())).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("이름을 넣어 주세요", substring = true)).fetchSemanticsNodes().size >= 2 } // 칸 아래 + 남은 것 줄
+        name.assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "이름을 넣어 주세요")).assertIsFocused()
     }
 
     /** 고른 생일은 '생일 지우기'로 안 고름으로 되돌린다. 날짜 창은 기본 창이라 Espresso로 '확인'(오늘)을 누른다. */
@@ -164,7 +175,8 @@ class OnboardingTest {
         waitFor(SemanticsMatcher.expectValue(SemanticsProperties.Error, "양을 넣어 주세요").and(hasContentDescription("첫 번째 양 (단위)")))
         rule.onNode(SemanticsMatcher.expectValue(SemanticsProperties.Error, "양을 넣어 주세요").and(hasContentDescription("두 번째 양 (단위)")))
             .assertExists()
-        assertEquals(3, rule.onAllNodes(hasText("양을 넣어 주세요")).fetchSemanticsNodes().size) // 줄 아래 2 + 버튼 위 남은 것 1
+        assertEquals(2, rule.onAllNodes(hasText("양을 넣어 주세요")).fetchSemanticsNodes().size) // 줄 아래 2
+        rule.onNode(hasContentDescription("1번째 인슐린 양 · 양을 넣어 주세요")).assertExists() // 버튼 위 남은 것(칸 이름 붙음)
     }
 
     /** 선택 칩(성별)은 다시 누르면 안 고름, 필수 칩(주사기)은 그대로. */

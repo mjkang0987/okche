@@ -138,7 +138,8 @@ fun MedFormSheet(
     val allErrors = medErrors(f)
     val errors = allErrors.filterKeys { it in touched }
     // 첫 번째로 남은 것(칸 순서) — 있으면 저장 버튼은 흐리게.
-    val missing = listOf("name", "shortName", "dose", "stock").firstNotNullOfOrNull { allErrors[it] }
+    val missing = listOf("name" to "약 이름", "shortName" to "짧은 이름", "dose" to "한 번에", "stock" to "지금 남은 양")
+        .firstNotNullOfOrNull { (key, label) -> allErrors[key]?.let { app.okche.ui.okcheNamed(label, it) } }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<String?>(null) } // "remove" / "blocked"
@@ -235,10 +236,7 @@ fun MedFormSheet(
                 },
                 color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
             )
-        }
-        OkcheFooter {
-            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkcheFooterButton(if (editing != null) "저장하기" else if (picking) "약방에 들이고 고르기" else "약방에 들이기", ::save, missing)
+            // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
             if (editing != null) {
                 Text(
                     "약방에서 빼기",
@@ -248,6 +246,10 @@ fun MedFormSheet(
                     color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Medium), textAlign = TextAlign.Center,
                 )
             }
+        }
+        OkcheFooter {
+            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+            OkcheFooterButton(if (editing != null) "저장하기" else if (picking) "약방에 들이고 고르기" else "약방에 들이기", ::save, missing)
         }
     }
 }

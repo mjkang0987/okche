@@ -186,7 +186,7 @@ class TangyakFlowTest {
         rule.onNode(hasText("+ 약 추가")).performClick()
         waitFor(hasText("저장하기"))
         rule.onNode(hasText("저장하기").and(hasClickAction())).assertIsNotEnabled() // 약을 고르기 전엔 흐리게 + 남은 것
-        waitFor(hasText("약을 골라 주세요"))
+        waitFor(hasText("약을 골라 주세요", substring = true)) // 남은 것 줄은 끝에 ' ›'
         rule.onNode(hasText("+ 약방에 새 약 들이기")).performScrollTo().performClick()
         waitFor(hasText("약방에 들이고 고르기"))
         rule.onNode(hasSetTextAction().and(hasText("약 이름", substring = true))).performTextInput("프레드니솔론")
@@ -204,7 +204,7 @@ class TangyakFlowTest {
         waitFor(androidx.compose.ui.test.hasContentDescription("콩이 · 하루 1번 · 1알", substring = true))
         rule.onNode(androidx.compose.ui.test.hasContentDescription("· 고치기", substring = true)).performClick()
         waitFor(hasText("이 약 그만 먹이기"))
-        rule.onNode(hasText("이 약 그만 먹이기")).performClick()
+        rule.onNode(hasText("이 약 그만 먹이기")).performScrollTo().performClick() // 내용 맨 아래(고정 칸 밖)
         waitFor(hasText("프레드니솔론을 그만 먹일까요?"))
         rule.onNode(hasText("그만 먹이기").and(hasClickAction())).performClick()
         waitFor(hasText("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."))

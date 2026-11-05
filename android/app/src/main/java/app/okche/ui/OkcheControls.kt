@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
@@ -595,11 +596,29 @@ fun OkcheFooter(content: @Composable () -> Unit) {
  * 공용 버튼은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게. iOS `okcheMissing`과 같음.
  */
 @Composable
-fun OkcheFooterButton(text: String, onClick: () -> Unit, missing: String?) {
-    if (missing != null) Text(missing, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+fun OkcheFooterButton(text: String, onClick: () -> Unit, missing: String?, onMissingTap: (() -> Unit)? = null) {
+    if (missing != null) {
+        val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
+        if (onMissingTap == null) {
+            Text(missing, color = OkcheColor.InkMuted, style = style)
+        } else {
+            // 누르면 그 칸으로(긴 화면 — 위쪽 칸이 문제일 때 찾게). 화면 읽기는 '›' 없이 읽게.
+            Text(
+                "$missing ›",
+                Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .clickable(role = Role.Button, onClickLabel = "그 칸으로 가기", onClick = onMissingTap)
+                    .semantics { contentDescription = missing }
+                    .wrapContentHeight(Alignment.CenterVertically),
+                color = OkcheColor.InkMuted, style = style,
+            )
+        }
+    }
     OkchePrimaryButton(
         text, onClick,
-        Modifier.alpha(if (missing == null) 1f else 0.45f).semantics { if (missing != null) stateDescription = missing },
+        Modifier.alpha(if (missing == null) 1f else 0.6f).semantics { if (missing != null) stateDescription = missing },
         enabled = missing == null,
     )
 }
+
+/** 칸 오류 글자 앞에 칸 이름 — 아래 줄은 어느 칸인지 말해야 해서(이미 들어 있으면 그대로). iOS `okcheNamed`와 같음. */
+fun okcheNamed(label: String, message: String) = if (label in message) message else "$label · $message"

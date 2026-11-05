@@ -225,18 +225,19 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
             OkcheChoiceChips("종류", snackKinds, kind, { kind = it })
             OkcheSwitchRow("수라 바꾸기 중에도 괜찮은 간식", "병원에서 괜찮다고 한 간식만 켜 두길 권해요.", ok, { ok = it })
             Text(note, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-        }
-        OkcheFooter {
-            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkcheFooterButton(button, ::save, if (name.isBlank()) "간식 이름을 넣으면 저장할 수 있어요" else null)
+            // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
             if (editing != null) {
                 Text(
                     "목록에서 빼기",
                     Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { removing = true }.padding(vertical = 12.dp),
-                    color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Bold),
+                    color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
+        }
+        OkcheFooter {
+            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+            OkcheFooterButton(button, ::save, if (name.isBlank()) "간식 이름을 넣으면 저장할 수 있어요" else null)
         }
     }
 }

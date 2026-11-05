@@ -318,7 +318,7 @@ class PetEditFlowTest {
         // 당뇨를 켜고 인슐린 설정 전엔 '저장하기'는 흐리게 + 남은 것
         rule.onNodeWithText("당뇨가 있어요").performScrollTo().performClick()
         rule.onNode(hasText("저장하기").and(hasClickAction())).assertIsNotEnabled()
-        waitFor(hasText("인슐린 시간과 양을 먼저 설정해 주세요"))
+        waitFor(hasText("인슐린 시간과 양을 먼저 설정해 주세요", substring = true))
 
         rule.onNodeWithContentDescription("인슐린 이름·양·시간 설정").performScrollTo().performClick()
         waitFor(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)")))
@@ -332,7 +332,7 @@ class PetEditFlowTest {
 
         // 아이 정보로 돌아오면 고치던 이름이 남아 있고, 저장하면 더보기 줄 이름이 바뀐다.
         waitFor(hasText("콩이이"))
-        rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요")).assertCountEquals(0)
+        rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요", substring = true)).assertCountEquals(0)
         rule.onNodeWithText("저장하기").performClick()
         waitFor(hasText("콩이이 아기씨"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }

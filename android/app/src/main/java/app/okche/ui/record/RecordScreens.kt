@@ -539,7 +539,7 @@ private fun EditIcon(record: Record, pets: List<Pet>, tint: androidx.compose.ui.
 
 /** 기록 지우기 확인 창(보드 DeleteConfirm): 기록 요약 칸이 안내 글보다 위. 지우면 `deletedAt`·`data` 비움. */
 @Composable
-private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, onClose: () -> Unit) {
+internal fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, onClose: () -> Unit) {
     val snacks = rememberSnacks()
     val meds = rememberMeds()
     val scope = rememberCoroutineScope()

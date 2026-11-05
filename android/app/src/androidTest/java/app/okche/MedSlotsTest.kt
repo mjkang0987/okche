@@ -26,6 +26,7 @@ import app.okche.store.RecordKind
 import app.okche.store.newId
 import app.okche.ui.med.hasOpenSchedule
 import app.okche.ui.med.medButtons
+import app.okche.ui.med.nextSlot
 import app.okche.ui.med.medShortName
 import app.okche.ui.med.medValue
 import app.okche.ui.med.recordSlot
@@ -242,6 +243,20 @@ class MedSlotsTest {
         assertTrue(runCatching { app.okche.ui.med.resumeSchedule(dao, s) }.isFailure) // '되돌리지 못했어요'로 알림
         assertTrue(dao.medSchedules().first { it.id == s.id }.activeUntil != null)
     }
+
+    /** 8-3c: 다음 탕약 — 모든 아이(추억 빼고)의 오늘 남은 차례 중 가장 이른 것, 같으면 먼저 모신 아이. */
+    @Test fun nextAcrossPets() {
+        val kong = app.okche.store.Pet(id = pet, createdAt = at(1, 9), name = "콩이", species = app.okche.store.Species.cat, breed = "", furColor = "")
+        val bori = app.okche.store.Pet(createdAt = at(2, 9), name = "보리", species = app.okche.store.Species.cat, breed = "", furColor = "")
+        val gone = app.okche.store.Pet(createdAt = at(3, 9), name = "별이", species = app.okche.store.Species.cat, breed = "", furColor = "", memorializedAt = at(4, 9))
+        fun s(p: app.okche.store.Pet, t: String) = row(times = listOf(t), from = at(20, 9)).copy(petId = p.id)
+        val rows = listOf(s(kong, "21:00"), s(bori, "21:00"), s(bori, "23:00"), s(gone, "07:00"))
+        val next = nextSlot(rows, emptyList(), listOf(bori, gone, kong), day)
+        assertEquals("콩이", next?.second?.name) // 같은 21:00이면 먼저 모신 아이, 추억 아이(07:00)는 빼고
+        assertEquals(at(27, 21), next?.first?.due)
+        assertEquals(null, nextSlot(emptyList(), emptyList(), listOf(kong), day))
+        assertEquals("약", app.okche.ui.main.plainWord(RecordKind.med))
+    }
 }
 
 /** 몇 시간마다 약(처음 먹일 때 = 지금) → 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴(8-3a). */
@@ -323,5 +338,35 @@ class RecordMedFlowTest {
         rule.onNode(hasText("먹고 토함").and(hasClickAction())).performClick()
         rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         waitFor(hasText("탕약 프레드니솔론 먹고 토함", substring = true))
+    }
+
+    /** 8-3c: 문안 '예정' 줄 → 오늘 먹일 약 시트, 탕약 화면 '다음 탕약' 띠 '줬어요' → 기록 알림. */
+    @Test fun mainPendingAndNextBand() {
+        runBlocking {
+            val dao = OkcheDatabase.get(context).dao()
+            OkcheDatabase.get(context).clearAllTables()
+            val petId = newId()
+            registerPet(dao, PetForm(name = "콩이"), petId = petId)
+            val med = Medication(name = "프레드니솔론", category = MedCategory.medicine, form = MedForm.pill, doseAmount = 1.0, unit = DoseUnit.pill)
+            dao.insert(med)
+            val now = System.currentTimeMillis()
+            dao.insert(MedSchedule(petId = petId, medicationId = med.id, amount = 1.0, unit = DoseUnit.pill, frequency = MedFrequency.everyNHours,
+                everyHours = 8, firstAt = now, activeFrom = now))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(tab("문안"))
+        rule.onNode(tab("문안")).performClick()
+        val pending = hasContentDescription("탕약 예정 · 오늘 먹일 약 보기", substring = true)
+        waitFor(pending)
+        rule.onAllNodes(pending)[0].performScrollTo().performClick() // 하루에 차례가 여럿이면 이른 것
+        waitFor(hasText("다음 차례"))
+        rule.onNode(hasContentDescription("닫기")).performClick()
+        rule.onNode(tab("더보기")).performClick()
+        waitFor(hasText("약 알림", substring = true))
+        rule.onNode(hasText("약 알림", substring = true)).performScrollTo().performClick()
+        val band = hasContentDescription("콩이 프레드니솔론 1알 줬어요", substring = true)
+        waitFor(band)
+        rule.onNode(band).performClick()
+        waitFor(hasText("프레드니솔론 줌 · ", substring = true))
     }
 }

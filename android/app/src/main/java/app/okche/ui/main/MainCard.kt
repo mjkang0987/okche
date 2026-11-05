@@ -39,7 +39,7 @@ fun mainDayTitle(day: String): String {
 }
 
 /** 오늘 기록에 넣는 종류(탕약·혈당·인슐린·옥체는 그 단계에서). */
-private val mainKinds = setOf(RecordKind.vomit, RecordKind.stool, RecordKind.urine, RecordKind.meal, RecordKind.snack)
+private val mainKinds = setOf(RecordKind.vomit, RecordKind.stool, RecordKind.urine, RecordKind.meal, RecordKind.snack, RecordKind.med)
 
 /** 오늘 기록: 그 아이의 그날 지우지 않은 기록, 이른 것 위. */
 fun mainTodayRecords(records: List<Record>, petId: String, day: String) =
@@ -51,5 +51,6 @@ fun plainWord(kind: RecordKind) = when (kind) {
     RecordKind.urine -> "소변"
     RecordKind.meal -> "식사"
     RecordKind.snack -> "간식"
+    RecordKind.med -> "약"
     else -> null
 }

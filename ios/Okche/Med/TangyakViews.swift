@@ -10,14 +10,25 @@ struct TangyakView: View {
     @Query private var meds: [Medication]
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }) private var records: [Record]
     @Environment(\.modelContext) private var context
+    @Environment(\.showUndo) private var showUndo
     @State private var failed = false
+    /// 띠의 '줬어요' 알림에서 되돌리기 = 그 기록 지우기 확인 창.
+    @State private var deleting: Record?
 
     var body: some View {
         let cards = MedSchedules.cards(schedules, pets: pets)
+        // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제 차례가 보임, 일기 탭과 같이 날 바뀜을 다룰 때 함께.
+        let next = MedSlots.next(schedules, records: records.filter { $0.kind == RecordKind.med.rawValue }, pets: pets, day: OkcheDay.of(.now))
         VStack(spacing: 0) {
             FormHeader(title: "탕약", note: "약 · 알림", icon: "chevron.left", iconLabel: "뒤로", trailing: AnyView(PetSeal())) { dismiss() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    // 다음 탕약 띠(보드 `Tangyak`, 2026-11-05 승인) — 오늘 남은 차례가 없으면 숨김.
+                    if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
+                        let amount = MedSchedules.amountText(next.slot.schedule.amount, next.slot.schedule.unit)
+                        NextMedBand(time: MedSlots.clockText(next.slot.due), detail: "\(next.pet.name) · \(med.name) \(amount)",
+                                    label: "\(MedSlots.clockText(next.slot.due)) \(next.pet.name) \(med.name) \(amount) 줬어요") { give(next.slot, med: med) }
+                    }
                     if cards.isEmpty {
                         Text("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요.")
                             .okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
@@ -53,8 +64,24 @@ struct TangyakView: View {
             }
         }
         .background(OkcheColor.hanji)
+        .deleteRecordDialog($deleting, pets: pets)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+    }
+
+    /// 띠 '줬어요': 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
+    private func give(_ slot: MedSlots.Slot, med: Medication) {
+        do {
+            let saved = try MedSlots.record(slot, in: context)
+            failed = false
+            showUndo(UndoToastItem(text: "\(med.name) 줌 · \(QuickRecord.time(saved))") {
+                deleting = saved
+                return true
+            })
+        } catch {
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+        }
     }
 }
 
@@ -599,5 +626,54 @@ struct HoursPreview: View {
         .padding(14)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// 다음 탕약 띠(보드 `Tangyak`): 남색 바탕 금테 112, '다음 탕약 / 오후 9:00 / 콩이 · 프레드니솔론 1알' + 한지색 '줬어요'. 큰 글자에선 버튼을 아래로.
+struct NextMedBand: View {
+    let time: String
+    let detail: String
+    let label: String
+    let onGive: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Group {
+            if typeSize >= .xxxLarge {
+                VStack(alignment: .leading, spacing: 12) { texts; button }
+            } else {
+                HStack(spacing: 12) { texts; Spacer(minLength: 0); button }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 21) // 금테(12 안쪽 + 매듭 9) 안에 머물게
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+        .background(OkcheColor.namsaekDeep)
+        .overlay(GoldFrame(inset: 12).stroke(LinearGradient(colors: [OkcheColor.geumLight, OkcheColor.geum, OkcheColor.geumShade],
+                                                            startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.1)
+            .accessibilityHidden(true))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var texts: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("다음 탕약").okcheText(OkcheType.label, weight: .medium).foregroundStyle(OkcheColor.onDeepMuted)
+                .accessibilityAddTraits(.isHeader)
+            // 보드는 본문 글꼴 22 굵게(제목 글꼴 아님).
+            Text(time).okcheText(OkcheTextStyle(family: .sans, size: 22, lineHeight: 30, weight: .bold)).foregroundStyle(OkcheColor.geumLight)
+            Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.hanji)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var button: some View {
+        Button(action: onGive) {
+            Text("줬어요").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaekDeep)
+                .padding(.horizontal, 18).frame(minHeight: 52)
+                .background(OkcheColor.hanji, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }

@@ -197,4 +197,21 @@ final class MedSlotsTests: XCTestCase {
         XCTAssertThrowsError(try MedSchedules.resume(s, in: context)) // '되돌리지 못했어요'로 알림
         XCTAssertNotNil(s.activeUntil)
     }
+
+    /// 8-3c: 다음 탕약 — 모든 아이(추억 빼고)의 오늘 남은 차례 중 가장 이른 것, 같으면 먼저 모신 아이.
+    func testNextAcrossPets() {
+        let kong = Pet(id: pet, now: at(1, 9), name: "콩이", species: .cat, breed: "", furColor: "")
+        let bori = Pet(now: at(2, 9), name: "보리", species: .cat, breed: "", furColor: "")
+        let gone = Pet(now: at(3, 9), name: "별이", species: .cat, breed: "", furColor: "", memorializedAt: at(4, 9))
+        func s(_ p: Pet, _ t: String) -> MedSchedule {
+            let r = MedSchedule(petId: p.id, medicationId: UUID(), amount: 1, unit: .pill, frequency: .daily, times: [t], activeFrom: at(20, 9))
+            return r
+        }
+        let rows = [s(kong, "21:00"), s(bori, "21:00"), s(bori, "23:00"), s(gone, "07:00")]
+        let next = MedSlots.next(rows, records: [], pets: [bori, gone, kong], day: day)
+        XCTAssertEqual(next?.pet.name, "콩이") // 같은 21:00이면 먼저 모신 아이, 추억 아이(07:00)는 빼고
+        XCTAssertEqual(next?.slot.due, at(27, 21))
+        XCTAssertNil(MedSlots.next([], records: [], pets: [kong], day: day))
+        XCTAssertEqual(MainCard.plainWord("med"), "약")
+    }
 }

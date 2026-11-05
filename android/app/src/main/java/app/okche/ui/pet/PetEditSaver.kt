@@ -3,6 +3,7 @@ package app.okche.ui.pet
 import android.util.Log
 import app.okche.store.InsulinPlan
 import app.okche.store.OkcheDao
+import app.okche.store.Pet
 import app.okche.store.RecordKind
 import app.okche.ui.record.kgText
 import app.okche.store.RestPeriod
@@ -63,8 +64,27 @@ data class PetEditForm(
 }
 
 /**
- * 아이 정보 저장. 오류가 있으면 아무것도 바꾸지 않고 오류를 돌려준다(칸 열쇠 → 문구, 화면 위에서부터 순서).
- * 칸 열쇠: name · birthDate · age · familyDate · insulinPlan, 저장소 오류는 save. 저장되면 빈 맵.
+ * 아이 정보 칸 검사 — 화면은 바로바로(남은 것·만진 칸 오류), 저장도 같은 규칙.
+ * 칸 열쇠 → 문구(화면 위에서부터): name · birthDate · age · familyDate · insulinPlan. [pet]은 저장된 아이, [hasPlan]은 열린 인슐린 계획이 있는지.
+ */
+internal fun petEditErrors(form: PetEditForm, pet: Pet, hasPlan: Boolean, today: LocalDate = LocalDate.now()): Map<String, String> {
+    val errors = linkedMapOf<String, String>()
+    if (form.name.isBlank()) errors["name"] = "이름을 넣어 주세요"
+    if (form.birthUnknown) {
+        // 열 때 나이를 안 고쳤으면 어림잡은 생일 그대로(검사 안 함).
+        val kept = pet.birthEstimated && form.age.trim() == form.loadedAge.trim()
+        if (!kept && form.age.isNotBlank() && form.age.toWholeNumber()?.takeIf { it in 0..30 } == null) errors["age"] = AGE_ERROR
+    } else if (form.birthDate != null && form.birthDate > today) {
+        errors["birthDate"] = FUTURE_DAY_ERROR
+    }
+    if (form.familyDate != null && form.familyDate > today) errors["familyDate"] = FUTURE_DAY_ERROR
+    // 추억 아이는 인슐린 계획 없이 둔다(간직할 때 닫고, 새로 열지 않음 — 되돌릴 때 6-4 규칙). 그래서 검사하지 않는다.
+    if (form.hasDiabetes && !hasPlan && pet.memorializedAt == null) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
+    return errors
+}
+
+/**
+ * 아이 정보 저장. 오류가 있으면 아무것도 바꾸지 않고 오류를 돌려준다([petEditErrors]), 저장소 오류는 save. 저장되면 빈 맵.
  * 당뇨를 끄면 열린 인슐린 계획을 끝내고, 휴양은 켤 때 열린 기간이 없을 때만 새로·끌 때 열린 기간 모두 닫는다(문서 2-1).
  */
 suspend fun savePetEdit(
@@ -75,28 +95,15 @@ suspend fun savePetEdit(
 ): Map<String, String> {
     try {
         val pet = dao.pet(form.petId) ?: return mapOf("save" to SAVE_ERROR)
-        val errors = linkedMapOf<String, String>()
-        val name = form.name.trim()
-        if (name.isEmpty()) errors["name"] = "이름을 넣어 주세요"
-
-        var birth: String? = null
-        if (form.birthUnknown) {
-            if (pet.birthEstimated && form.age.trim() == form.loadedAge.trim()) {
-                birth = pet.birthDate
-            } else if (form.age.isNotBlank()) {
-                val age = form.age.toWholeNumber()
-                if (age == null || age !in 0..30) errors["age"] = AGE_ERROR else birth = today.minusYears(age.toLong()).toString()
-            }
-        } else {
-            if (form.birthDate != null && form.birthDate > today) errors["birthDate"] = FUTURE_DAY_ERROR
-            birth = form.birthDate?.toString()
-        }
-        if (form.familyDate != null && form.familyDate > today) errors["familyDate"] = FUTURE_DAY_ERROR
-
         val plans = dao.openInsulinPlans(pet.id)
-        // 추억 아이는 인슐린 계획 없이 둔다(간직할 때 닫고, 새로 열지 않음 — 되돌릴 때 6-4 규칙). 그래서 검사하지 않는다.
-        if (form.hasDiabetes && plans.isEmpty() && pet.memorializedAt == null) errors["insulinPlan"] = "인슐린 시간과 양을 먼저 설정해 주세요"
+        val errors = petEditErrors(form, pet, plans.isNotEmpty(), today)
         if (errors.isNotEmpty()) return errors
+        val name = form.name.trim()
+        val birth = when {
+            !form.birthUnknown -> form.birthDate?.toString()
+            pet.birthEstimated && form.age.trim() == form.loadedAge.trim() -> pet.birthDate
+            else -> form.age.toWholeNumber()?.let { today.minusYears(it.toLong()).toString() }
+        }
 
         val edited = pet.copy(
             name = name, species = form.species, breed = form.breed, furColor = form.furColor, sex = form.sex, neutered = form.neutered,

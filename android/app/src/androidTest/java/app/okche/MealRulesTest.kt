@@ -229,7 +229,7 @@ class SuraFlowTest {
 
         rule.onNode(hasText("끼니 시간 정하기 ›")).performScrollTo().performClick()
         waitFor(hasText("저장하기"))
-        rule.onNode(hasText("저장하기")).performScrollTo().performClick()
+        rule.onNode(hasText("저장하기")).performClick()
         waitFor(hasContentDescription("끼니 시간 바꾸기"))
         // 오늘 정한 끼니는 아직 지나지 않은 것만 칸이 생긴다(18시 뒤엔 없음) — 있으면 남김까지.
         val some = rule.onAllNodes(hasText("남김").and(isSelectable())).fetchSemanticsNodes()

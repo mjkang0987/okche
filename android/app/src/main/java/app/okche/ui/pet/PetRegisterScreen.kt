@@ -18,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -39,7 +38,8 @@ import app.okche.ui.OkcheChoiceCards
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheErrorText
 import app.okche.ui.OkcheFieldLabel
-import app.okche.ui.OkchePrimaryButton
+import app.okche.ui.OkcheFooter
+import app.okche.ui.OkcheFooterButton
 import app.okche.ui.OkcheSwitchRow
 import app.okche.ui.OkcheTextField
 import app.okche.ui.theme.OkcheColor
@@ -57,29 +57,26 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     val context = LocalContext.current
     val saver: FormSaveModel = viewModel(key = "petRegister")
     var form by rememberSaveable { mutableStateOf(PetForm()) }
-    var errors by rememberSaveable { mutableStateOf(emptyMap<String, String>()) }
-    val anchors = remember { Anchors() }
-    // 고친 칸의 오류는 바로 지운다. 인슐린 줄 수가 바뀌면 줄 번호가 밀리므로 줄 오류를 모두 지운다.
+    /** 한 번 만진 칸 — 칸 아래 오류는 만진 뒤부터(열자마자 빨간 글자가 뜨지 않게). */
+    var touched by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var failed by rememberSaveable { mutableStateOf(false) }
+    val allErrors = registerErrors(form)
+    val errors = allErrors.touchedOnly(touched)
+    // 첫 번째로 남은 것(화면 위에서부터) — 있으면 '모시기'는 흐리게.
+    val missing = (listOf("name", "birthDate", "age", "weight") + insulinOrder(form.insulinRows.size)).firstNotNullOfOrNull { allErrors[it] }
     fun edit(key: String? = null, change: PetForm.() -> PetForm) {
         val rows = form.insulinRows.size
         form = form.change()
-        if (key != null) errors = errors - key
-        if (form.insulinRows.size != rows) errors = errors.filterKeys { !it.startsWith("time") && !it.startsWith("units") }
+        touched = touched.afterRows(key, rows, form.insulinRows.size)
     }
     // 저장 결과 받기(저장 중 화면이 다시 만들어졌어도 여기서 받는다).
     val result = saver.result
     LaunchedEffect(result) {
         if (result == null) return@LaunchedEffect
-        errors = result
-        val first = result.keys.firstOrNull()
-        if (first == null) {
-            saver.consume()
-            onSaved()
-            return@LaunchedEffect
-        }
-        // consume은 맨 뒤에: result가 바뀌면 이 효과가 취소돼 스크롤(bringIntoView)이 중간에 끊긴다.
-        anchors.goTo(first, focusable = true)
+        failed = "save" in result
+        touched = touched + result.keys // 화면 검사와 저장 검사가 어긋나도 그 칸이 보이게
         saver.consume()
+        if (result.isEmpty()) onSaved()
     }
 
     // 저장 중엔 닫지 않는다(닫으면 끝난 결과가 남아 다음 등록 화면에 옛 결과가 뜸). 닫을 때 남은 결과도 버린다.
@@ -95,14 +92,12 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
 
         Column(
             Modifier
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space2, bottom = OkcheSpacing.Space6),
+                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space2, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(20.dp), // 보드 칸 사이 20(토큰에 없음)
         ) {
-            OkcheTextField(
-                form.name, { edit("name") { copy(name = it) } }, "이름", anchors.of("name"),
-                error = errors["name"],
-            )
+            OkcheTextField(form.name, { edit("name") { copy(name = it) } }, "이름", error = errors["name"])
             OkcheChoiceCards(
                 "종", listOf(Species.cat to "고양이", Species.dog to "강아지"), form.species,
                 { edit { withSpecies(it) } },
@@ -121,14 +116,10 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
                 form.birthUnknown, form.age, form.birthDate, errors,
                 onAge = { edit("age") { copy(age = it) } },
                 onBirthDate = { edit("birthDate") { copy(birthDate = it) } },
-                onBirthUnknown = {
-                    edit { copy(birthUnknown = it) }
-                    errors = errors - "age" - "birthDate"
-                },
-                anchor = { anchors.of(it) },
+                onBirthUnknown = { edit { copy(birthUnknown = it) } },
             )
             OkcheTextField(
-                form.weight, { edit("weight") { copy(weight = it) } }, "체중", anchors.of("weight"), hint = "(kg)",
+                form.weight, { edit("weight") { copy(weight = it) } }, "체중", hint = "(kg)",
                 error = errors["weight"], keyboardOptions = decimalKeys,
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -139,16 +130,18 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             }
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OkcheSwitchRow("당뇨가 있어요", "켜면 일기와 위젯에 혈당·인슐린 칸이 생겨요.", form.hasDiabetes, { edit { copy(hasDiabetes = it) } })
-                if (form.hasDiabetes) InsulinBox(form, errors, ::edit, { errors = errors.filterKeys { !it.startsWith("time") } }) { key ->
-                    anchors.of(key)
-                }
+                if (form.hasDiabetes) InsulinBox(form, errors, ::edit)
             }
-            errors["save"]?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("모시기", enabled = !saver.saving, onClick = {
+        }
+        OkcheFooter {
+            if (failed) OkcheErrorText(SAVE_ERROR)
+            OkcheFooterButton("모시기", {
+                if (missing == null) {
                     // 새로 모신 아이는 바로 지금 보는 아이(6-3).
                     val id = newId()
                     saver.save { registerPet(OkcheDatabase.get(context).dao(), form, petId = id).also { if (it.isEmpty()) runCatching { context.setLastPetId(id) } } }
-                })
+                }
+            }, missing)
         }
     }
 }
@@ -159,8 +152,6 @@ private fun InsulinBox(
     form: PetForm,
     errors: Map<String, String>,
     edit: (String?, PetForm.() -> PetForm) -> Unit,
-    clearTimeErrors: () -> Unit,
-    anchor: (String) -> Modifier,
 ) {
     Column(
         Modifier
@@ -176,7 +167,7 @@ private fun InsulinBox(
         )
         Column {
             OkcheFieldLabel("맞는 시간과 양", Modifier.padding(bottom = OkcheSpacing.Space2))
-            InsulinRowsEditor(form.insulinRows, errors, { key, rows -> edit(key) { copy(insulinRows = rows) } }, clearTimeErrors, anchor)
+            InsulinRowsEditor(form.insulinRows, errors, { key, rows -> edit(key) { copy(insulinRows = rows) } })
         }
         Column {
             OkcheChoiceChips(

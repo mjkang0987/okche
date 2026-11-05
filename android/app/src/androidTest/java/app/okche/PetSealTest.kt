@@ -124,7 +124,7 @@ class PetSwitchFlowTest {
     private fun register(name: String) {
         waitFor(hasSetTextAction().and(hasText("이름")))
         rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput(name)
-        rule.onNode(hasText("모시기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("모시기").and(hasClickAction())).performClick()
     }
 
     @Test fun switchPets() {

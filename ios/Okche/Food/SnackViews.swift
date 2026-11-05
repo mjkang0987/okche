@@ -144,26 +144,24 @@ struct SnackFormSheet: View {
                     }
                     OkcheSwitchRow(title: "수라 바꾸기 중에도 괜찮은 간식", detail: "병원에서 괜찮다고 한 간식만 켜 두길 권해요.", isOn: $ok)
                     Text(note).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
+                    if editing != nil {
+                        Button { removing = true } label: {
+                            Text("목록에서 빼기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, OkcheSpacing.space6)
                 .padding(.bottom, OkcheSpacing.space4)
             }
-            VStack(spacing: 8) {
+            .okcheFooter {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button(buttonTitle, action: save).buttonStyle(.okchePrimary)
                     .okcheMissing(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "간식 이름을 넣으면 저장할 수 있어요" : nil)
-                if editing != nil {
-                    Button { removing = true } label: {
-                        Text("목록에서 빼기").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.yeonji)
-                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
             }
-            .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, 10).padding(.bottom, OkcheSpacing.space4)
-            .overlay(alignment: .top) { Rectangle().fill(OkcheColor.line).frame(height: 1) }
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])

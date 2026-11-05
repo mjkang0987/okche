@@ -14,9 +14,13 @@ struct InsulinSetupView: View {
             .merging(failed ? [.save: "저장하지 못했어요. 다시 해 주세요."] : [:]) { a, _ in a }
     }
     /// 첫 번째로 남은 것(위에서부터) — 있으면 저장 버튼은 흐리게.
-    private var missing: String? {
+    private var missingField: PetRegistration.Field? {
         let all = PetRegistration.insulinErrors(form.slots)
-        return (form.slots.map { PetRegistration.Field.insulinUnits($0.id) } + [.insulinTimes]).lazy.compactMap { all[$0] }.first
+        return (form.slots.map { PetRegistration.Field.insulinUnits($0.id) } + [.insulinTimes]).first { all[$0] != nil }
+    }
+    private var missing: String? {
+        guard let field = missingField, let message = PetRegistration.insulinErrors(form.slots)[field] else { return nil }
+        return petFieldLabel(field, slots: form.slots.map(\.id)).map { okcheNamed($0, message) } ?? message
     }
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
@@ -28,6 +32,7 @@ struct InsulinSetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: "인슐린", note: "설정", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         OkcheTextField(label: "인슐린 이름", text: $form.name, placeholder: "예: 병원에서 받은 인슐린 이름")
@@ -57,7 +62,14 @@ struct InsulinSetupView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .okcheFooter {
                     OkcheFieldError(message: errors[.save])
-                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing)
+                    // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing) {
+                        guard let field = missingField else { return }
+                        touched.insert(field)
+                        withAnimation { proxy.scrollTo(field, anchor: .center) }
+                        if field != .insulinTimes { focused = field }
+                    }
+                }
                 }
         }
         .background(OkcheColor.hanji)

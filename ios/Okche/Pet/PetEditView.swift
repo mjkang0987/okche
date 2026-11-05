@@ -33,9 +33,13 @@ struct PetEditView: View {
         allErrors.filter { touched.contains($0.key) }.merging(failed ? [.save: "저장하지 못했어요. 다시 해 주세요."] : [:]) { a, _ in a }
     }
     /// 첫 번째로 남은 것(화면 위에서부터) — 있으면 저장 버튼은 흐리게.
-    private var missing: String? {
+    private var missingField: PetRegistration.Field? {
         let all = allErrors
-        return [PetRegistration.Field.name, .birth, .age, .family, .insulinPlan].lazy.compactMap { all[$0] }.first
+        return [PetRegistration.Field.name, .birth, .age, .family, .insulinPlan].first { all[$0] != nil }
+    }
+    private var missing: String? {
+        guard let field = missingField, let message = allErrors[field] else { return nil }
+        return petFieldLabel(field, slots: []).map { okcheNamed($0, message) } ?? message
     }
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
@@ -59,6 +63,7 @@ struct PetEditView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: PetTitle.name(pet), note: "아이 정보", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         summary
@@ -107,7 +112,14 @@ struct PetEditView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .okcheFooter {
                     OkcheFieldError(message: errors[.save])
-                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing)
+                    // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing) {
+                        guard let field = missingField else { return }
+                        touched.insert(field)
+                        withAnimation { proxy.scrollTo(field, anchor: .center) }
+                        if field == .name || field == .age { focused = field }
+                    }
+                }
                 }
         }
         .background(OkcheColor.hanji)

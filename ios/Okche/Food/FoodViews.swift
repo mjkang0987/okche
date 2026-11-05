@@ -63,14 +63,11 @@ struct FoodChangeSheet: View {
                 .padding(.top, OkcheSpacing.space6)
                 .padding(.bottom, OkcheSpacing.space4)
             }
-            VStack(spacing: 8) {
+            .okcheFooter {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button("바꾸기", action: save).buttonStyle(.okchePrimary)
                     .okcheMissing(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "사료 이름을 넣으면 바꿀 수 있어요" : nil)
             }
-            .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, 10).padding(.bottom, OkcheSpacing.space4)
-            .overlay(alignment: .top) { Rectangle().fill(OkcheColor.line).frame(height: 1) }
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])

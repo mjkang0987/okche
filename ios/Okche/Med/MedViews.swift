@@ -112,7 +112,8 @@ struct MedFormSheet: View {
     /// 첫 번째로 남은 것(칸 순서) — 있으면 저장 버튼은 흐리게.
     private var missing: String? {
         let all = MedRules.errors(form)
-        return [MedRules.Field.name, .shortName, .dose, .stock].lazy.compactMap { all[$0] }.first
+        let labels: [(MedRules.Field, String)] = [(.name, "약 이름"), (.shortName, "짧은 이름"), (.dose, "한 번에"), (.stock, "지금 남은 양")]
+        return labels.lazy.compactMap { field, label in all[field].map { okcheNamed(label, $0) } }.first
     }
 
     var body: some View {
@@ -152,28 +153,26 @@ struct MedFormSheet: View {
                          : picking ? "들이면 약 추가 화면으로 돌아가 이 약이 바로 골라져 있어요. 약방에도 그대로 남아요."
                          : "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
+                    if let editing {
+                        Button {
+                            dialog = MedRules.takers(editing, schedules: schedules, pets: pets).isEmpty ? .remove : .blocked
+                        } label: {
+                            Text("약방에서 빼기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, OkcheSpacing.space6)
                 .padding(.bottom, OkcheSpacing.space4)
             }
-            VStack(spacing: 4) {
+            .okcheFooter {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button(editing != nil ? "저장하기" : picking ? "약방에 들이고 고르기" : "약방에 들이기", action: save).buttonStyle(.okchePrimary)
                     .okcheMissing(missing)
-                if let editing {
-                    Button {
-                        dialog = MedRules.takers(editing, schedules: schedules, pets: pets).isEmpty ? .remove : .blocked
-                    } label: {
-                        Text("약방에서 빼기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
-                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
             }
-            .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, 10).padding(.bottom, OkcheSpacing.space4)
-            .overlay(alignment: .top) { Rectangle().fill(OkcheColor.line).frame(height: 1) }
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])

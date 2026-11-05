@@ -183,9 +183,14 @@ struct MedAddView: View {
     /// 지금 칸 오류 — 만진 칸만 보임.
     private var errors: [MedSchedules.Field: String] { MedSchedules.errors(form).filter { touched.contains($0.key) } }
     /// 첫 번째로 남은 것(화면 위에서부터) — 있으면 저장 버튼은 흐리게.
-    private var missing: String? {
+    private var missingField: MedSchedules.Field? {
         let all = MedSchedules.errors(form)
-        return [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].lazy.compactMap { all[$0] }.first
+        return [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].first { all[$0] != nil }
+    }
+    private var missing: String? {
+        guard let field = missingField, let message = MedSchedules.errors(form)[field] else { return nil }
+        let labels: [MedSchedules.Field: String] = [.dose: "한 번에 얼마나", .everyDays: "며칠마다 간격", .everyHours: "몇 시간마다 간격", .times: "먹일 시간"]
+        return labels[field].map { okcheNamed($0, message) } ?? message
     }
     @State private var started = false
     @State private var adding = false
@@ -208,6 +213,7 @@ struct MedAddView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: "탕약", note: scheduleId == nil ? "약 추가" : "약 고치기", icon: "chevron.left", iconLabel: "탕약으로 돌아가기") { dismiss() }
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let editing {
@@ -223,20 +229,27 @@ struct MedAddView: View {
                     frequency
                     OkcheMenuPicker(label: "먹이는 방법", note: "(선택)", options: MedSchedules.howTos, selection: $form.howTo, inline: false)
                     if scheduleId != nil { note("횟수·시간·양을 바꾸면 지금부터 새로 세요. 지난 기록은 그대로예요.") }
+                    // 그만 먹이기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
+                    if scheduleId != nil {
+                        Button { stopping = true } label: {
+                            Text("이 약 그만 먹이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, 8).padding(.bottom, OkcheSpacing.space4)
             }
             .okcheFooter {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing)
-                if scheduleId != nil {
-                    Button { stopping = true } label: {
-                        Text("이 약 그만 먹이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
-                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing) {
+                    guard let field = missingField else { return }
+                    touched.insert(field)
+                    withAnimation { proxy.scrollTo(field, anchor: .center) }
                 }
+            }
             }
         }
         .background(OkcheColor.hanji)

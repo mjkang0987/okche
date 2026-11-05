@@ -397,10 +397,29 @@ extension View {
 
     /// 주 버튼에 붙여 덜 채웠으면(`missing`이 있으면) 흐리게 + 못 누름 + 바로 위에 남은 것 한 줄.
     /// 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
-    func okcheMissing(_ missing: String?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let missing { Text(missing).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
-            disabled(missing != nil).opacity(missing == nil ? 1 : 0.45).accessibilityHint(missing ?? "")
+    /// `onShow`가 있으면 남은 것 줄을 누르면 그 칸으로(긴 화면 — 위쪽 칸이 문제일 때 찾게).
+    func okcheMissing(_ missing: String?, onShow: (() -> Void)? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let missing {
+                if let onShow {
+                    Button(action: onShow) {
+                        Text("\(missing) ›").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(missing)
+                    .accessibilityHint("그 칸으로 가기")
+                } else {
+                    Text(missing).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                }
+            }
+            disabled(missing != nil).opacity(missing == nil ? 1 : 0.6).accessibilityHint(missing ?? "")
         }
     }
+}
+
+/// 칸 오류 글자 앞에 칸 이름 — 아래 줄은 어느 칸인지 말해야 해서(이미 들어 있으면 그대로).
+func okcheNamed(_ label: String, _ message: String) -> String {
+    message.contains(label) ? message : "\(label) · \(message)"
 }

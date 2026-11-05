@@ -69,7 +69,9 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["완료"].firstMatch.tap()
 
         let birth = app.buttons["생일"]
+        reveal(birth, in: app)
         birth.tap()
+        XCTAssertTrue(app.buttons["고르기"].waitForExistence(timeout: 3))
         app.buttons["고르기"].tap()
         XCTAssertNotEqual(birth.value as? String, "안 고름")
         birth.tap()
@@ -234,7 +236,7 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["다시 모시기"].tap()
         XCTAssertTrue(app.buttons["추억으로 간직하기"].waitForExistence(timeout: 3))
 
-        app.buttons["이 아이 기록 지우기"].tap()
+        tapBelow(app.buttons["이 아이 기록 지우기"], in: app)
         XCTAssertTrue(app.staticTexts["콩이의 기록을 지울까요?"].waitForExistence(timeout: 3))
         app.buttons["지우기"].tap()
         XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 5))

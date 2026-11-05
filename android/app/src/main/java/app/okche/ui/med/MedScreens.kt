@@ -82,7 +82,7 @@ fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> U
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("약방", "약 목록", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", onBack, trailing = seal)
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6),
+            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
@@ -142,6 +142,7 @@ fun MedFormSheet(
         errors = errors - key
     }
 
+    val toasts = app.okche.ui.LocalUndoToasts.current
     fun run(work: suspend () -> Unit) {
         if (busy) return
         busy = true
@@ -169,7 +170,13 @@ fun MedFormSheet(
             )
             "remove" -> OkcheConfirmDialog(
                 "${withObjectParticle(editing.name)} 약방에서 뺄까요?", "빼기", destructive = true,
-                onCancel = { dialog = null }, onConfirm = { dialog = null; run { removeMed(dao, editing) } },
+                onCancel = { dialog = null }, onConfirm = {
+                    dialog = null
+                    run {
+                        removeMed(dao, editing)
+                        toasts?.removed("${app.okche.ui.pet.withObjectParticle(editing.name)} 약방에서 뺐어요") { restoreMed(dao, editing) }
+                    }
+                },
                 message = "탕약에서 더는 고를 수 없어요. 지난 기록의 약 이름은 그대로 남아요.", confirmLook = ButtonLook.Danger,
             )
         }

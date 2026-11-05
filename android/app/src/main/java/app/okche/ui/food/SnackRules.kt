@@ -101,3 +101,6 @@ suspend fun recordSnack(dao: OkcheDao, snackId: String, amount: String, occurred
     dao.update(updated)
     return updated
 }
+
+/** 목록에서 뺀 다과 되돌리기(뺀 직후 알림의 '되돌리기'). [original]은 빼기 전 값. */
+suspend fun restoreSnack(dao: OkcheDao, original: Snack, now: Long = System.currentTimeMillis()) = dao.update(original.copy(deletedAt = null, updatedAt = now))

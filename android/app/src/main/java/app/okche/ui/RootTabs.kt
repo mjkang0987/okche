@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -81,10 +84,37 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
     More(R.string.tab_more, Icons.Outlined.MoreHoriz),
 }
 
-/** 하단 탭 5개. 순서는 디자인 기준(일기 → 문안 → 실록 → 어진첩 → 더보기), 첫 화면은 일기. */
+/** 하단 탭 5개 + 앱 하나의 되돌리기 알림 자리(탭 막대가 보이면 그 위, 없으면 화면 아래). */
 @Composable
 fun RootTabs() {
+    var item by remember { mutableStateOf<UndoToastItem?>(null) }
+    var toastHeight by remember { mutableStateOf(0.dp) }
+    val barHeight = remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val appScope = rememberCoroutineScope()
+    val toasts = remember { UndoToasts({ item = it }, appScope, view) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalUndoToasts provides toasts, LocalUndoInset provides if (item != null) toastHeight else 0.dp) {
+        Box(Modifier.fillMaxSize()) {
+            RootTabsContent(barHeight)
+            UndoToast(
+                item, onDismiss = { item = null }, onUndo = { item?.undo?.invoke() },
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .then(if (barHeight.value > 0.dp) Modifier.padding(bottom = barHeight.value) else Modifier.navigationBarsPadding())
+                    .onSizeChanged { toastHeight = with(density) { it.height.toDp() } },
+            )
+        }
+    }
+}
+
+/** 하단 탭 5개. 순서는 디자인 기준(일기 → 문안 → 실록 → 어진첩 → 더보기), 첫 화면은 일기. */
+@Composable
+private fun RootTabsContent(barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val toasts = LocalUndoToasts.current
+    // 다른 탭으로 가면 옛 되돌리기를 남기지 않음.
+    androidx.compose.runtime.LaunchedEffect(selected) { toasts?.show(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -208,8 +238,10 @@ fun RootTabs() {
         containerColor = OkcheColor.Hanji,
         bottomBar = {
             // 디자인의 탭 막대: 흰 바탕, 위 가는 선(line), 선택 알약 표시 없음.
+            // 알림이 탭 막대 위에 뜨게 높이를 알림 자리에 알림(탭 막대가 없는 화면이면 0).
+            androidx.compose.runtime.DisposableEffect(Unit) { onDispose { barHeight.value = 0.dp } }
             NavigationBar(
-                Modifier.drawWithContent {
+                Modifier.onSizeChanged { barHeight.value = with(density) { it.height.toDp() } }.drawWithContent {
                     drawContent()
                     val stroke = 1.dp.toPx()
                     drawLine(OkcheColor.Line, Offset(0f, stroke / 2), Offset(size.width, stroke / 2), stroke)

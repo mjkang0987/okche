@@ -81,7 +81,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.okche.R
-import app.okche.ui.UndoToast
+import app.okche.ui.LocalUndoInset
+import app.okche.ui.LocalUndoToasts
 import app.okche.ui.UndoToastItem
 import app.okche.ui.med.MedSlot
 import app.okche.ui.med.hasOpenSchedule
@@ -148,32 +149,12 @@ fun RecordTab(
     // 약 목록을 읽기 전엔 탕약 줄을 그리지 않음('다 줬어요'가 잠깐 뜨지 않게).
     val medsLoaded by remember { dao.medicationsFlow() }.collectAsState(null)
     val meds = medsLoaded.orEmpty()
-    var toastHeight by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
+    val toasts = LocalUndoToasts.current
     /** 방금 누른 탕약 버튼 — 약 1초 보였다가 빠짐. */
     var checked by remember { mutableStateOf<CheckedMed?>(null) }
-    var toast by remember { mutableStateOf<UndoToastItem?>(null) }
-    var undoFailed by remember { mutableStateOf(false) }
-    var undoAsking by remember { mutableStateOf(false) }
-
-    var undoRecord by remember { mutableStateOf<Record?>(null) }
-    // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
-    fun undo(record: Record) {
-        scope.launch {
-            runCatching { deleteRecord(dao, record) }
-                .onSuccess {
-                    undoRecord = null
-                    checked = null
-                    toast = null
-                    undoFailed = false
-                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
-                }
-                .onFailure {
-                    undoFailed = true // 알림은 남겨 다시 누를 수 있게
-                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌리지 못했어요. 다시 해 주세요.")
-                }
-        }
-    }    // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
+    /** 탕약 알림의 '되돌리기' = 방금 남긴 기록 지우기(확인 창 → 지움 → '기록을 지웠어요 · 되돌리기'). */
+    var deleting by remember { mutableStateOf<Record?>(null) }
+    // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
     val medLine = who?.let { id ->
         val all = schedules ?: return@let null
         val recs = medRecords ?: return@let null
@@ -215,11 +196,13 @@ fun RecordTab(
                     runCatching { recordSlot(dao, slot) }
                         .onSuccess {
                             failed = false
-                            undoFailed = false
                             justSaved = it.id
-                            undoRecord = it
                             val text = "${mine.name} 줌 · ${recordTime(it)}"
-                            toast = UndoToastItem(text)
+                            val saved = it
+                            toasts?.show(UndoToastItem(text) {
+                                toasts.show(null)
+                                deleting = saved // 지우기 확인 창(지우면 '기록을 지웠어요 · 되돌리기')
+                            })
                             @Suppress("DEPRECATION") view.announceForAccessibility("$text. 되돌리려면 되돌리기")
                             kotlinx.coroutines.delay(1_000)
                             if (checked === mine) checked = null // 그새 다른 약을 눌렀으면 그 '✓'는 남김
@@ -238,7 +221,6 @@ fun RecordTab(
                 }
             }) { row, value ->
                 scope.launch {
-                    undoFailed = false
                     runCatching { saveQuickRecord(dao, row, value, who) }
                         .onSuccess {
                             justSaved = it.id
@@ -251,28 +233,20 @@ fun RecordTab(
             Text(if (medLine == null) "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                 else "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         }
-        if (undoFailed) OkcheErrorText("되돌리지 못했어요. 다시 해 주세요.") else if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+        if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
         if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
         // 되돌리기 알림이 맨 아래 내용을 가리지 않게 그만큼 더 내려가게.
-        if (toast != null) Spacer(Modifier.height(toastHeight))
+        Spacer(Modifier.height(LocalUndoInset.current))
     }
-    // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음.
-    androidx.compose.runtime.LaunchedEffect(who) { toast = null }
-    UndoToast(toast, onDismiss = {
-        toast = null
-        undoFailed = false // 알림이 닫히면 되돌리기 실패 문구도
-    }, modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { toastHeight = with(density) { it.height.toDp() } }, onUndo = {
-        if (undoRecord != null) undoAsking = true // 되돌리기도 확인 창을 한 번 거친다(2026-11-05 사용자)
-    })
     }
-    undoRecord?.takeIf { undoAsking }?.let { record ->
-        app.okche.ui.OkcheConfirmDialog(
-            "방금 남긴 기록을 되돌릴까요?", "되돌리기", onCancel = { undoAsking = false }, onConfirm = { undoAsking = false; undo(record) },
-            destructive = true, message = "${recordTime(record)} ${recordValue(record, meds = meds)} 기록이 지워지고, 탕약 줄에 다시 나와요.",
-            confirmLook = app.okche.ui.ButtonLook.Danger,
-        )
+    // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음(처음 그릴 때는 그대로).
+    var lastWho by remember { mutableStateOf(who) }
+    if (lastWho != who) {
+        lastWho = who
+        toasts?.show(null)
     }
+    deleting?.let { DeleteRecordDialog(dao, it, pets.orEmpty()) { deleting = null } }
     medSheet?.let { pet ->
         app.okche.ui.med.MedTodaySheet(pet, onSaved = { saved ->
             saved.lastOrNull()?.let {
@@ -567,6 +541,7 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    val toasts = LocalUndoToasts.current
     OkcheConfirmDialog(
         "이 기록을 지울까요?", "지우기",
         onCancel = onClose,
@@ -575,7 +550,11 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
             busy = true
             scope.launch {
                 runCatching { deleteRecord(dao, record) }
-                    .onSuccess { onClose() }
+                    .onSuccess {
+                        onClose()
+                        // 되돌리면 지우기 전 그대로(지울 때 비운 내용까지 — record는 지우기 전 값).
+                        toasts?.removed("기록을 지웠어요") { restoreRecord(dao, record) }
+                    }
                     .onFailure { failed = true }
                 busy = false
             }
@@ -587,7 +566,7 @@ private fun DeleteRecordDialog(dao: OkcheDao, record: Record, pets: List<Pet>, o
             Modifier.fillMaxWidth().background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 14.dp, vertical = 12.dp),
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
-        Text("지운 기록은 되돌릴 수 없고, 실록 통계에서도 빠져요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+        Text("지운 기록은 실록 통계에서도 빠져요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
         if (failed) OkcheErrorText("지우지 못했어요. 다시 해 주세요.")
     }
 }
@@ -612,7 +591,7 @@ fun RecordLogScreen(pets: List<Pet>, current: Pet?, onBack: () -> Unit, onOpenSu
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6 + LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             DateBar(day, today) { day = it }

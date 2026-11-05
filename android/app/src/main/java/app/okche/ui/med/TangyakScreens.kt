@@ -112,7 +112,7 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("탕약", "약 · 알림", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", onBack, trailing = seal)
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6),
+            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             if (cards.isEmpty()) {
@@ -290,6 +290,7 @@ fun MedAddScreen(
     }
 
     if (adding) MedFormSheet(null, pets, records, picking = true, onAdded = { pick(it) }) { adding = false }
+    val toasts = app.okche.ui.LocalUndoToasts.current
     if (stopping && editing != null) {
         val med = meds.firstOrNull { it.id == editing.medicationId }
         app.okche.ui.OkcheConfirmDialog(
@@ -302,7 +303,12 @@ fun MedAddScreen(
                     scope.launch {
                         failed = runCatching { stopSchedule(dao, editing) }.isFailure
                         busy = false
-                        if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.") else onBack()
+                        if (failed) {
+                            view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+                        } else {
+                            onBack()
+                            toasts?.removed("${app.okche.ui.pet.withObjectParticle(med?.name ?: "약")} 그만 먹이기로 했어요") { resumeSchedule(dao, editing) }
+                        }
                     }
                 }
             },

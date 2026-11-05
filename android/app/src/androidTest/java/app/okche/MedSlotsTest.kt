@@ -211,6 +211,31 @@ class MedSlotsTest {
         assertEquals(listOf("위장약 시럽", "프레드니솔론", "유산균"), options.map { it.first.name })
         assertEquals(listOf("물약 · 필요할 때만", "알약 · 콩이가 먹는 약", "가루"), options.map { it.second })
     }
+
+    /** 지우기·빼기 뒤 '되돌리기'(2026-11-05 사용자): 기록은 지울 때 비운 내용까지, 약방 약, 그만 먹인 줄(새 줄이 없을 때만). */
+    @Test fun removeThenRestore() = runBlocking {
+        val med = Medication(name = "프레드니솔론", category = MedCategory.medicine, form = MedForm.pill, doseAmount = 1.0, unit = DoseUnit.pill)
+        dao.insert(med)
+        val s = row(times = listOf("20:00"), med = med.id, from = at(20, 9))
+        dao.insert(s)
+        val record = recordSlot(dao, remainingSlots(listOf(s), emptyList(), pet, day)[0], now = at(27, 21))
+        app.okche.ui.record.deleteRecord(dao, record)
+        assertEquals("{}", dao.medRecordsFlow().first().let { if (it.isEmpty()) "{}" else it.single().data })
+        app.okche.ui.record.restoreRecord(dao, record)
+        val back = dao.medRecordsFlow().first().single()
+        assertEquals(listOf(record.data, record.slotKey), listOf(back.data, back.slotKey))
+        app.okche.ui.med.removeMed(dao, med)
+        app.okche.ui.med.restoreMed(dao, med)
+        assertEquals(null, dao.medicationsFlow().first().single().deletedAt)
+        app.okche.ui.med.stopSchedule(dao, s, at(27, 22))
+        app.okche.ui.med.resumeSchedule(dao, s)
+        assertEquals(null, dao.medSchedules().single().activeUntil)
+        // 그 사이 새 줄이 열렸으면 되살리지 않음(한 주기에 열린 줄 둘이 되지 않게).
+        app.okche.ui.med.stopSchedule(dao, dao.medSchedules().single(), at(27, 22))
+        dao.insert(row(times = listOf("21:00"), series = s, from = at(27, 23)))
+        app.okche.ui.med.resumeSchedule(dao, s)
+        assertTrue(dao.medSchedules().first { it.id == s.id }.activeUntil != null)
+    }
 }
 
 /** 몇 시간마다 약(처음 먹일 때 = 지금) → 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴(8-3a). */
@@ -246,11 +271,14 @@ class RecordMedFlowTest {
         rule.onNode(give).performClick()
         waitFor(hasText("프레드니솔론 줌 · ", substring = true))
         waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))
+        // '되돌리기' = 지우기 확인 창 → 지움 → '기록을 지웠어요 · 되돌리기' → 되돌리면 기록이 돌아옴.
         rule.onNode(hasText("되돌리기").and(hasClickAction())).performClick()
-        waitFor(hasText("방금 남긴 기록을 되돌릴까요?")) // 확인 창 한 번
-        rule.onAllNodes(hasText("되돌리기").and(hasClickAction())).onLast().performClick()
-        waitFor(give) // 차례가 줄에 돌아옴
+        waitFor(hasText("이 기록을 지울까요?"))
+        rule.onNode(hasText("지우기").and(hasClickAction())).performClick()
+        waitFor(hasText("기록을 지웠어요"))
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("탕약 프레드니솔론", substring = true)).fetchSemanticsNodes().isEmpty() }
+        rule.onNode(hasText("되돌리기").and(hasClickAction())).performClick()
+        waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))
     }
 
     /** 8-3b: ⋯ 오늘 먹일 약 시트 → 줬어요 → 기록하기, 예정에 없던 약 → 기록하기, 연필 → 먹고 토함으로 고치기. */

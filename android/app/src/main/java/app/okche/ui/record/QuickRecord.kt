@@ -94,6 +94,10 @@ suspend fun deleteRecord(dao: OkcheDao, record: Record, now: Long = System.curre
     dao.update(record.copy(deletedAt = now, updatedAt = now, data = "{}", slotKey = null))
 }
 
+/** 지운 기록 되돌리기(지운 직후 알림의 '되돌리기'): [original]은 지우기 전 값 — 비운 `data`·`slotKey`까지 돌려놓는다. */
+suspend fun restoreRecord(dao: OkcheDao, original: Record, now: Long = System.currentTimeMillis()) =
+    dao.update(original.copy(deletedAt = null, updatedAt = now))
+
 /** `YYYY-MM-DD`를 하루 옮긴 날. */
 fun shiftDay(day: String, days: Long): String = LocalDate.parse(day).plusDays(days).toString()
 

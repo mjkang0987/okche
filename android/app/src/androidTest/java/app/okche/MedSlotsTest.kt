@@ -356,7 +356,7 @@ class RecordMedFlowTest {
         scenario = ActivityScenario.launch(MainActivity::class.java)
         waitFor(tab("문안"))
         rule.onNode(tab("문안")).performClick()
-        val pending = hasContentDescription("탕약 예정 · 오늘 먹일 약 보기", substring = true)
+        val pending = hasContentDescription("오늘 먹일 약 보기", substring = true) // 차례가 막 지나면 '놓침'
         waitFor(pending)
         rule.onAllNodes(pending)[0].performScrollTo().performClick() // 하루에 차례가 여럿이면 이른 것
         waitFor(hasText("다음 차례"))

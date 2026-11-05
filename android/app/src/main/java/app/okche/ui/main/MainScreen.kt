@@ -271,13 +271,16 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
 private fun PendingRow(slot: app.okche.ui.med.MedSlot, medName: String?, onClick: () -> Unit) {
     val time = app.okche.ui.med.hhmm(slot.due)
     // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
+    // 시간이 지났는데 안 준 차례는 '놓침'(2026-11-05 사용자).
+    val missed = slot.due < System.currentTimeMillis()
+    val state = if (missed) "놓침" else "예정"
     val name = medName?.let { "$it " }.orEmpty()
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .clickable(role = Role.Button, onClick = onClick)
-            .clearAndSetSemantics { contentDescription = "$time ${name}탕약 예정 · 오늘 먹일 약 보기"; role = Role.Button },
+            .clearAndSetSemantics { contentDescription = "$time ${name}탕약 $state · 오늘 먹일 약 보기"; role = Role.Button },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -290,7 +293,7 @@ private fun PendingRow(slot: app.okche.ui.med.MedSlot, medName: String?, onClick
             Modifier.weight(1f),
             color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
         )
-        Text("예정", color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
+        Text(state, color = if (missed) OkcheColor.Yeonji else OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = OkcheColor.Namsaek)
     }
 }

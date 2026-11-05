@@ -208,6 +208,9 @@ struct TodayRecordSection: View {
     /// 예정 줄: '21:00  탕약 · 약 … 예정 ›', 누르면 오늘 먹일 약 시트.
     private func pendingRow(_ slot: MedSlots.Slot) -> some View {
         let time = MedSlots.hhmm(slot.due)
+        // 시간이 지났는데 안 준 차례는 '놓침'(2026-11-05 사용자).
+        let missed = slot.due < .now
+        let state = missed ? "놓침" : "예정"
         // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
         let name = meds.first { $0.id == slot.schedule.medicationId }.map { "\($0.name) " } ?? ""
         return Button { medSheet = pets.first { $0.id == petId } } label: {
@@ -216,14 +219,14 @@ struct TodayRecordSection: View {
                     + Text(" · 약").font(.system(size: plainSize)).foregroundColor(OkcheColor.inkMuted))
                     .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("예정").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaek)
+                Text(state).okcheText(OkcheType.body, weight: .bold).foregroundStyle(missed ? OkcheColor.yeonji : OkcheColor.namsaek)
                 Image(systemName: "chevron.right").font(.body).foregroundStyle(OkcheColor.namsaek).accessibilityHidden(true)
             }
             .frame(minHeight: rowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(time) \(name)탕약 예정 · 오늘 먹일 약 보기")
+        .accessibilityLabel("\(time) \(name)탕약 \(state) · 오늘 먹일 약 보기")
     }
 
     private func rowContent(_ record: Record, _ value: String) -> some View {

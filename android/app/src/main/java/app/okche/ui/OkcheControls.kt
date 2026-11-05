@@ -579,11 +579,10 @@ fun <T> OkcheMenuPicker(label: String, options: List<Pair<T, String>>, selected:
 
 // 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게).
 
-/** 화면·시트 아래에 붙은 주 버튼 칸: 위 선 + 한지 바탕(스크롤 밖에 두어 늘 보이게). iOS `okcheFooter`와 같은 모양. */
+/** 화면·시트 아래에 붙은 주 버튼 칸: 한지 바탕(위 선 없음 — 2026-11-05 사용자, 스크롤 밖에 두어 늘 보이게). iOS `okcheFooter`와 같은 모양. */
 @Composable
 fun OkcheFooter(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(OkcheColor.Hanji)) {
-        androidx.compose.material3.HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
         Column(
             Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = 8.dp), // 기기 아래 막대 자리는 바깥이 둠
             verticalArrangement = Arrangement.spacedBy(8.dp),

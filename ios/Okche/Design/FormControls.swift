@@ -382,7 +382,7 @@ struct OkcheMenuPicker<Value: Hashable>: View {
 // MARK: 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게)
 
 extension View {
-    /// 화면·시트 아래에 붙은 주 버튼 칸: 위 선 + 한지 바탕, 내용이 많아도 늘 보인다. `show`가 거짓이면 칸 없음.
+    /// 화면·시트 아래에 붙은 주 버튼 칸: 한지 바탕(위 선 없음 — 2026-11-05 사용자), 내용이 많아도 늘 보인다. `show`가 거짓이면 칸 없음.
     func okcheFooter<Footer: View>(show: Bool = true, @ViewBuilder _ footer: () -> Footer) -> some View {
         let content = footer()
         return safeAreaInset(edge: .bottom, spacing: 0) {
@@ -390,7 +390,6 @@ extension View {
                 VStack(alignment: .leading, spacing: 8) { content }
                     .padding(.horizontal, OkcheSpacing.space4).padding(.top, 10).padding(.bottom, 8)
                     .background(OkcheColor.hanji)
-                    .overlay(alignment: .top) { OkcheColor.line.frame(height: 1) }
             }
         }
     }

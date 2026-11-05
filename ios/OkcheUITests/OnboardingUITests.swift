@@ -151,10 +151,11 @@ final class OnboardingUITests: XCTestCase {
         for nth in ["첫 번째", "두 번째"] {
             let units = app.textFields["\(nth) 양 (단위)"]
             XCTAssertTrue(units.waitForExistence(timeout: 3))
+            reveal(units, in: app)
             units.tap()
             units.typeText("2")
+            app.buttons["완료"].firstMatch.tap() // 자판이 다음 칸을 가리지 않게
         }
-        app.buttons["완료"].firstMatch.tap()
         let setupSave = app.buttons["저장하기"].firstMatch
         while !setupSave.isHittable { app.swipeUp() }
         setupSave.tap()

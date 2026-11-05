@@ -3,9 +3,9 @@ import XCTest
 /// 첫 실행 → 아이 등록 → 탭 화면 흐름. 앱은 `-ui-testing`이면 빈 메모리 저장소로 뜬다.
 @MainActor
 final class OnboardingUITests: XCTestCase {
-    private func launch(keepSettings: Bool = false) -> XCUIApplication {
+    private func launch(keepSettings: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"] + (keepSettings ? ["-keep-settings"] : [])
+        app.launchArguments = ["-ui-testing"] + (keepSettings ? ["-keep-settings"] : []) + extra
         app.launch()
         return app
     }
@@ -508,6 +508,27 @@ final class OnboardingUITests: XCTestCase {
     }
 
     /// 몇 시간마다 약(처음 먹일 때 = 지금)을 하나 추가하고 일기 탭으로.
+    /// 8-4b: 알림 켠 약을 처음 저장하면 허락 안내 창 — '나중에'여도 약은 저장되고 탕약 목록으로.
+    func testNotifyAskOnFirstSave() {
+        let app = launch(extra: ["-notify-ask"])
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["탕약 · 약 알림"], in: app)
+        app.buttons["+ 약 추가"].tap()
+        tapBelow(app.buttons["+ 약방에 새 약 들이기"], in: app)
+        let name = app.textFields["약 이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.tap()
+        name.typeText("프레드니솔론")
+        app.buttons["약방에 들이고 고르기"].tap()
+        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertTrue(app.staticTexts["약 먹일 시간을 알려 드릴까요?"].waitForExistence(timeout: 3))
+        app.buttons["나중에"].tap()
+        XCTAssertTrue(app.staticTexts["먹고 있는 약"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["프레드니솔론"].exists)
+    }
+
     private func addHoursMedAndOpenRecord(_ app: XCUIApplication) {
         XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
         app.tabBars.buttons["더보기"].tap()

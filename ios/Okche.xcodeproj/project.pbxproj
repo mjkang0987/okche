@@ -47,6 +47,7 @@
 		8900F8EC917DF5EEC04483A8 /* MedSheetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD0254E2747998246139247 /* MedSheetViews.swift */; };
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
 		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
+		8D89CD5891DC346774F1F5FD /* MedReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274F9FEBB38E4DDF70F92647 /* MedReminders.swift */; };
 		903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0275EB8CA7B29A763A8B16D3 /* MainCard.swift */; };
 		95ABC1DC5E7B906B146994BC /* MedNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E39E7464C390CAF358F0AA5 /* MedNotify.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
@@ -108,6 +109,7 @@
 		1CC005C5642CB5CC5C1B1760 /* TabScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabScreen.swift; sourceTree = "<group>"; };
 		22DBD1236DA5DCED32A786F9 /* OkcheTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OkcheTokens.swift; path = ../../../design/generated/OkcheTokens.swift; sourceTree = "<group>"; };
 		26D4DB5EBE50D81DD114901B /* PetEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetEditingTests.swift; sourceTree = "<group>"; };
+		274F9FEBB38E4DDF70F92647 /* MedReminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedReminders.swift; sourceTree = "<group>"; };
 		28809CA2E38D55D30DE87A2C /* OkcheDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheDay.swift; sourceTree = "<group>"; };
 		2B822C022AE27D79E8DEE12B /* MedSlots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedSlots.swift; sourceTree = "<group>"; };
 		2C604B5EEB3BFD9BCC93D250 /* SnackRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnackRules.swift; sourceTree = "<group>"; };
@@ -327,6 +329,7 @@
 			isa = PBXGroup;
 			children = (
 				4E39E7464C390CAF358F0AA5 /* MedNotify.swift */,
+				274F9FEBB38E4DDF70F92647 /* MedReminders.swift */,
 			);
 			path = Notify;
 			sourceTree = "<group>";
@@ -504,6 +507,7 @@
 				49EA965508951840BD7CFB45 /* MainView.swift in Sources */,
 				790F42C0FF0254712506CDB9 /* MealRules.swift in Sources */,
 				95ABC1DC5E7B906B146994BC /* MedNotify.swift in Sources */,
+				8D89CD5891DC346774F1F5FD /* MedReminders.swift in Sources */,
 				650F987FDC0C7A0F5D0571FD /* MedRules.swift in Sources */,
 				A490AFA4074C1845E2F45C69 /* MedSchedules.swift in Sources */,
 				8900F8EC917DF5EEC04483A8 /* MedSheetViews.swift in Sources */,

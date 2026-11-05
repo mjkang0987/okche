@@ -126,7 +126,10 @@ fun todaySlots(schedules: List<MedSchedule>, records: List<Record>, petId: Strin
             val r = extras.removeFirstOrNull() ?: break
             entries[i] = MedSlotEntry(entries[i].slot, r)
         }
-        result += entries
+        // 그만 먹인 줄(뒤를 잇는 줄 없이 닫힘)의 안 준 차례는 빼기 — 그만 먹이면 바로 줄·시트에서 사라짐(2026-11-05 사용자).
+        // 그만 먹인 주기 = 열린 줄이 하나도 없음(바꾸기·추억 되돌리기로 이어진 줄은 열려 있음).
+        val stopped = if (series.none { it.activeUntil == null }) rows.map { it.id }.toSet() else emptySet()
+        result += entries.filter { it.record != null || it.slot.schedule.id !in stopped }
     }
     return result.sortedWith(compareBy({ it.slot.due }, { it.slot.schedule.createdAt }, { it.slot.schedule.id }))
 }

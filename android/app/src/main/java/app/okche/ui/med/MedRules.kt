@@ -144,3 +144,6 @@ fun medBlockedMessage(med: Medication, takers: List<String>) =
 
 /** 약방에서 빼기: `deletedAt`만(지난 기록의 약 이름은 남음 — 1-4). */
 suspend fun removeMed(dao: OkcheDao, med: Medication, now: Long = System.currentTimeMillis()) = dao.update(med.copy(deletedAt = now, updatedAt = now))
+
+/** 약방에서 뺀 약 되돌리기(뺀 직후 알림의 '되돌리기'). [original]은 빼기 전 값. */
+suspend fun restoreMed(dao: OkcheDao, original: Medication, now: Long = System.currentTimeMillis()) = dao.update(original.copy(deletedAt = null, updatedAt = now))

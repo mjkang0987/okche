@@ -187,6 +187,13 @@ enum MedRules {
         try save(context)
     }
 
+    /// 약방에서 뺀 약 되돌리기(뺀 직후 알림의 '되돌리기').
+    static func restore(_ med: Medication, now: Date = .now, in context: ModelContext) throws {
+        med.deletedAt = nil
+        med.updatedAt = now
+        try save(context)
+    }
+
     private static func save(_ context: ModelContext) throws {
         do {
             try context.save()

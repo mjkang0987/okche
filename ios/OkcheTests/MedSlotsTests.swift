@@ -67,6 +67,14 @@ final class MedSlotsTests: XCTestCase {
         // 빠진 열린 줄로 준 기록은 짝 없는 기록 — 남은 차례 앞에서 하나 처리(하루 세 번 먹이지 않게).
         XCTAssertEqual(remaining([o1, row(times: ["09:00", "21:00"], series: o1, from: at(27, 7))],
                                  [given(o1, key: key(o1, "08:00"), at: at(27, 8))]), [at(27, 21)])
+        // 08:00 안 주고 10:00에 그만 먹이면 그날 남은 차례도 바로 빠짐(뒤를 잇는 줄 없음).
+        XCTAssertTrue(remaining([row(times: ["08:00", "20:00"], from: at(20, 9), until: at(27, 10))], []).isEmpty)
+        // 추억으로 간직(10:00)했다가 같은 날 되돌려(11:00) 다시 연 줄이 있으면 그만 먹인 게 아님 — 안 준 08:00은 남음.
+        let kept = row(times: ["08:00", "20:00"], from: at(20, 9), until: at(27, 10))
+        XCTAssertEqual(remaining([kept, row(times: ["08:00", "20:00"], series: kept, from: at(27, 11))], []), [at(27, 8), at(27, 20)])
+        // 추억 되돌린 날 다시 그만 먹이면(12:00) 옛 줄의 안 준 08:00도 빠짐.
+        let reopened = row(times: ["08:00", "20:00"], series: kept, from: at(27, 11), until: at(27, 12))
+        XCTAssertTrue(remaining([kept, reopened], []).isEmpty)
         // 바꾼 다음 날은 새 줄 그대로.
         XCTAssertEqual(MedSlots.remaining([s1, s2], records: [g], petId: pet, day: "2026-10-28").map(\.due), [at(28, 9), at(28, 21)])
     }
@@ -162,5 +170,31 @@ final class MedSlotsTests: XCTestCase {
         let options = MedSlots.extraOptions([other, med, syrup], schedules: [s, need], pet: kong)
         XCTAssertEqual(options.map(\.med.name), ["위장약 시럽", "프레드니솔론", "유산균"])
         XCTAssertEqual(options.map(\.detail), ["물약 · 필요할 때만", "알약 · 콩이가 먹는 약", "가루"])
+    }
+
+    /// 지우기·빼기 뒤 '되돌리기'(2026-11-05 사용자): 기록은 지울 때 비운 내용까지, 약방 약, 그만 먹인 줄(새 줄이 없을 때만).
+    func testRemoveThenRestore() throws {
+        let med = Medication(name: "프레드니솔론", category: .medicine, form: .pill, doseAmount: 1, unit: .pill)
+        context.insert(med)
+        let s = row(times: ["20:00"], med: med.id, from: at(20, 9))
+        context.insert(s)
+        let record = try MedSlots.record(MedSlots.remaining([s], records: [], petId: pet, day: day)[0], now: at(27, 21), in: context)
+        let kept = (record.data, record.slotKey)
+        try QuickRecord.delete(record, in: context)
+        XCTAssertEqual([record.data, record.slotKey], ["{}", nil])
+        try QuickRecord.restore(record, data: kept.0, slotKey: kept.1, in: context)
+        XCTAssertNil(record.deletedAt)
+        XCTAssertEqual(QuickRecord.value(record), "프레드니솔론 1알")
+        try MedRules.remove(med, in: context)
+        try MedRules.restore(med, in: context)
+        XCTAssertNil(med.deletedAt)
+        try MedSchedules.stop(s, now: at(27, 22), in: context)
+        try MedSchedules.resume(s, in: context)
+        XCTAssertNil(s.activeUntil)
+        // 그 사이 새 줄이 열렸으면 되살리지 않음(한 주기에 열린 줄 둘이 되지 않게).
+        try MedSchedules.stop(s, now: at(27, 22), in: context)
+        context.insert(row(times: ["21:00"], series: s, from: at(27, 23)))
+        XCTAssertThrowsError(try MedSchedules.resume(s, in: context)) // '되돌리지 못했어요'로 알림
+        XCTAssertNotNil(s.activeUntil)
     }
 }

@@ -101,6 +101,7 @@ struct SnackFormSheet: View {
     let mode: Mode
     var onAdded: (Snack) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.showUndo) private var showUndo
     @Environment(\.modelContext) private var context
     @State private var name = ""
     @State private var kind = SnackKind.lickable
@@ -227,6 +228,9 @@ struct SnackFormSheet: View {
             try SnackRules.remove(editing, in: context)
             removing = false
             dismiss()
+            showUndo(.removed("\(PetTitle.withObjectParticle(editing.name)) 목록에서 뺐어요", show: showUndo) {
+                try SnackRules.restore(editing, in: context)
+            })
         } catch {
             removing = false
             failed = true

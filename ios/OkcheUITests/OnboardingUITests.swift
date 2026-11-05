@@ -524,7 +524,7 @@ final class OnboardingUITests: XCTestCase {
         app.tabBars.buttons["일기"].tap()
     }
 
-    /// 8-3a: 일기 탕약 버튼 → 기록·되돌리기 알림 → 되돌리기 → 버튼이 돌아옴.
+    /// 8-3a: 일기 탕약 버튼 → 기록 알림 → '되돌리기' = 지우기 확인 창 → 지움 → '기록을 지웠어요 · 되돌리기' → 되돌리면 기록이 돌아옴.
     func testRecordMedGiveUndo() {
         let app = launch()
         register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
@@ -533,10 +533,15 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(give.waitForExistence(timeout: 3))
         give.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '프레드니솔론 줌 · '")).firstMatch.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 탕약 프레드니솔론 1알'")).firstMatch.exists)
+        let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 탕약 프레드니솔론 1알'")).firstMatch
+        XCTAssertTrue(line.exists)
         app.buttons["되돌리기"].tap()
-        XCTAssertTrue(give.waitForExistence(timeout: 3)) // 차례가 줄에 돌아옴
-        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '탕약 프레드니솔론'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["이 기록을 지울까요?"].waitForExistence(timeout: 3)) // 확인 창 한 번
+        app.buttons["지우기"].tap()
+        XCTAssertTrue(app.staticTexts["기록을 지웠어요"].waitForExistence(timeout: 3)) // 지운 뒤 알림
+        XCTAssertTrue(line.waitForNonExistence(timeout: 5))
+        app.buttons["되돌리기"].tap()
+        XCTAssertTrue(line.waitForExistence(timeout: 5)) // 되돌리면 기록이 돌아옴
     }
 
     /// 8-3b: ⋯ 오늘 먹일 약 시트 → 줬어요 → 기록하기, 예정에 없던 약 → 기록하기, 연필 → 먹고 토함으로 고치기.
@@ -546,8 +551,8 @@ final class OnboardingUITests: XCTestCase {
         addHoursMedAndOpenRecord(app)
         tapBelow(app.buttons["탕약 자세히 남기기"], in: app)
         XCTAssertTrue(app.staticTexts["다음 차례"].waitForExistence(timeout: 3))
-        app.buttons["기록하기"].tap() // 고른 게 없으면 안내
-        XCTAssertTrue(app.staticTexts["먹인 약을 하나 이상 골라 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["기록하기"].isEnabled) // 고른 게 없으면 흐리게 + 안내
+        XCTAssertTrue(app.staticTexts["먹인 약을 하나 이상 고르면 기록할 수 있어요"].waitForExistence(timeout: 3))
         app.buttons["줬어요"].firstMatch.tap()
         app.buttons["기록하기"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '콩이 · 탕약 프레드니솔론 1알'")).firstMatch.waitForExistence(timeout: 3))

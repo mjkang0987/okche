@@ -96,7 +96,7 @@ fun SnackListScreen(current: Pet?, seal: @Composable () -> Unit, onBack: () -> U
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("다과", "간식 목록", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", onBack, trailing = seal)
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6),
+            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
@@ -176,6 +176,7 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
         is SnackFormMode.Edit -> Triple("다과 고치기", "목록에서 빼도 지난 기록의 간식 이름은 그대로 남아요.", "저장하기")
     }
 
+    val toasts = app.okche.ui.LocalUndoToasts.current
     fun run(work: suspend () -> Unit) {
         if (busy) return
         busy = true
@@ -201,7 +202,13 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
         OkcheConfirmDialog(
             "${withObjectParticle(editing.name)} 목록에서 뺄까요?", "빼기", destructive = true,
             onCancel = { removing = false },
-            onConfirm = { removing = false; run { removeSnack(dao, editing) } },
+            onConfirm = {
+                removing = false
+                run {
+                    removeSnack(dao, editing)
+                    toasts?.removed("${withObjectParticle(editing.name)} 목록에서 뺐어요") { restoreSnack(dao, editing) }
+                }
+            },
             message = "다과 기록에서 더는 고를 수 없어요. 지난 기록의 간식 이름은 그대로 남아요.",
             confirmLook = ButtonLook.Danger,
         )

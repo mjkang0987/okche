@@ -19,13 +19,13 @@ struct RecordTab: View {
     // shortcut: 약 주기·탕약 기록 전체를 읽어 화면에서 거름, 기록이 수천 건이 되어 느려지면 `@Query`에 아이·날 조건을 넣는다.
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     @Query private var meds: [Medication]
-    @State private var undoFailed = false
     @Query(filter: #Predicate<Record> { $0.kind == "med" && $0.deletedAt == nil }) private var medRecords: [Record]
     /// 방금 누른 탕약 버튼 — 약 1초 '✓ 프레드'로 보였다가 빠짐.
     @State private var checked: (key: String, medicationId: UUID, title: String, name: String)?
     /// 탭 바 위 '프레드니솔론 줌 · 21:02 · 되돌리기'와 되돌릴 기록.
-    @State private var toast: UndoToastItem?
-    @State private var undoRecord: Record?
+    @Environment(\.showUndo) private var showUndo
+    /// 탕약 알림의 '되돌리기' = 방금 남긴 기록 지우기(확인 창 → 지움 → '기록을 지웠어요 · 되돌리기').
+    @State private var deleting: Record?
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
     private var chipPets: [Pet] { pets.filter { $0.memorializedAt == nil } }
@@ -53,13 +53,12 @@ struct RecordTab: View {
                 }, mealMore: suraPet, med: medLine, onGive: give)
                 Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                      : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                OkcheFieldError(message: undoFailed ? "되돌리지 못했어요. 다시 해 주세요." : failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .undoToast($toast, onUndo: undo)
-            .onChange(of: toast == nil) { if toast == nil { undoFailed = false } } // 알림이 닫히면 되돌리기 실패 문구도
-            .onChange(of: who) { toast = nil } // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음
+            .deleteRecordDialog($deleting, pets: pets)
+            .onChange(of: who) { showUndo(nil) } // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음
             .navigationDestination(for: RecordRoute.self) { route in
                 switch route {
                 case .sura(let petId): SuraScreen(petId: petId)
@@ -107,35 +106,19 @@ struct RecordTab: View {
         do {
             let saved = try MedSlots.record(slot, in: context)
             failed = false
-            undoFailed = false
             justSaved = saved.id
-            undoRecord = saved
             checked = (slot.key, slot.schedule.medicationId, "✓ \(MedSlots.shortName(med))", med?.name ?? "약")
-            toast = UndoToastItem(text: "\(med?.name ?? "약") 줌 · \(QuickRecord.time(saved))")
+            showUndo(UndoToastItem(text: "\(med?.name ?? "약") 줌 · \(QuickRecord.time(saved))") {
+                deleting = saved // 지우기 확인 창(지우면 '기록을 지웠어요 · 되돌리기')
+                return true
+            })
             Task {
                 try? await Task.sleep(for: .seconds(1))
                 if checked?.key == slot.key { checked = nil } // 그새 다른 약을 눌렀으면 그 '✓'는 남김
             }
         } catch {
-            undoFailed = false
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
-        }
-    }
-
-    /// 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
-    private func undo() {
-        guard let record = undoRecord else { return }
-        do {
-            try QuickRecord.delete(record, in: context)
-            undoRecord = nil
-            checked = nil
-            toast = nil
-            undoFailed = false
-            AccessibilityNotification.Announcement("되돌렸어요").post()
-        } catch {
-            undoFailed = true // 알림은 남겨 다시 누를 수 있게
-            AccessibilityNotification.Announcement("되돌리지 못했어요. 다시 해 주세요.").post()
         }
     }
 
@@ -151,7 +134,6 @@ struct RecordTab: View {
 
     private func record(_ row: QuickRecord.Row, _ value: String) {
         do {
-            undoFailed = false
             justSaved = try QuickRecord.save(row, value: value, petId: who, in: context).id
             failed = false
             AccessibilityNotification.Announcement("아뢰었사옵니다").post()
@@ -187,7 +169,7 @@ struct QuickRecordCard: View {
     /// 탕약 줄(소피 다음) — 없으면 줄 없음(보드 `RecordNoMed`).
     var med: MedLine? = nil
     var onGive: (MedSlots.Slot) -> Void = { _ in }
-    @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 56
+    @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
@@ -463,6 +445,7 @@ private struct DeleteRecordDialog: ViewModifier {
     @Binding var record: Record?
     let pets: [Pet]
     @Environment(\.modelContext) private var context
+    @Environment(\.showUndo) private var showUndo
     @State private var failed = false
 
     func body(content: Content) -> some View {
@@ -470,8 +453,13 @@ private struct DeleteRecordDialog: ViewModifier {
             OkcheConfirmDialog(title: "이 기록을 지울까요?", destructive: true, confirm: "지우기", confirmLook: .danger,
                                onCancel: { record = nil }, onConfirm: {
                                    do {
+                                       // 되돌리기에 쓸 내용(지우면 data·slotKey를 비움 — 1-4).
+                                       let kept = (data: target.data, slotKey: target.slotKey)
                                        try QuickRecord.delete(target, in: context)
                                        record = nil
+                                       showUndo(.removed("기록을 지웠어요", show: showUndo) {
+                                           try QuickRecord.restore(target, data: kept.data, slotKey: kept.slotKey, in: context)
+                                       })
                                    } catch {
                                        failed = true
                                        AccessibilityNotification.Announcement("지우지 못했어요. 다시 해 주세요.").post()
@@ -483,7 +471,7 @@ private struct DeleteRecordDialog: ViewModifier {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12).padding(.horizontal, 14)
                     .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                Text("지운 기록은 되돌릴 수 없고, 실록 통계에서도 빠져요.").okcheText(OkcheType.label, weight: .regular)
+                Text("지운 기록은 실록 통계에서도 빠져요.").okcheText(OkcheType.label, weight: .regular)
                     .foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "지우지 못했어요. 다시 해 주세요." : nil)
             }

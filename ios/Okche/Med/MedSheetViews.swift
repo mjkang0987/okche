@@ -15,7 +15,6 @@ struct MedTodaySheet: View {
     @State private var picks: [String: String] = [:]
     @State private var extra = false
     @State private var failed = false
-    @State private var noPick = false
     @State private var saving = false
 
     static let statuses: [(value: String, title: String)] = [("given", "줬어요"), ("skipped", "건너뜀"), ("vomited", "먹고 토함")]
@@ -43,14 +42,17 @@ struct MedTodaySheet: View {
                     Text("'먹고 토함'은 실록에 따로 세요. 다시 먹여도 되는지는 병원에 물어보길 권해요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 }
-                OkcheFieldError(message: noPick ? "먹인 약을 하나 이상 골라 주세요" : failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                // 남은 차례가 없으면 버튼도 없음(모두 기록함).
-                if entries.contains(where: { $0.record == nil }) {
-                    Button("기록하기") { save(entries) }.buttonStyle(.okchePrimary)
-                }
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
+        }
+        // 남은 차례가 없으면 버튼도 없음(모두 기록함).
+        .stickyFooter(show: entries.contains { $0.record == nil }) {
+            OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+            // 덜 채우면 흐리게 + 남은 것 안내(2026-11-05 사용자).
+            Button("기록하기") { save(entries) }.buttonStyle(.okchePrimary)
+                .disabled(picks.isEmpty)
+                .footerHint(picks.isEmpty ? "먹인 약을 하나 이상 고르면 기록할 수 있어요" : nil)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -99,7 +101,7 @@ struct MedTodaySheet: View {
             }
             .accessibilityElement(children: .combine)
             OkcheChoiceChips(options: Self.statuses,
-                             selection: Binding(get: { recorded ?? picks[entry.slot.key] }, set: { picks[entry.slot.key] = $0; noPick = false }))
+                             selection: Binding(get: { recorded ?? picks[entry.slot.key] }, set: { picks[entry.slot.key] = $0 }))
                 .disabled(recorded != nil)
                 .opacity(recorded != nil ? 0.7 : 1)
                 // 칩이 어느 약·몇 시 것인지(보드 legend).
@@ -112,11 +114,7 @@ struct MedTodaySheet: View {
     private func save(_ entries: [MedSlots.Entry]) {
         guard !saving else { return }
         let chosen = entries.filter { $0.record == nil }.compactMap { e in picks[e.slot.key].map { (slot: e.slot, status: $0) } }
-        guard !chosen.isEmpty else {
-            noPick = true
-            AccessibilityNotification.Announcement("먹인 약을 하나 이상 골라 주세요").post()
-            return
-        }
+        guard !chosen.isEmpty else { return }
         saving = true
         do {
             onSaved(try MedSlots.record(chosen, in: context))
@@ -143,8 +141,6 @@ struct MedExtraSheet: View {
     @State private var status = "given"
     @State private var occurredAt = Date.now
     @State private var timeChanged = false
-    @State private var pickError: String?
-    @State private var amountError: String?
     @State private var adding = false
     @State private var failed = false
     @State private var saving = false
@@ -187,9 +183,8 @@ struct MedExtraSheet: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    OkcheFieldError(message: pickError)
                 }
-                OkcheTextField(label: "얼마나", text: $amount, unit: med.map { MedRules.unitTitle($0.unit) }, keyboard: .decimalPad, error: amountError)
+                OkcheTextField(label: "얼마나", text: $amount, unit: med.map { MedRules.unitTitle($0.unit) }, keyboard: .decimalPad)
                 VStack(alignment: .leading, spacing: 6) {
                     OkcheFieldLabel(title: "언제")
                     RecordTimeRow(occurredAt: $occurredAt, changed: $timeChanged, isNew: editing == nil)
@@ -201,11 +196,15 @@ struct MedExtraSheet: View {
                     Text("정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 }
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                Button("기록하기", action: save).buttonStyle(.okchePrimary)
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
+        }
+        .stickyFooter {
+            OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+            Button("기록하기", action: save).buttonStyle(.okchePrimary)
+                .disabled(missing != nil)
+                .footerHint(missing)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -219,24 +218,26 @@ struct MedExtraSheet: View {
         }
     }
 
+    private var amountValue: Double? {
+        PetRegistration.number(amount.trimmingCharacters(in: .whitespaces)).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// 아직 채우지 않은 것 — 있으면 '기록하기'는 흐리게.
+    private var missing: String? {
+        if !meds.contains(where: { $0.id == picked }) { return "어떤 약인지 고르면 기록할 수 있어요" }
+        if amountValue == nil { return "'얼마나'에 0보다 큰 숫자를 넣으면 기록할 수 있어요" }
+        return nil
+    }
+
     /// 고르면 '얼마나'는 그 약의 '한 번에'.
     private func pick(_ med: Medication) {
         picked = med.id
         amount = MedRules.number(med.doseAmount)
-        pickError = nil
-        amountError = nil
     }
 
     private func save() {
         guard !saving else { return }
-        let med = meds.first { $0.id == picked }
-        let value = PetRegistration.number(amount.trimmingCharacters(in: .whitespaces))
-        pickError = med == nil ? "어떤 약인지 골라 주세요" : nil
-        amountError = (value ?? 0) > 0 ? nil : "0보다 큰 숫자로 넣어 주세요"
-        guard let med, let value, value > 0 else {
-            AccessibilityNotification.Announcement([pickError, amountError].compactMap { $0 }.joined(separator: ". ")).post()
-            return
-        }
+        guard let med = meds.first(where: { $0.id == picked }), let value = amountValue else { return }
         saving = true
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         let at = editing == nil && !timeChanged ? Date.now : occurredAt
@@ -249,6 +250,30 @@ struct MedExtraSheet: View {
             saving = false
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+        }
+    }
+}
+
+private extension View {
+    /// 흐린 주 버튼 바로 위 '무엇이 남았는지' 한 줄(화면 읽기는 버튼 앞에서 읽음).
+    func footerHint(_ hint: String?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let hint { Text(hint).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
+            // 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게. 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
+            self.opacity(hint == nil ? 1 : 0.45).accessibilityHint(hint ?? "")
+        }
+    }
+
+    /// 시트 아래에 붙은 '기록하기'(보드 MedSheet·MedExtra — 차례가 많아도 늘 보이게, 2026-11-05 사용자): 위 선 + 한지 바탕.
+    func stickyFooter<Footer: View>(show: Bool = true, @ViewBuilder _ footer: () -> Footer) -> some View {
+        let content = footer()
+        return safeAreaInset(edge: .bottom, spacing: 0) {
+            if show {
+                VStack(alignment: .leading, spacing: 8) { content }
+                    .padding(.horizontal, OkcheSpacing.space4).padding(.top, 10).padding(.bottom, 8)
+                    .background(OkcheColor.hanji)
+                    .overlay(alignment: .top) { OkcheColor.line.frame(height: 1) }
+            }
         }
     }
 }

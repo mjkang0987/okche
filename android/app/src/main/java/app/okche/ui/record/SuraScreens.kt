@@ -152,7 +152,7 @@ fun SuraScreen(pet: Pet?, seal: @Composable () -> Unit, onBack: () -> Unit, open
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("수라", "식사량", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", onBack, trailing = seal)
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6),
+            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             if (petId != null) {

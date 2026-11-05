@@ -581,7 +581,7 @@ final class OnboardingUITests: XCTestCase {
         register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
         addHoursMedAndOpenRecord(app)
         app.tabBars.buttons["문안"].tap()
-        let pending = app.buttons.matching(NSPredicate(format: "label ENDSWITH '탕약 예정 · 오늘 먹일 약 보기'")).firstMatch
+        let pending = app.buttons.matching(NSPredicate(format: "label ENDSWITH '오늘 먹일 약 보기'")).firstMatch
         tapBelow(pending, in: app)
         XCTAssertTrue(app.staticTexts["다음 차례"].waitForExistence(timeout: 3))
         app.buttons["닫기"].firstMatch.tap()

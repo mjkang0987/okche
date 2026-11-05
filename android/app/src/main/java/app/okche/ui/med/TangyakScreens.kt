@@ -138,7 +138,8 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
                 val med = meds.firstOrNull { it.id == slot.schedule.medicationId } ?: return@let
                 val amount = amountText(slot.schedule.amount, slot.schedule.unit)
                 val time = clockText(slot.due)
-                NextMedBand(time, "${pet.name} · ${med.name} $amount", "$time ${pet.name} ${med.name} $amount 줬어요", busy = giving) {
+                // 시간이 지났는데 안 준 차례는 '놓친 탕약'(2026-11-05 사용자).
+                NextMedBand(if (slot.due < System.currentTimeMillis()) "놓친 탕약" else "다음 탕약", time, "${pet.name} · ${med.name} $amount", "$time ${pet.name} ${med.name} $amount 줬어요", busy = giving) {
                     // 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
                     if (giving) return@NextMedBand
                     giving = true
@@ -189,7 +190,7 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
 
 /** 다음 탕약 띠(보드 Tangyak): 남색 바탕 금테 112, '다음 탕약 / 오후 9:00 / 콩이 · 프레드니솔론 1알' + 한지색 '줬어요'. 큰 글자에선 버튼을 아래로. */
 @Composable
-private fun NextMedBand(time: String, detail: String, label: String, busy: Boolean = false, onGive: () -> Unit) {
+private fun NextMedBand(title: String, time: String, detail: String, label: String, busy: Boolean = false, onGive: () -> Unit) {
     val modifier = Modifier
         .fillMaxWidth()
         .heightIn(min = 112.dp)
@@ -203,7 +204,7 @@ private fun NextMedBand(time: String, detail: String, label: String, busy: Boole
         .padding(horizontal = 28.dp, vertical = 18.dp) // 금테(12 안쪽) 안에 머물고 보드 높이 112
     val texts = @Composable { m: Modifier ->
         Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("다음 탕약", Modifier.semantics { heading() }, color = OkcheColor.OnDeepMuted, style = OkcheType.Label.toTextStyle(FontWeight.Medium))
+            Text(title, Modifier.semantics { heading() }, color = OkcheColor.OnDeepMuted, style = OkcheType.Label.toTextStyle(FontWeight.Medium))
             // 보드는 본문 글꼴 22 굵게(제목 글꼴 아님).
             Text(time, color = OkcheColor.GeumLight, style = OkcheType.Body.toTextStyle(FontWeight.Bold).copy(fontSize = 22.sp, lineHeight = 30.sp))
             Text(detail, color = OkcheColor.Hanji, style = OkcheType.Label.toTextStyle(FontWeight.Normal))

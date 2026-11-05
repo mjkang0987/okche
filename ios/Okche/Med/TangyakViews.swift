@@ -30,7 +30,8 @@ struct TangyakView: View {
                     // 다음 탕약 띠(보드 `Tangyak`, 2026-11-05 승인) — 오늘 남은 차례가 없으면 숨김.
                     if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
                         let amount = MedSchedules.amountText(next.slot.schedule.amount, next.slot.schedule.unit)
-                        NextMedBand(time: MedSlots.clockText(next.slot.due), detail: "\(next.pet.name) · \(med.name) \(amount)",
+                        // 시간이 지났는데 안 준 차례는 '놓친 탕약'(2026-11-05 사용자).
+                        NextMedBand(title: next.slot.due < .now ? "놓친 탕약" : "다음 탕약", time: MedSlots.clockText(next.slot.due), detail: "\(next.pet.name) · \(med.name) \(amount)",
                                     label: "\(MedSlots.clockText(next.slot.due)) \(next.pet.name) \(med.name) \(amount) 줬어요", busy: giving) { give(next.slot, med: med) }
                     }
                     if cards.isEmpty {
@@ -640,6 +641,7 @@ struct HoursPreview: View {
 
 /// 다음 탕약 띠(보드 `Tangyak`): 남색 바탕 금테 112, '다음 탕약 / 오후 9:00 / 콩이 · 프레드니솔론 1알' + 한지색 '줬어요'. 큰 글자에선 버튼을 아래로.
 struct NextMedBand: View {
+    var title = "다음 탕약"
     let time: String
     let detail: String
     let label: String
@@ -667,7 +669,7 @@ struct NextMedBand: View {
 
     private var texts: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("다음 탕약").okcheText(OkcheType.label, weight: .medium).foregroundStyle(OkcheColor.onDeepMuted)
+            Text(title).okcheText(OkcheType.label, weight: .medium).foregroundStyle(OkcheColor.onDeepMuted)
                 .accessibilityAddTraits(.isHeader)
             // 보드는 본문 글꼴 22 굵게(제목 글꼴 아님).
             Text(time).okcheText(OkcheTextStyle(family: .sans, size: 22, lineHeight: 30, weight: .bold)).foregroundStyle(OkcheColor.geumLight)

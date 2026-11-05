@@ -15,8 +15,8 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["아이 등록하고 시작하기"].tap()
         XCTAssertTrue(app.staticTexts["새 아기씨 모시기"].waitForExistence(timeout: 5))
 
-        // 이름 없이 모시면 오류가 뜨고 그대로 남는다.
-        app.buttons["모시기"].firstMatch.tap()
+        // 이름이 없으면 '모시기'는 흐리고 못 누름 + 남은 것 안내.
+        XCTAssertFalse(app.buttons["모시기"].firstMatch.isEnabled)
         XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3))
 
         let name = app.textFields["이름"]
@@ -61,8 +61,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(weight.waitForExistence(timeout: 5))
         weight.tap()
         weight.typeText("0")
-        app.buttons["모시기"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3)) // 남은 것 안내
         app.textFields["이름"].tap()
         app.textFields["이름"].typeText("콩")
         XCTAssertFalse(app.staticTexts["이름을 넣어 주세요"].exists)
@@ -139,8 +138,7 @@ final class OnboardingUITests: XCTestCase {
         while !diabetes.isHittable { app.swipeUp() }
         diabetes.tap()
         let save = app.buttons["저장하기"].firstMatch
-        while !save.isHittable { app.swipeUp() }
-        save.tap()
+        XCTAssertFalse(save.isEnabled) // 인슐린 설정 전엔 흐리게
         XCTAssertTrue(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].waitForExistence(timeout: 3))
 
         let setupLink = app.buttons["인슐린 이름·양·시간 설정"]
@@ -476,7 +474,7 @@ final class OnboardingUITests: XCTestCase {
         tapBelow(app.buttons["탕약 · 약 알림"], in: app)
         XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
         app.buttons["+ 약 추가"].tap()
-        tapBelow(app.buttons["저장하기"], in: app)
+        XCTAssertFalse(app.buttons["저장하기"].isEnabled) // 약을 고르기 전엔 흐리게 + 남은 것
         XCTAssertTrue(app.staticTexts["약을 골라 주세요"].waitForExistence(timeout: 3))
         tapBelow(app.buttons["+ 약방에 새 약 들이기"], in: app)
         let name = app.textFields["약 이름"]

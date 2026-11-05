@@ -178,7 +178,15 @@ struct MedAddView: View {
     @Query private var meds: [Medication]
     @Query(filter: #Predicate<Record> { $0.deletedAt == nil }) private var records: [Record]
     @State private var form = MedSchedules.Form()
-    @State private var errors: [MedSchedules.Field: String] = [:]
+    /// 한 번 만진 칸 — 칸 아래 오류는 만진 뒤부터(열자마자 빨간 글자가 뜨지 않게).
+    @State private var touched: Set<MedSchedules.Field> = []
+    /// 지금 칸 오류 — 만진 칸만 보임.
+    private var errors: [MedSchedules.Field: String] { MedSchedules.errors(form).filter { touched.contains($0.key) } }
+    /// 첫 번째로 남은 것(화면 위에서부터) — 있으면 저장 버튼은 흐리게.
+    private var missing: String? {
+        let all = MedSchedules.errors(form)
+        return [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].lazy.compactMap { all[$0] }.first
+    }
     @State private var started = false
     @State private var adding = false
     @State private var failed = false
@@ -200,7 +208,7 @@ struct MedAddView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: "탕약", note: scheduleId == nil ? "약 추가" : "약 고치기", icon: "chevron.left", iconLabel: "탕약으로 돌아가기") { dismiss() }
-            ScrollViewReader { scroller in ScrollView {
+            ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let editing {
                         fixedWho(editing)
@@ -215,21 +223,21 @@ struct MedAddView: View {
                     frequency
                     OkcheMenuPicker(label: "먹이는 방법", note: "(선택)", options: MedSchedules.howTos, selection: $form.howTo, inline: false)
                     if scheduleId != nil { note("횟수·시간·양을 바꾸면 지금부터 새로 세요. 지난 기록은 그대로예요.") }
-                    OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                    VStack(spacing: 4) {
-                        Button("저장하기") { save(scroller) }.buttonStyle(.okchePrimary)
-                        if scheduleId != nil {
-                            Button { stopping = true } label: {
-                                Text("이 약 그만 먹이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
-                                    .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
-                .padding(.top, 8).padding(.bottom, OkcheSpacing.space6)
-            } }
+                .padding(.top, 8).padding(.bottom, OkcheSpacing.space4)
+            }
+            .okcheFooter {
+                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+                Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing)
+                if scheduleId != nil {
+                    Button { stopping = true } label: {
+                        Text("이 약 그만 먹이기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
@@ -267,7 +275,7 @@ struct MedAddView: View {
             OkcheFieldLabel(title: "누가 먹나요?", note: "(여럿 고를 수 있어요)").accessibilityAddTraits(.isHeader)
             OkcheChoiceChips(options: alive.map { ($0.id, $0.name) }, multiple: true, isOn: { form.petIds.contains($0) }) { id in
                 if let i = form.petIds.firstIndex(of: id) { form.petIds.remove(at: i) } else { form.petIds.append(id) }
-                errors[.pets] = nil
+                touched.insert(.pets)
             }
             note("여럿 고르면 아이마다 따로 만들어져요. 양·시간은 나중에 아이마다 고칠 수 있어요.")
             OkcheFieldError(message: errors[.pets])
@@ -312,7 +320,7 @@ struct MedAddView: View {
                     OkcheChoiceChips(options: (1...7).map { ($0, MedSchedules.weekdayNames[$0 - 1]) }, multiple: true,
                                      isOn: { form.weekdays.contains($0) }) { d in
                         if let i = form.weekdays.firstIndex(of: d) { form.weekdays.remove(at: i) } else { form.weekdays.append(d) }
-                        errors[.weekdays] = nil
+                        touched.insert(.weekdays)
                     }
                     .id(MedSchedules.Field.weekdays)
                 }
@@ -390,7 +398,7 @@ struct MedAddView: View {
     }
 
     private func field(_ key: WritableKeyPath<MedSchedules.Form, String>, _ error: MedSchedules.Field) -> Binding<String> {
-        Binding(get: { form[keyPath: key] }, set: { form[keyPath: key] = $0; errors[error] = nil })
+        Binding(get: { form[keyPath: key] }, set: { form[keyPath: key] = $0; touched.insert(error) })
     }
 
     // MARK: 동작
@@ -468,8 +476,8 @@ struct MedAddView: View {
         form.medicationId = med.id
         pickedUnit = med.unit
         form.dose = MedRules.number(med.doseAmount) // 그 약의 '한 번에'
-        errors[.med] = nil
-        errors[.dose] = nil
+        touched.insert(.med)
+        touched.insert(.dose)
     }
 
     private func addTime() {
@@ -478,7 +486,7 @@ struct MedAddView: View {
         let candidates = ["08:00", "21:00"] + (0..<24).map { String(format: "%02d:00", (12 + $0) % 24) }
         if let next = candidates.first(where: { !used.contains($0) }) {
             form.times.append(next)
-            errors[.times] = nil
+            touched.insert(.times)
         }
     }
 
@@ -500,15 +508,8 @@ struct MedAddView: View {
         })
     }
 
-    private func save(_ scroller: ScrollViewProxy) {
-        guard !saving else { return }
-        errors = MedSchedules.errors(form)
-        // 화면 위에서부터 첫 오류 칸으로 옮겨 가 눈에 보이게.
-        if let first = [MedSchedules.Field.pets, .med, .dose, .everyDays, .weekdays, .everyHours, .times].first(where: { errors[$0] != nil }) {
-            withAnimation { scroller.scrollTo(first, anchor: .center) }
-            AccessibilityNotification.Announcement(errors.count == 1 ? errors[first]! : "고칠 곳 \(errors.count)개. \(errors[first]!)").post()
-            return
-        }
+    private func save() {
+        guard !saving, missing == nil else { return }
         saving = true
         do {
             if let editing, let original {

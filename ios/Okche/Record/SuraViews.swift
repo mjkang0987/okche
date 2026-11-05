@@ -439,11 +439,13 @@ struct MealTimeSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12).padding(.horizontal, 14)
                     .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                OkcheFieldError(message: error)
-                Button("저장하기", action: save).buttonStyle(.okchePrimary)
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
+        }
+        .okcheFooter {
+            OkcheFieldError(message: error)
+            Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(problem)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -529,23 +531,21 @@ struct MealTimeSheet: View {
         }
     }
 
-    /// 시간 겹침 안 됨, 준 양은 0~2000 정수(비우면 없음), 급식기는 끼니 1개 이상.
-    private func save() {
-        guard !saving else { return } // 두 번 눌러 계획 줄이 하나 더 생기지 않게
-        if Set(rows.map(\.time)).count != rows.count {
-            return fail("같은 시간의 끼니가 있어요. 시간을 바꿔 주세요.")
-        }
-        if feeder && rows.isEmpty {
-            return fail("급식기는 끼니 시간을 하나 이상 넣어 주세요.")
-        }
-        var slots: [MealSlot] = []
-        for row in rows {
+    /// 고칠 것(있으면 저장 버튼은 흐리게): 시간 겹침 안 됨, 준 양은 0~2000 정수(비우면 없음), 급식기는 끼니 1개 이상.
+    private var problem: String? {
+        if Set(rows.map(\.time)).count != rows.count { return "같은 시간의 끼니가 있어요. 시간을 바꿔 주세요." }
+        if feeder && rows.isEmpty { return "급식기는 끼니 시간을 하나 이상 넣어 주세요." }
+        let badGrams = rows.contains { row in
             let text = row.grams.trimmingCharacters(in: .whitespaces)
-            let grams = text.isEmpty ? nil : Int(text)
-            if !text.isEmpty && !(grams.map { (0...2000).contains($0) } ?? false) {
-                return fail("준 양은 0에서 2000 사이 숫자로 넣어 주세요.")
-            }
-            slots.append(MealSlot(name: "", time: row.time, grams: grams))
+            return !text.isEmpty && !(Int(text).map { (0...2000).contains($0) } ?? false)
+        }
+        return badGrams ? "준 양은 0에서 2000 사이 숫자로 넣어 주세요." : nil
+    }
+
+    private func save() {
+        guard !saving, problem == nil else { return } // 두 번 눌러 계획 줄이 하나 더 생기지 않게
+        let slots = rows.map { row in
+            MealSlot(name: "", time: row.time, grams: Int(row.grams.trimmingCharacters(in: .whitespaces)))
         }
         saving = true
         do {

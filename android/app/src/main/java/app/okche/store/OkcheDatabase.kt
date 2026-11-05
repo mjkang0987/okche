@@ -15,7 +15,7 @@ import androidx.room.TypeConverters
         Pet::class, RestPeriod::class, Record::class, Medication::class, MedSchedule::class, InsulinPlan::class,
         Food::class, FoodChange::class, Snack::class, MealPlan::class, Photo::class, PhotoPet::class, Setting::class,
     ],
-    version = 1,
+    version = 2,
 )
 @TypeConverters(Converters::class)
 abstract class OkcheDatabase : RoomDatabase() {
@@ -25,8 +25,15 @@ abstract class OkcheDatabase : RoomDatabase() {
         @Volatile private var instance: OkcheDatabase? = null
 
         fun get(context: Context): OkcheDatabase = instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(context.applicationContext, OkcheDatabase::class.java, "okche.db").build()
+            instance ?: Room.databaseBuilder(context.applicationContext, OkcheDatabase::class.java, "okche.db").addMigrations(MIGRATION_1_2).build()
                 .also { instance = it }
         }
+    }
+}
+
+/** 1 → 2 (8-4a): 약 주기에 '안 줬으면 다시 알림'. */
+val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE med_schedule ADD COLUMN remind_again_minutes INTEGER NOT NULL DEFAULT 0")
     }
 }

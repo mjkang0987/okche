@@ -105,6 +105,8 @@ final class MedSchedule {
     var reminder: Bool
     /// 0, 5, 10, 15, 30, 60
     var leadMinutes: Int
+    /// 안 줬으면 다시 알림 0(안 함)·10·30·60 — 먹일 시각 + 이 분에 차례가 남아 있으면 한 번 더.
+    var remindAgainMinutes: Int = 0
     var activeFrom: Date
     /// 이 시각은 포함하지 않음.
     var activeUntil: Date?
@@ -113,7 +115,7 @@ final class MedSchedule {
          amount: Double, unit: DoseUnit, frequency: MedFrequency, times: [String] = [], everyDays: Int? = nil,
          startDate: String? = nil, weekdays: [Int] = [], everyHours: Int? = nil, firstAt: Date? = nil,
          shiftOnLate: Bool = true, howTo: HowTo? = nil, reminder: Bool = true, leadMinutes: Int = 10,
-         activeFrom: Date, activeUntil: Date? = nil) {
+         remindAgainMinutes: Int = 0, activeFrom: Date, activeUntil: Date? = nil) {
         self.id = id
         createdAt = now
         updatedAt = now
@@ -133,6 +135,7 @@ final class MedSchedule {
         self.howTo = howTo
         self.reminder = reminder
         self.leadMinutes = leadMinutes
+        self.remindAgainMinutes = remindAgainMinutes
         self.activeFrom = activeFrom
         self.activeUntil = activeUntil
     }

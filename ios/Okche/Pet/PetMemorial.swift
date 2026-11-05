@@ -49,7 +49,7 @@ enum PetLifecycle {
                                        unit: m.unit, frequency: m.frequency, times: m.times, everyDays: m.everyDays,
                                        startDate: m.startDate, weekdays: m.weekdays, everyHours: m.everyHours, firstAt: m.firstAt,
                                        shiftOnLate: m.shiftOnLate, howTo: m.howTo, reminder: m.reminder,
-                                       leadMinutes: m.leadMinutes, activeFrom: now))
+                                       leadMinutes: m.leadMinutes, remindAgainMinutes: m.remindAgainMinutes, activeFrom: now))
         }
         for p in insulin {
             context.insert(InsulinPlan(now: now, petId: petId, name: p.name, syringe: p.syringe, slots: p.slots,

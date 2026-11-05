@@ -78,6 +78,8 @@ data class MedSchedule(
     val reminder: Boolean = true,
     /** 0, 5, 10, 15, 30, 60 */
     @ColumnInfo(name = "lead_minutes") val leadMinutes: Int = 10,
+    /** 안 줬으면 다시 알림: 0(안 함), 10, 30, 60 */
+    @ColumnInfo(name = "remind_again_minutes", defaultValue = "0") val remindAgainMinutes: Int = 0,
     @ColumnInfo(name = "active_from") val activeFrom: Long,
     /** 이 시각은 포함하지 않음. */
     @ColumnInfo(name = "active_until") val activeUntil: Long? = null,

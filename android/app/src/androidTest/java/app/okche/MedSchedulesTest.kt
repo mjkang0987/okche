@@ -258,6 +258,22 @@ class MedChangeTest {
         assertNull(all().first { it.id == rows[1].id }.activeUntil) // 다른 아이 줄 그대로
     }
 
+    /** 새 줄에 칸 값이 다 들어가고, 다시 알림만 바꾸면 그 줄을 고침(5장). */
+    @Test fun againChangeSameRow() = runBlocking {
+        val t0 = at(2026, 10, 27, 7)
+        val f = ScheduleFields(
+            petIds = listOf(newId()), medicationId = newId(), frequency = MedFrequency.everyNHours, everyHours = "8", firstAt = at(2026, 10, 27, 8),
+            shiftOnLate = false, howTo = HowTo.inFood, leadMinutes = 30, remindAgainMinutes = 10,
+        )
+        val s = addSchedules(dao, f, DoseUnit.pill, t0).single()
+        assertEquals(listOf<Any?>(false, HowTo.inFood, 30, 10), all().single().let { listOf(it.shiftOnLate, it.howTo, it.leadMinutes, it.remindAgainMinutes) })
+        val original = app.okche.ui.med.scheduleFieldsOf(s, s.firstAt!!)
+        assertEquals(10, original.remindAgainMinutes)
+        assertEquals(app.okche.ui.med.ChangeResult.SameRow, app.okche.ui.med.changeSchedule(dao, s, original, original.copy(remindAgainMinutes = 60), at(2026, 10, 27, 9)))
+        assertEquals(60, all().single().remindAgainMinutes)
+        assertNull(all().single().activeUntil)
+    }
+
     @Test fun stopAndFirstAtPrefill() = runBlocking {
         val t0 = at(2026, 10, 27, 7)
         val hours = make(MedFrequency.everyNHours, listOf(newId()), t0)[0]

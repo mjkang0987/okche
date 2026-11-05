@@ -29,6 +29,8 @@ val medFrequencies = listOf(
 )
 val howTos = listOf(HowTo.plain to "그냥 먹여요", HowTo.inFood to "사료에 섞어요", HowTo.inTreat to "간식에 숨겨요", HowTo.syringe to "주사기로 먹여요")
 val medLeadChoices = listOf(0 to "먹일 시간에", 5 to "5분 전", 10 to "10분 전", 15 to "15분 전", 30 to "30분 전", 60 to "1시간 전")
+/** 안 줬으면 다시 알림 고르기(데이터 5장 `remindAgainMinutes`). */
+val againChoices = listOf(0 to "안 함", 10 to "10분 뒤", 30 to "30분 뒤", 60 to "1시간 뒤")
 /** ISO 요일(월=1) 글자. */
 val weekdayNames = listOf("월", "화", "수", "목", "금", "토", "일")
 
@@ -187,6 +189,7 @@ data class ScheduleFields(
     val shiftOnLate: Boolean = true,
     val reminder: Boolean = true,
     val leadMinutes: Int = 10,
+    val remindAgainMinutes: Int = 0,
     val howTo: HowTo = HowTo.plain,
 )
 
@@ -233,7 +236,7 @@ private fun buildRows(f: ScheduleFields, unit: DoseUnit, now: Long): List<MedSch
             weekdays = if (f.frequency == MedFrequency.weekdays) f.weekdays.sorted() else emptyList(),
             everyHours = if (hours) f.everyHours.toWholeNumber() else null, firstAt = if (hours) maxOf(f.firstAt, roundedUp(now)) else null, // 지금보다 이르면 지금(폼을 오래 열어 둬도 첫 차례가 빠지지 않게)
             shiftOnLate = f.shiftOnLate, howTo = f.howTo, reminder = f.frequency != MedFrequency.asNeeded && f.reminder,
-            leadMinutes = f.leadMinutes, activeFrom = now,
+            leadMinutes = f.leadMinutes, remindAgainMinutes = f.remindAgainMinutes, activeFrom = now,
         )
     }
     return rows
@@ -247,7 +250,8 @@ fun scheduleFieldsOf(s: MedSchedule, firstAt: Long) = ScheduleFields(
     // 며칠마다가 아니던 줄을 며칠마다로 바꾸면 시작하는 날은 6시 기준 오늘(약 추가와 같음).
     everyDays = (s.everyDays ?: 2).toString(), startDate = runCatching { LocalDate.parse(s.startDate ?: app.okche.store.OkcheDay.of(System.currentTimeMillis())) }.getOrElse { LocalDate.now() },
     weekdays = s.weekdays.sorted(), times = s.times.sorted().ifEmpty { listOf("08:00") }, everyHours = (s.everyHours ?: 8).toString(),
-    firstAt = firstAt, shiftOnLate = s.shiftOnLate, reminder = s.reminder, leadMinutes = s.leadMinutes, howTo = s.howTo ?: HowTo.plain,
+    firstAt = firstAt, shiftOnLate = s.shiftOnLate, reminder = s.reminder, leadMinutes = s.leadMinutes,
+    remindAgainMinutes = s.remindAgainMinutes, howTo = s.howTo ?: HowTo.plain,
 )
 
 /**
@@ -283,7 +287,7 @@ private fun core(f: ScheduleFields): List<Any?> {
 
 enum class ChangeResult { None, SameRow, NewRow }
 
-/** 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로. */
+/** 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·다시 알림·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로. */
 suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFields, f: ScheduleFields, now: Long = System.currentTimeMillis()): ChangeResult {
     if (f == original || s.activeUntil != null) return ChangeResult.None // 닫힌 줄은 되살리지 않음
     if (core(f) != core(original)) {
@@ -292,7 +296,7 @@ suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFiel
         dao.replaceSchedule(s.copy(activeUntil = now, updatedAt = now), row)
         return ChangeResult.NewRow
     }
-    dao.update(s.copy(reminder = f.frequency != MedFrequency.asNeeded && f.reminder, leadMinutes = f.leadMinutes, howTo = f.howTo, updatedAt = now))
+    dao.update(s.copy(reminder = f.frequency != MedFrequency.asNeeded && f.reminder, leadMinutes = f.leadMinutes, remindAgainMinutes = f.remindAgainMinutes, howTo = f.howTo, updatedAt = now))
     return ChangeResult.SameRow
 }
 

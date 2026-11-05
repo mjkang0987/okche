@@ -589,7 +589,10 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
             if (f.frequency == MedFrequency.everyNHours) "차례마다 알림 보내기" else "시간마다 알림 보내기", "", f.reminder,
             { v -> edit("reminder") { copy(reminder = v) } },
         )
-        OkcheMenuPicker("알림 보낼 때", medLeadChoices, f.leadMinutes, { v -> edit("lead") { copy(leadMinutes = v) } })
+        if (f.reminder) {
+            OkcheMenuPicker("알림 보낼 때", medLeadChoices, f.leadMinutes, { v -> edit("lead") { copy(leadMinutes = v) } })
+            OkcheMenuPicker("안 줬으면 다시 알림", againChoices, f.remindAgainMinutes, { v -> edit("again") { copy(remindAgainMinutes = v) } })
+        }
     }
 }
 

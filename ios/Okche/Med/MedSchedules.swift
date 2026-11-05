@@ -8,6 +8,7 @@ enum MedSchedules {
     ]
     static let howTos: [(value: HowTo, title: String)] = [(.plain, "그냥 먹여요"), (.inFood, "사료에 섞어요"), (.inTreat, "간식에 숨겨요"), (.syringe, "주사기로 먹여요")]
     static let leadChoices: [(minutes: Int, title: String)] = [(0, "먹일 시간에"), (5, "5분 전"), (10, "10분 전"), (15, "15분 전"), (30, "30분 전"), (60, "1시간 전")]
+    static let againChoices: [(minutes: Int, title: String)] = [(0, "안 함"), (10, "10분 뒤"), (30, "30분 뒤"), (60, "1시간 뒤")]
     /// ISO 요일(월=1) 글자.
     static let weekdayNames = ["월", "화", "수", "목", "금", "토", "일"]
 
@@ -205,6 +206,7 @@ enum MedSchedules {
         var shiftOnLate = true
         var reminder = true
         var leadMinutes = 10
+        var remindAgainMinutes = 0
         var howTo = HowTo.plain
     }
 
@@ -255,8 +257,10 @@ enum MedSchedules {
                         startDate: f.frequency == .everyNDays ? PetRegistration.day(f.startDate, .okcheDevice) : nil,
                         weekdays: f.frequency == .weekdays ? f.weekdays.sorted() : [],
                         everyHours: hours ? PetRegistration.wholeNumber(f.everyHours.trimmingCharacters(in: .whitespaces)) : nil,
-                        firstAt: hours ? max(f.firstAt, roundedUp(now)) : nil, // 지금보다 이르면 지금(폼을 오래 열어 둬도 첫 차례가 빠지지 않게) shiftOnLate: f.shiftOnLate, howTo: f.howTo,
-                        reminder: f.frequency == .asNeeded ? false : f.reminder, leadMinutes: f.leadMinutes, activeFrom: now)
+                        // 지금보다 이르면 지금(폼을 오래 열어 둬도 첫 차례가 빠지지 않게).
+                        firstAt: hours ? max(f.firstAt, roundedUp(now)) : nil, shiftOnLate: f.shiftOnLate, howTo: f.howTo,
+                        reminder: f.frequency == .asNeeded ? false : f.reminder, leadMinutes: f.leadMinutes,
+                        remindAgainMinutes: f.remindAgainMinutes, activeFrom: now)
         }
         return made
     }
@@ -280,6 +284,7 @@ enum MedSchedules {
         f.shiftOnLate = s.shiftOnLate
         f.reminder = s.reminder
         f.leadMinutes = s.leadMinutes
+        f.remindAgainMinutes = s.remindAgainMinutes
         f.howTo = s.howTo ?? .plain
         return f
     }
@@ -340,7 +345,7 @@ enum MedSchedules {
 
     enum ChangeResult: Equatable { case none, sameRow, newRow }
 
-    /// 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로.
+    /// 고치기 저장(5장): 횟수·시간·양 → 그 줄을 닫고 같은 `seriesId`로 새 줄, 알림·몇 분 전·다시 알림·먹이는 방법만 → 그 줄을 고침, 안 바꿨으면 그대로.
     @discardableResult
     static func change(_ s: MedSchedule, from original: Form, to f: Form, now: Date = .now, in context: ModelContext) throws -> ChangeResult {
         guard f != original, s.activeUntil == nil else { return .none } // 닫힌 줄은 되살리지 않음
@@ -360,6 +365,7 @@ enum MedSchedules {
         }
         s.reminder = f.frequency == .asNeeded ? false : f.reminder
         s.leadMinutes = f.leadMinutes
+        s.remindAgainMinutes = f.remindAgainMinutes
         s.howTo = f.howTo
         s.updatedAt = now
         try save(context)

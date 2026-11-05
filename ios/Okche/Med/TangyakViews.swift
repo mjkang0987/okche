@@ -406,7 +406,11 @@ struct MedAddView: View {
                     OkcheFieldError(message: errors[.times])
                 }
                 OkcheSwitchRow(title: form.frequency == .everyNHours ? "차례마다 알림 보내기" : "시간마다 알림 보내기", isOn: $form.reminder)
-                OkcheMenuPicker(label: "알림 보낼 때", options: MedSchedules.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)
+                // 알림을 끄면 '알림 보낼 때'·'다시 알림'은 숨김(8-4).
+                if form.reminder {
+                    OkcheMenuPicker(label: "알림 보낼 때", options: MedSchedules.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)
+                    OkcheMenuPicker(label: "안 줬으면 다시 알림", options: MedSchedules.againChoices.map { ($0.minutes, $0.title) }, selection: $form.remindAgainMinutes)
+                }
             }
         }
     }

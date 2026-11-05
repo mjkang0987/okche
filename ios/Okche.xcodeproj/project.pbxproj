@@ -23,6 +23,7 @@
 		36D433BA612453B341D24296 /* FoodViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C43BC7334DDC910B21B9BC5 /* FoodViews.swift */; };
 		3845BBC987E9608D145B36D1 /* RecordDetailTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC5A22B158B3162629C6935 /* RecordDetailTests.swift */; };
 		3F842F5BE36A90FE38166270 /* FoodRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 935B4FE477BE31CBAFE4B4E1 /* FoodRulesTests.swift */; };
+		40D83CD78156D172A07B7055 /* MedNotifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24746FB0B75D33397B72821 /* MedNotifyTests.swift */; };
 		47B5D69BEBA333C23CA3FCEC /* OkcheApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */; };
 		47E69A733C055FBF45DB1209 /* RecordDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587A130CDC735508E9872722 /* RecordDetailViews.swift */; };
 		49EA965508951840BD7CFB45 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B64C52723E00E8751B628DCD /* MainView.swift */; };
@@ -47,6 +48,7 @@
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
 		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
 		903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0275EB8CA7B29A763A8B16D3 /* MainCard.swift */; };
+		95ABC1DC5E7B906B146994BC /* MedNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E39E7464C390CAF358F0AA5 /* MedNotify.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
 		993F2F797C959E00151D1DE4 /* MealRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F73F64B813195814FFBB6A /* MealRulesTests.swift */; };
 		A490AFA4074C1845E2F45C69 /* MedSchedules.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9272A3825D3B69753AFF2C0 /* MedSchedules.swift */; };
@@ -114,6 +116,7 @@
 		4237F70768EE44C9E0C8879D /* MealRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRules.swift; sourceTree = "<group>"; };
 		465382965673124E58129062 /* PetRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistrationTests.swift; sourceTree = "<group>"; };
 		473738171DE9AE6187DF447C /* Setting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Setting.swift; sourceTree = "<group>"; };
+		4E39E7464C390CAF358F0AA5 /* MedNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedNotify.swift; sourceTree = "<group>"; };
 		5119E23AD833065A0FAF7789 /* Record.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Record.swift; sourceTree = "<group>"; };
 		587A130CDC735508E9872722 /* RecordDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordDetailViews.swift; sourceTree = "<group>"; };
 		5A4BF4CD6AC6701107CCE7DA /* YakbangTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YakbangTests.swift; sourceTree = "<group>"; };
@@ -147,6 +150,7 @@
 		CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheApp.swift; sourceTree = "<group>"; };
 		D1A30483ED372C0D7CC3D663 /* SuraViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuraViews.swift; sourceTree = "<group>"; };
 		D1A3F2256A1A50E4C05ADCC8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D24746FB0B75D33397B72821 /* MedNotifyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedNotifyTests.swift; sourceTree = "<group>"; };
 		D5A3B487406661C9AA6598AC /* PetMemorialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetMemorialTests.swift; sourceTree = "<group>"; };
 		D7D6C2E378358E8E76912918 /* Pet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pet.swift; sourceTree = "<group>"; };
 		D9272A3825D3B69753AFF2C0 /* MedSchedules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedSchedules.swift; sourceTree = "<group>"; };
@@ -216,6 +220,7 @@
 				5B035B4439988F35D74E2301 /* Food */,
 				14418F3198CF6A5506552208 /* Main */,
 				14BD6FDF1BD4A4ECAA26416B /* Med */,
+				C56DE62EC115C23D14F4B236 /* Notify */,
 				668FCDBAAA3D289747A49494 /* Pet */,
 				EE34943794570AE9DF0CF728 /* Record */,
 				145D616F467EADC0B735C0ED /* Store */,
@@ -276,6 +281,7 @@
 				935B4FE477BE31CBAFE4B4E1 /* FoodRulesTests.swift */,
 				F2E96E8F46489BFC87729621 /* MainCardTests.swift */,
 				33F73F64B813195814FFBB6A /* MealRulesTests.swift */,
+				D24746FB0B75D33397B72821 /* MedNotifyTests.swift */,
 				F57E6ED410BA84EDC2095BEF /* MedSchedulesTests.swift */,
 				082864CCFDA593EE4B31CBD5 /* MedSlotsTests.swift */,
 				650B5CE9E60CE1C7C6FCB96A /* OkcheTests.swift */,
@@ -315,6 +321,14 @@
 				6CBACD4702BCB2779A7EAB76 /* OkcheUITests */,
 				536C334B158539884270DE68 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		C56DE62EC115C23D14F4B236 /* Notify */ = {
+			isa = PBXGroup;
+			children = (
+				4E39E7464C390CAF358F0AA5 /* MedNotify.swift */,
+			);
+			path = Notify;
 			sourceTree = "<group>";
 		};
 		CC6296CEC67F4E91A4464E36 /* Tabs */ = {
@@ -451,6 +465,7 @@
 				3F842F5BE36A90FE38166270 /* FoodRulesTests.swift in Sources */,
 				59772EFB793215AC18BF8358 /* MainCardTests.swift in Sources */,
 				993F2F797C959E00151D1DE4 /* MealRulesTests.swift in Sources */,
+				40D83CD78156D172A07B7055 /* MedNotifyTests.swift in Sources */,
 				0C9ABCF374B5DECB6D561680 /* MedSchedulesTests.swift in Sources */,
 				6340AEE5F76504041780F497 /* MedSlotsTests.swift in Sources */,
 				B98102180DE4DD53B6377DCA /* OkcheTests.swift in Sources */,
@@ -488,6 +503,7 @@
 				903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */,
 				49EA965508951840BD7CFB45 /* MainView.swift in Sources */,
 				790F42C0FF0254712506CDB9 /* MealRules.swift in Sources */,
+				95ABC1DC5E7B906B146994BC /* MedNotify.swift in Sources */,
 				650F987FDC0C7A0F5D0571FD /* MedRules.swift in Sources */,
 				A490AFA4074C1845E2F45C69 /* MedSchedules.swift in Sources */,
 				8900F8EC917DF5EEC04483A8 /* MedSheetViews.swift in Sources */,

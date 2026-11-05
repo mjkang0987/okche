@@ -3,6 +3,7 @@ package app.okche
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -146,15 +147,15 @@ class SnackFlowTest {
         waitFor(hasText("+ 다과 · 간식 남기기"))
         rule.onNode(hasText("+ 다과 · 간식 남기기")).performScrollTo().performClick()
         waitFor(hasText("+ 새 다과 들이기")) // 다과가 없으면 들이기만
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
-        waitFor(hasText("어떤 다과를 줬는지 골라 주세요"))
+        rule.onNode(hasText("기록하기").and(hasClickAction())).assertIsNotEnabled() // 덜 채우면 흐리게 + 남은 것
+        waitFor(hasText("어떤 다과를 줬는지 고르면 기록할 수 있어요"))
         rule.onNode(hasText("+ 새 다과 들이기")).performScrollTo().performClick()
         waitFor(hasText("다과에 들이고 고르기"))
         rule.onNode(hasSetTextAction().and(hasText("간식 이름", substring = true))).performTextInput("연어 퓨레")
         rule.onNode(hasText("다과에 들이고 고르기").and(hasClickAction())).performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(isSelected().and(hasText("연어 퓨레", substring = true))).fetchSemanticsNodes().isNotEmpty() } // 바로 골라짐
         rule.onNode(hasSetTextAction().and(hasText("얼마나 줬나요?", substring = true))).performTextInput("반 개")
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("다과에 들이고 고르기")).fetchSemanticsNodes().isEmpty() && rule.onAllNodes(hasText("얼마나 줬나요?", substring = true)).fetchSemanticsNodes().isEmpty() }
         waitFor(hasText("다과 연어 퓨레 · 반 개", substring = true).and(hasText("아뢰었사옵니다", substring = true))) // 수라 화면에 방금 남긴 다과
         rule.onNode(hasContentDescription("뒤로")).performClick()

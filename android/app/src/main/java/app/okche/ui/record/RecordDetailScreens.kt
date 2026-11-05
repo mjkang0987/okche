@@ -118,10 +118,12 @@ fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, B
     }
 
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
+        Column {
         Column(
             Modifier
+                .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState())
-                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+                .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -164,6 +166,9 @@ fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, B
                 }
             }
             Warning(kind) { alerting = true }
+        }
+        // 자세히 기록은 고를 칸이 모두 선택이라 늘 누를 수 있음.
+        app.okche.ui.OkcheFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
             OkchePrimaryButton("기록하기", {
                 if (busy) return@OkchePrimaryButton
@@ -184,6 +189,7 @@ fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, B
                         }
                 }
             })
+        }
         }
     }
     if (alerting) GuideLayer(kind) { alerting = false }

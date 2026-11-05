@@ -60,6 +60,8 @@ import app.okche.ui.ButtonLook
 import app.okche.ui.OkcheChoiceCards
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheErrorText
+import app.okche.ui.OkcheFooter
+import app.okche.ui.OkcheFooterButton
 import app.okche.ui.OkchePrimaryButton
 import app.okche.ui.OkcheTextField
 import app.okche.ui.pet.DateField
@@ -116,12 +118,7 @@ fun FoodChangeSheet(pet: Pet, onClose: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
 
     fun save() {
-        if (busy) return
-        if (name.isBlank()) {
-            nameError = "사료 이름을 넣어 주세요"
-            view.announceForAccessibility("사료 이름을 넣어 주세요")
-            return
-        }
+        if (busy || name.isBlank()) return
         busy = true
         scope.launch {
             // 오늘 뒤는 안 됨 — 오늘 = 6시 기준(달력에선 자정 뒤 날짜도 고를 수 있어 여기서 맞춤).
@@ -148,7 +145,7 @@ fun FoodChangeSheet(pet: Pet, onClose: () -> Unit) {
         ) {
             SheetHeader({ Text("${pet.name} · 사료 바꾸기", it, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle()) }, onClose)
             OkcheTextField(
-                name, { name = it; if (it.isNotBlank()) nameError = null }, "사료 이름",
+                name, { name = it; nameError = if (it.isBlank()) "사료 이름을 넣어 주세요" else null }, "사료 이름",
                 placeholder = "예: 가수분해 처방식 1.5kg", error = nameError,
             )
             val previous = previousFoodNames(pet.id, OkcheDay.of(System.currentTimeMillis()), changes, foods)
@@ -170,13 +167,9 @@ fun FoodChangeSheet(pet: Pet, onClose: () -> Unit) {
                 color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
             )
         }
-        HorizontalDivider(color = OkcheColor.Line)
-        Column(
-            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = OkcheSpacing.Space6),
-            verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
-        ) {
+        OkcheFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton("바꾸기", ::save)
+            OkcheFooterButton("바꾸기", ::save, if (name.isBlank()) "사료 이름을 넣으면 바꿀 수 있어요" else null)
         }
     }
 }

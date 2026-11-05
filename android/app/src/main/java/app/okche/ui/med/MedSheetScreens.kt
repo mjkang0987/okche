@@ -52,6 +52,8 @@ import app.okche.store.Pet
 import app.okche.store.Record
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheErrorText
+import app.okche.ui.OkcheFooter
+import app.okche.ui.OkcheFooterButton
 import app.okche.ui.OkcheFieldLabel
 import app.okche.ui.OkchePrimaryButton
 import app.okche.ui.OkcheTextField
@@ -84,30 +86,6 @@ private fun SheetHeader(title: String, subtitle: String? = null, onClose: () -> 
         )
         IconButton(onClose) { Icon(Icons.Outlined.Close, "닫기", tint = OkcheColor.Ink) }
     }
-}
-
-/** 시트 아래에 붙은 '기록하기'(보드 MedSheet·MedExtra — 차례가 많아도 늘 보이게, 2026-11-05 사용자): 위 선 + 한지 바탕. */
-@Composable
-private fun StickyFooter(content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(OkcheColor.Hanji)) {
-        HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
-        Column(
-            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = 8.dp), // 시트가 기기 아래 막대 자리를 따로 둠(iOS와 같게)
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) { content() }
-    }
-}
-
-/** 아래 고정 주 버튼: [hint]가 있으면(덜 채움) 흐리게 + 바로 위에 남은 것 한 줄(화면 읽기는 버튼 앞에서 읽음). */
-@Composable
-private fun FooterButton(text: String, onClick: () -> Unit, hint: String?) {
-    if (hint != null) Text(hint, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-    // 공용 버튼은 못 누를 때도 같은 색이라 여기서 흐리게. 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
-    OkchePrimaryButton(
-        text, onClick,
-        Modifier.alpha(if (hint == null) 1f else 0.45f).semantics { if (hint != null) stateDescription = hint },
-        enabled = hint == null,
-    )
 }
 
 @Composable
@@ -208,10 +186,10 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
             }
         }
         // 남은 차례가 없으면 버튼도 없음(모두 기록함).
-        if (entries.orEmpty().any { it.record == null }) StickyFooter {
+        if (entries.orEmpty().any { it.record == null }) OkcheFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
             // 덜 채우면 흐리게 + 남은 것 안내(2026-11-05 사용자).
-            FooterButton("기록하기", ::save, if (picks.isEmpty()) "먹인 약을 하나 이상 고르면 기록할 수 있어요" else null)
+            OkcheFooterButton("기록하기", ::save, if (picks.isEmpty()) "먹인 약을 하나 이상 고르면 기록할 수 있어요" else null)
         }
         }
     }
@@ -313,9 +291,9 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
                 Text("정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
         }
-        StickyFooter {
+        OkcheFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            FooterButton("기록하기", ::save, missing)
+            OkcheFooterButton("기록하기", ::save, missing)
         }
         }
     }

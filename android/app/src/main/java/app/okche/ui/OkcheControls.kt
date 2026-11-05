@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -573,4 +574,32 @@ fun <T> OkcheMenuPicker(label: String, options: List<Pair<T, String>>, selected:
         // 내용 너비(최소 150) — 보드처럼 이름 오른쪽에, 큰 글자에선 다음 줄로.
         field(Modifier.widthIn(min = 150.dp).width(IntrinsicSize.Max))
     }
+}
+
+// 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게).
+
+/** 화면·시트 아래에 붙은 주 버튼 칸: 위 선 + 한지 바탕(스크롤 밖에 두어 늘 보이게). iOS `okcheFooter`와 같은 모양. */
+@Composable
+fun OkcheFooter(content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(OkcheColor.Hanji)) {
+        androidx.compose.material3.HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
+        Column(
+            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = 8.dp), // 기기 아래 막대 자리는 바깥이 둠
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { content() }
+    }
+}
+
+/**
+ * 아래 고정 주 버튼: [missing]이 있으면(덜 채움) 흐리게 + 못 누름 + 바로 위에 남은 것 한 줄.
+ * 공용 버튼은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게. iOS `okcheMissing`과 같음.
+ */
+@Composable
+fun OkcheFooterButton(text: String, onClick: () -> Unit, missing: String?) {
+    if (missing != null) Text(missing, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+    OkchePrimaryButton(
+        text, onClick,
+        Modifier.alpha(if (missing == null) 1f else 0.45f).semantics { if (missing != null) stateDescription = missing },
+        enabled = missing == null,
+    )
 }

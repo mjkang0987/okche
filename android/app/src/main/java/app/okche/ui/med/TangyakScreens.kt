@@ -307,7 +307,7 @@ fun MedAddScreen(
                 }
             },
             destructive = true,
-            message = "${pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()}의 탕약 줄과 알림에서 빠져요. 지난 기록과 약방의 약은 그대로 남아요.",
+            message = "${pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()}의 탕약 줄과 알림에서 바로 빠져요(오늘 아직 안 준 차례도). 지난 기록과 약방의 약은 그대로 남아요.",
             confirmLook = app.okche.ui.ButtonLook.Danger,
         )
     }

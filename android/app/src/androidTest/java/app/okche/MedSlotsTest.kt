@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -117,6 +118,8 @@ class MedSlotsTest {
         // 빠진 열린 줄로 준 기록은 짝 없는 기록 — 남은 차례 앞에서 하나 처리(하루 세 번 먹이지 않게).
         assertEquals(listOf(at(27, 21)), remaining(listOf(o1, row(times = listOf("09:00", "21:00"), series = o1, from = at(27, 7))),
             listOf(given(o1, key(o1, "08:00"), at(27, 8)))))
+        // 08:00 안 주고 10:00에 그만 먹이면 그날 남은 차례도 바로 빠짐(뒤를 잇는 줄 없음).
+        assertTrue(remaining(listOf(row(times = listOf("08:00", "20:00"), from = at(20, 9), until = at(27, 10))), emptyList()).isEmpty())
         // 바꾼 다음 날은 새 줄 그대로.
         assertEquals(listOf(at(28, 9), at(28, 21)), remainingSlots(listOf(s1, s2), listOf(g), pet, "2026-10-28").map { it.due })
     }
@@ -244,6 +247,8 @@ class RecordMedFlowTest {
         waitFor(hasText("프레드니솔론 줌 · ", substring = true))
         waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))
         rule.onNode(hasText("되돌리기").and(hasClickAction())).performClick()
+        waitFor(hasText("방금 남긴 기록을 되돌릴까요?")) // 확인 창 한 번
+        rule.onAllNodes(hasText("되돌리기").and(hasClickAction())).onLast().performClick()
         waitFor(give) // 차례가 줄에 돌아옴
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("탕약 프레드니솔론", substring = true)).fetchSemanticsNodes().isEmpty() }
     }
@@ -267,22 +272,22 @@ class RecordMedFlowTest {
         waitFor(hasContentDescription("탕약 자세히 남기기"))
         rule.onNode(hasContentDescription("탕약 자세히 남기기")).performClick()
         waitFor(hasText("다음 차례"))
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick() // 고른 게 없으면 안내
-        waitFor(hasText("먹인 약을 하나 이상 골라 주세요"))
+        rule.onNode(hasText("기록하기").and(hasClickAction())).assertIsNotEnabled() // 고른 게 없으면 흐리게 + 안내
+        waitFor(hasText("먹인 약을 하나 이상 고르면 기록할 수 있어요"))
         rule.onAllNodes(hasText("줬어요").and(hasClickAction()))[0].performClick()
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         waitFor(hasText("콩이 · 탕약 프레드니솔론 1알", substring = true))
         rule.onNode(hasContentDescription("탕약 자세히 남기기")).performClick()
         waitFor(hasText("에 기록함", substring = true))
         rule.onNode(hasText("+ 예정에 없던 약 남기기")).performScrollTo().performClick()
         waitFor(hasText("정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요."))
         rule.onNode(hasText("프레드니솔론").and(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))).performClick()
-        rule.onAllNodes(hasText("기록하기").and(hasClickAction())).onLast().performScrollTo().performClick() // 위에 뜬 시트의 것
+        rule.onAllNodes(hasText("기록하기").and(hasClickAction())).onLast().performClick() // 위에 뜬 시트의 것
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("+ 예정에 없던 약 남기기")).fetchSemanticsNodes().isEmpty() } // 두 시트 다 닫힘
         rule.onNode(hasContentDescription("콩이 탕약 기록 고치기", substring = true)).performScrollTo().performClick()
         waitFor(hasText("콩이 · 탕약 기록", substring = true))
         rule.onNode(hasText("먹고 토함").and(hasClickAction())).performClick()
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         waitFor(hasText("탕약 프레드니솔론 먹고 토함", substring = true))
     }
 }

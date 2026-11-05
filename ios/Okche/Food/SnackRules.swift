@@ -103,6 +103,13 @@ enum SnackRules {
         try save(context)
     }
 
+    /// 목록에서 뺀 다과 되돌리기(뺀 직후 알림의 '되돌리기').
+    static func restore(_ snack: Snack, now: Date = .now, in context: ModelContext) throws {
+        snack.deletedAt = nil
+        snack.updatedAt = now
+        try save(context)
+    }
+
     /// 다과 기록하기: 새 기록이면 넣고, 고치기면 `data`·(시간을 바꿨으면)`occurredAt`·`day`·`updatedAt`.
     @discardableResult
     static func record(snackId: UUID, amount: String, occurredAt: Date, editing: Record?, petId: UUID, now: Date = .now,

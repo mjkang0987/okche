@@ -126,6 +126,15 @@ enum QuickRecord {
         try save(context)
     }
 
+    /// 지운 기록 되돌리기(지운 직후 알림의 '되돌리기'): 지울 때 비운 `data`·`slotKey`를 돌려놓는다.
+    static func restore(_ record: Record, data: String, slotKey: String?, now: Date = .now, in context: ModelContext) throws {
+        record.deletedAt = nil
+        record.data = data
+        record.slotKey = slotKey
+        record.updatedAt = now
+        try save(context)
+    }
+
     /// `YYYY-MM-DD`를 하루 옮긴 날.
     static func shift(_ day: String, by days: Int) -> String {
         let calendar = Calendar(identifier: .gregorian)

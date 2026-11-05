@@ -10,6 +10,7 @@ struct RootTabView: View {
         TabView(selection: $tab) {
             // 디자인 아이콘은 선 모양이라, 시스템이 탭 아이콘을 채운 모양으로 바꾸지 않게 탭마다 symbolVariants를 끈다.
             RecordTab()
+                .undoToastHost()
                 .tabItem { Label("일기", systemImage: "doc.text").environment(\.symbolVariants, .none) }
                 .tag(AppTab.record)
             MainTab()
@@ -22,6 +23,7 @@ struct RootTabView: View {
                 .tabItem { Label("어진첩", systemImage: "photo").environment(\.symbolVariants, .none) }
                 .tag(AppTab.album)
             MoreTab()
+                .undoToastHost()
                 .tabItem { Label("더보기", systemImage: "ellipsis").environment(\.symbolVariants, .none) }
                 .tag(AppTab.more)
         }

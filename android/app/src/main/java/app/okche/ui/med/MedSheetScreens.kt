@@ -85,6 +85,25 @@ private fun SheetHeader(title: String, subtitle: String? = null, onClose: () -> 
     }
 }
 
+/** 시트 아래에 붙은 '기록하기'(보드 MedSheet·MedExtra — 차례가 많아도 늘 보이게, 2026-11-05 사용자): 위 선 + 한지 바탕. */
+@Composable
+private fun StickyFooter(content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(OkcheColor.Hanji)) {
+        HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
+        Column(
+            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = OkcheSpacing.Space6),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { content() }
+    }
+}
+
+/** 아래 고정 주 버튼: [hint]가 있으면(덜 채움) 흐리게 + 바로 위에 남은 것 한 줄(화면 읽기는 버튼 앞에서 읽음). */
+@Composable
+private fun FooterButton(text: String, onClick: () -> Unit, hint: String?) {
+    if (hint != null) Text(hint, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+    OkchePrimaryButton(text, onClick, enabled = hint == null)
+}
+
 @Composable
 private fun LinkText(text: String, onClick: () -> Unit) = Text(
     text,
@@ -110,7 +129,6 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
     val picks = remember { mutableStateMapOf<String, String>() }
     var extra by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    var noPick by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제 차례가 보임, 일기 탭과 같이 날 바뀜을 다룰 때 함께.
     val entries = if (schedules != null && records != null) todaySlots(schedules!!, records!!, pet.id, OkcheDay.of(System.currentTimeMillis())) else null
@@ -119,12 +137,7 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
 
     fun save() {
         val chosen = entries.orEmpty().filter { it.record == null }.mapNotNull { e -> picks[e.slot.key]?.let { e.slot to it } }
-        if (busy) return
-        if (chosen.isEmpty()) {
-            noPick = true
-            @Suppress("DEPRECATION") view.announceForAccessibility("먹인 약을 하나 이상 골라 주세요")
-            return
-        }
+        if (busy || chosen.isEmpty()) return
         busy = true
         scope.launch {
             val saved = runCatching { recordSlots(dao, chosen) }
@@ -141,8 +154,9 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
 
     if (extra) MedExtraSheet(pet, onSaved = { onSaved(listOf(it)); onClose() }) { extra = false }
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
+        Column {
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SheetHeader("${pet.name} · 탕약", "오늘 먹일 약", onClose)
@@ -175,7 +189,7 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
                             // 묶음 이름(legend)은 화면 읽기만 — '오후 9:00 프레드니솔론'. 이미 기록한 차례는 칩만 흐리게(글자는 대비 그대로).
                             OkcheChoiceChips(
                                 "${clockText(due)} ${med?.name ?: "약"}${if (recorded != null) ", 기록함" else ""}", medStatuses, recorded ?: picks[entry.slot.key],
-                                { picks[entry.slot.key] = it; noPick = false }, Modifier.alpha(if (recorded != null) 0.7f else 1f),
+                                { picks[entry.slot.key] = it }, Modifier.alpha(if (recorded != null) 0.7f else 1f),
                                 onDeselect = { picks.remove(entry.slot.key) }, hideLabel = true, enabled = recorded == null,
                             )
                         }
@@ -186,9 +200,13 @@ fun MedTodaySheet(pet: Pet, onSaved: (List<Record>) -> Unit = {}, onClose: () ->
             if (groups.isNotEmpty()) {
                 Text("'먹고 토함'은 실록에 따로 세요. 다시 먹여도 되는지는 병원에 물어보길 권해요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
-            if (noPick) OkcheErrorText("먹인 약을 하나 이상 골라 주세요") else if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            // 남은 차례가 없으면 버튼도 없음(모두 기록함).
-            if (entries.orEmpty().any { it.record == null }) OkchePrimaryButton("기록하기", ::save)
+        }
+        // 남은 차례가 없으면 버튼도 없음(모두 기록함).
+        if (entries.orEmpty().any { it.record == null }) StickyFooter {
+            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+            // 덜 채우면 흐리게 + 남은 것 안내(2026-11-05 사용자).
+            FooterButton("기록하기", ::save, if (picks.isEmpty()) "먹인 약을 하나 이상 고르면 기록할 수 있어요" else null)
+        }
         }
     }
 }
@@ -212,8 +230,6 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     var status by remember { mutableStateOf(start?.optString("status")?.takeIf { it.isNotEmpty() } ?: "given") }
     var occurredAt by remember { mutableLongStateOf(editing?.occurredAt ?: System.currentTimeMillis()) }
     var timeChanged by remember { mutableStateOf(false) }
-    var pickError by remember { mutableStateOf<String?>(null) }
-    var amountError by remember { mutableStateOf<String?>(null) }
     var adding by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -221,23 +237,22 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     val options = if (editing == null) extraMedOptions(meds, schedules, pet)
     else meds.filter { it.id == picked }.map { it to medFormTitle(it.form) } // 고치기는 약 고정(약방에서 뺀 약도)
     val med = meds.firstOrNull { it.id == picked }
+    val amountValue = amount.toDecimal()?.takeIf { it > 0 }
+    // 아직 채우지 않은 것 — 있으면 '기록하기'는 흐리게.
+    val missing = when {
+        med == null -> "어떤 약인지 고르면 기록할 수 있어요"
+        amountValue == null -> "얼마나를 0보다 큰 숫자로 넣으면 기록할 수 있어요"
+        else -> null
+    }
 
     fun pick(m: app.okche.store.Medication) {
         picked = m.id
         amount = medNumber(m.doseAmount) // 고르면 '얼마나'는 그 약의 '한 번에'
-        pickError = null
-        amountError = null
     }
 
     fun save() {
-        val value = amount.toDecimal()
-        pickError = if (med == null) "어떤 약인지 골라 주세요" else null
-        amountError = if ((value ?: 0.0) > 0) null else "0보다 큰 숫자로 넣어 주세요"
-        if (med == null || value == null || value <= 0) {
-            @Suppress("DEPRECATION") view.announceForAccessibility(listOfNotNull(pickError, amountError).joinToString(". "))
-            return
-        }
-        if (busy) return
+        val value = amountValue
+        if (med == null || value == null || busy) return
         busy = true
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         val at = if (editing == null && !timeChanged) System.currentTimeMillis() else occurredAt
@@ -262,8 +277,9 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     }
     if (adding) MedFormSheet(null, listOf(pet), records, picking = true, onAdded = { pick(it) }) { adding = false }
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
+        Column {
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             SheetHeader("${pet.name} · ${if (editing == null) "예정에 없던 약" else "탕약 기록"}", onClose = onClose)
@@ -274,9 +290,9 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
                     else SnackPickCard(m.name, detail, true, enabled = false) {} // 고정
                 }
                 if (editing == null) LinkText("+ 약방에 새 약 들이기") { adding = true }
-                pickError?.let { OkcheErrorText(it) }
             }
-            OkcheTextField(amount, { amount = it }, "얼마나", suffix = med?.let { unitTitle(it.unit) }, error = amountError,
+            OkcheTextField(amount, { amount = it }, "얼마나", suffix = med?.let { unitTitle(it.unit) },
+                error = if (amount.isEmpty() || amountValue != null) null else "0보다 큰 숫자로 넣어 주세요",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OkcheFieldLabel("언제")
@@ -291,8 +307,11 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
             if (editing == null) {
                 Text("정해 둔 시간 밖에 준 약이라 탕약 횟수(1/3)에는 들어가지 않아요. 약방 남은 양에서는 빠져요.", color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
             }
+        }
+        StickyFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton("기록하기", ::save)
+            FooterButton("기록하기", ::save, missing)
+        }
         }
     }
 }

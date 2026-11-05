@@ -167,6 +167,7 @@ struct MedAddView: View {
     /// 있으면 약 고치기(보드 `MedChange`) — 아이·약은 고정, '이 약 그만 먹이기'(8-2b).
     var scheduleId: UUID?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.showUndo) private var showUndo
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     /// 고치기 처음 값(바꾼 게 없으면 저장 안 함).
     @State private var original: MedSchedules.Form?
@@ -239,7 +240,7 @@ struct MedAddView: View {
         .fullScreenCover(isPresented: $stopping) {
             if let editing, let med = meds.first(where: { $0.id == editing.medicationId }) {
                 OkcheConfirmDialog(title: "\(PetTitle.withObjectParticle(med.name)) 그만 먹일까요?", destructive: true,
-                                   message: "\(pets.first { $0.id == editing.petId }?.name ?? "")의 탕약 줄과 알림에서 빠져요. 지난 기록과 약방의 약은 그대로 남아요.",
+                                   message: "\(pets.first { $0.id == editing.petId }?.name ?? "")의 탕약 줄과 알림에서 바로 빠져요(오늘 아직 안 준 차례도). 지난 기록과 약방의 약은 그대로 남아요.",
                                    confirm: "그만 먹이기", confirmLook: .danger, onCancel: { stopping = false }, onConfirm: stop)
                     .presentationBackground(.clear)
             }
@@ -433,6 +434,10 @@ struct MedAddView: View {
             try MedSchedules.stop(editing, in: context)
             stopping = false
             dismiss()
+            let name = meds.first { $0.id == editing.medicationId }?.name ?? "약"
+            showUndo(.removed("\(PetTitle.withObjectParticle(name)) 그만 먹이기로 했어요", show: showUndo) {
+                try MedSchedules.resume(editing, in: context)
+            })
         } catch {
             stopping = false
             failed = true

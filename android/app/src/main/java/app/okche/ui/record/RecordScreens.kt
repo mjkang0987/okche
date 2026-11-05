@@ -154,8 +154,26 @@ fun RecordTab(
     var checked by remember { mutableStateOf<CheckedMed?>(null) }
     var toast by remember { mutableStateOf<UndoToastItem?>(null) }
     var undoFailed by remember { mutableStateOf(false) }
+    var undoAsking by remember { mutableStateOf(false) }
+
     var undoRecord by remember { mutableStateOf<Record?>(null) }
-    // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
+    // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
+    fun undo(record: Record) {
+        scope.launch {
+            runCatching { deleteRecord(dao, record) }
+                .onSuccess {
+                    undoRecord = null
+                    checked = null
+                    toast = null
+                    undoFailed = false
+                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
+                }
+                .onFailure {
+                    undoFailed = true // 알림은 남겨 다시 누를 수 있게
+                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌리지 못했어요. 다시 해 주세요.")
+                }
+        }
+    }    // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
     val medLine = who?.let { id ->
         val all = schedules ?: return@let null
         val recs = medRecords ?: return@let null
@@ -239,29 +257,21 @@ fun RecordTab(
         // 되돌리기 알림이 맨 아래 내용을 가리지 않게 그만큼 더 내려가게.
         if (toast != null) Spacer(Modifier.height(toastHeight))
     }
-    // 되돌리기 = 그 기록 지우기(1-4) → 차례가 줄에 돌아옴.
     // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음.
     androidx.compose.runtime.LaunchedEffect(who) { toast = null }
     UndoToast(toast, onDismiss = {
         toast = null
         undoFailed = false // 알림이 닫히면 되돌리기 실패 문구도
     }, modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { toastHeight = with(density) { it.height.toDp() } }, onUndo = {
-        val record = undoRecord ?: return@UndoToast
-        scope.launch {
-            runCatching { deleteRecord(dao, record) }
-                .onSuccess {
-                    undoRecord = null
-                    checked = null
-                    toast = null
-                    undoFailed = false
-                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
-                }
-                .onFailure {
-                    undoFailed = true // 알림은 남겨 다시 누를 수 있게
-                    @Suppress("DEPRECATION") view.announceForAccessibility("되돌리지 못했어요. 다시 해 주세요.")
-                }
-        }
+        if (undoRecord != null) undoAsking = true // 되돌리기도 확인 창을 한 번 거친다(2026-11-05 사용자)
     })
+    }
+    undoRecord?.takeIf { undoAsking }?.let { record ->
+        app.okche.ui.OkcheConfirmDialog(
+            "방금 남긴 기록을 되돌릴까요?", "되돌리기", onCancel = { undoAsking = false }, onConfirm = { undoAsking = false; undo(record) },
+            destructive = true, message = "${recordTime(record)} ${recordValue(record, meds = meds)} 기록이 지워지고, 탕약 줄에 다시 나와요.",
+            confirmLook = app.okche.ui.ButtonLook.Danger,
+        )
     }
     medSheet?.let { pet ->
         app.okche.ui.med.MedTodaySheet(pet, onSaved = { saved ->

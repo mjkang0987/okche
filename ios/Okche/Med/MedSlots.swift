@@ -130,7 +130,9 @@ enum MedSlots {
                 guard let r = extras.popFirst() else { break }
                 entries[i] = Entry(slot: entries[i].slot, record: r)
             }
-            result += entries
+            // 그만 먹인 줄(뒤를 잇는 줄 없이 닫힘)의 안 준 차례는 빼기 — 그만 먹이면 바로 줄·시트에서 사라짐(2026-11-05 사용자).
+            let stopped = Set(rows.filter { r in r.activeUntil != nil && !series.contains { $0.activeFrom == r.activeUntil } }.map { ObjectIdentifier($0) })
+            result += entries.filter { $0.record != nil || !stopped.contains(ObjectIdentifier($0.slot.schedule)) }
         }
         return result.sorted { a, b in
             (a.slot.due, a.slot.schedule.createdAt, id(a.slot.schedule)) < (b.slot.due, b.slot.schedule.createdAt, id(b.slot.schedule))

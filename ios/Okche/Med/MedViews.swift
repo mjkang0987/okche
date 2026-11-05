@@ -75,6 +75,7 @@ struct MedFormSheet: View {
     let mode: Mode
     var onAdded: (Medication) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.showUndo) private var showUndo
     @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }) private var pets: [Pet]
@@ -227,6 +228,9 @@ struct MedFormSheet: View {
             try MedRules.remove(editing, in: context)
             dialog = nil
             dismiss()
+            showUndo(.removed("\(PetTitle.withObjectParticle(editing.name)) 약방에서 뺐어요", show: showUndo) {
+                try MedRules.restore(editing, in: context)
+            })
         } catch {
             dialog = nil
             failed = true

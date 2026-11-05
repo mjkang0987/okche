@@ -374,6 +374,15 @@ enum MedSchedules {
         try save(context)
     }
 
+    /// 그만 먹이기 되돌리기(직후 알림의 '되돌리기'): 다시 연다 — 그 사이 같은 주기에 새 줄이 생겼으면 그대로 둠.
+    static func resume(_ s: MedSchedule, now: Date = .now, in context: ModelContext) throws {
+        let series = try context.fetch(FetchDescriptor<MedSchedule>()).filter { $0.seriesId == s.seriesId && $0.deletedAt == nil }
+        guard s.activeUntil != nil, !series.contains(where: { $0.activeUntil == nil }) else { return }
+        s.activeUntil = nil
+        s.updatedAt = now
+        try save(context)
+    }
+
     /// 알림 스위치(바로 저장 — 그 줄을 고침, 5장).
     static func setReminder(_ s: MedSchedule, _ on: Bool, now: Date = .now, in context: ModelContext) throws {
         s.reminder = on

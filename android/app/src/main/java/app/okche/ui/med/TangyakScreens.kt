@@ -313,9 +313,15 @@ internal var notifyAskOn = true
 
 /** 알림 켠 약을 저장했고 안드로이드 13 이상에서 아직 허락도, 안내 창도 없었으면 안내 창(8-4 '허락'). */
 private suspend fun shouldAskNotify(context: android.content.Context, f: ScheduleFields): Boolean =
-    notifyAskOn && f.reminder && f.frequency != MedFrequency.asNeeded && android.os.Build.VERSION.SDK_INT >= 33 &&
-        context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+    notifyAskOn && f.reminder && f.frequency != MedFrequency.asNeeded && (needsNotifyPermission(context) || needsExactAlarm(context)) &&
         !context.notifyAsked()
+
+private fun needsNotifyPermission(context: android.content.Context) = android.os.Build.VERSION.SDK_INT >= 33 &&
+    context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+
+/** '알람 및 리마인더'가 꺼져 있으면 알림이 최대 1시간 늦을 수 있어 함께 묻는다(2026-11-06 사용자). 안드로이드 14부터 처음엔 꺼짐. */
+private fun needsExactAlarm(context: android.content.Context) = android.os.Build.VERSION.SDK_INT >= 31 &&
+    !context.getSystemService(android.app.AlarmManager::class.java).canScheduleExactAlarms()
 
 /**
  * 약 추가(보드 MedAdd·MedAddWeekday·MedAddHours·MedAddAsNeeded): 누가 먹나요(여럿), 약방에서 고르기, 한 번에 얼마나,
@@ -385,7 +391,16 @@ fun MedAddScreen(
 
     var asking by rememberSaveable { mutableStateOf(false) }
     // 허락 창의 답과 상관없이 약은 이미 저장됨 — 답이 오면 저장 뒤처럼 나감.
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onBack() }
+    // 알림 허락 다음 '알람 및 리마인더'가 꺼져 있으면 그 설정 화면으로 — 돌아오면 다시 걸기(onResume)가 정시로 건다.
+    fun exactThenBack() {
+        if (needsExactAlarm(context)) {
+            runCatching {
+                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}")))
+            }
+        }
+        onBack()
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { exactThenBack() }
 
     fun save() {
         if (busy || missing != null) return
@@ -408,7 +423,10 @@ fun MedAddScreen(
         app.okche.ui.OkcheConfirmDialog(
             "약 먹일 시간을 알려 드릴까요?", "계속하기",
             onCancel = { asking = false; onBack() },
-            onConfirm = { asking = false; permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+            onConfirm = {
+                asking = false
+                if (needsNotifyPermission(context)) permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else exactThenBack()
+            },
             text = "알림을 허락하면 정해 둔 시간에 탕약 알림이 와요. 다음 창에서 '허용'을 눌러 주세요.",
             message = "나중에 휴대폰 설정에서도 켤 수 있어요.",
             cancel = "나중에",

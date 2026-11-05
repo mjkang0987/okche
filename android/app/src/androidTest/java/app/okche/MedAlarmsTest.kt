@@ -147,6 +147,42 @@ class MedAlarmsTest {
         }
     }
 
+    /** 알림은 허락됐고 '알람 및 리마인더'만 꺼져 있으면 안내 창 → '계속하기' → 그 설정 화면(2026-11-06 사용자). */
+    @Test fun continueOpensExactAlarmSettings() {
+        val am = context.getSystemService(android.app.AlarmManager::class.java)
+        assumeTrue(Build.VERSION.SDK_INT >= 33 && !am.canScheduleExactAlarms())
+        val ui = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        ui.grantRuntimePermission(context.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
+        runBlocking {
+            dao.insert(kong)
+            dao.insert(pill)
+            context.setNotifyAsked(false)
+        }
+        notifyAskOn = true
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitFor(tab("더보기"))
+        rule.onNode(tab("더보기")).performClick()
+        waitFor(hasText("약 알림", substring = true))
+        rule.onNode(hasText("약 알림", substring = true)).performScrollTo().performClick()
+        waitFor(hasText("+ 약 추가"))
+        rule.onNode(hasText("+ 약 추가")).performClick()
+        waitFor(hasText("프레드니솔론", substring = true).and(hasClickAction()))
+        rule.onNode(hasText("프레드니솔론", substring = true).and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("저장하기").and(hasClickAction())).performClick()
+        waitFor(hasText("약 먹일 시간을 알려 드릴까요?"))
+        rule.onNode(hasText("계속하기").and(hasClickAction())).performClick()
+        var top = ""
+        repeat(20) {
+            if ("SCHEDULE_EXACT_ALARM" in top || "AlarmsAndReminders" in top) return@repeat
+            Thread.sleep(250)
+            top = ui.executeShellCommand("dumpsys activity activities").let { fd ->
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText()
+            }.lines().filter { "topResumedActivity" in it || "mResumedActivity" in it }.joinToString()
+        }
+        ui.executeShellCommand("input keyevent KEYCODE_BACK").close()
+        org.junit.Assert.assertTrue(top, "settings" in top.lowercase())
+    }
+
     /** 알림을 누른 것처럼 아이 id를 실어 열면 그 아이의 오늘 먹일 약 시트. */
     @Test fun openFromNotificationShowsSheet() {
         runBlocking { seed("08:00") }

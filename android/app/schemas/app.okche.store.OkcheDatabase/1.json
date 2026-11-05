@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "4919c65f36c972f774602aab6b71ae10",
+    "identityHash": "d08c42be1fd6c1837c54a50067f2412d",
     "entities": [
       {
         "tableName": "pet",
@@ -351,7 +351,7 @@
       },
       {
         "tableName": "med_schedule",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `pet_id` TEXT NOT NULL, `medication_id` TEXT NOT NULL, `series_id` TEXT NOT NULL, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, `frequency` TEXT NOT NULL, `times` TEXT NOT NULL, `every_days` INTEGER, `start_date` TEXT, `weekdays` TEXT NOT NULL, `every_hours` INTEGER, `first_at` INTEGER, `shift_on_late` INTEGER NOT NULL, `how_to` TEXT, `reminder` INTEGER NOT NULL, `lead_minutes` INTEGER NOT NULL, `remind_again_minutes` INTEGER NOT NULL, `active_from` INTEGER NOT NULL, `active_until` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `pet_id` TEXT NOT NULL, `medication_id` TEXT NOT NULL, `series_id` TEXT NOT NULL, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, `frequency` TEXT NOT NULL, `times` TEXT NOT NULL, `every_days` INTEGER, `start_date` TEXT, `weekdays` TEXT NOT NULL, `every_hours` INTEGER, `first_at` INTEGER, `shift_on_late` INTEGER NOT NULL, `how_to` TEXT, `reminder` INTEGER NOT NULL, `lead_minutes` INTEGER NOT NULL, `active_from` INTEGER NOT NULL, `active_until` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -464,12 +464,6 @@
           {
             "fieldPath": "leadMinutes",
             "columnName": "lead_minutes",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "remindAgainMinutes",
-            "columnName": "remind_again_minutes",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -1079,7 +1073,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4919c65f36c972f774602aab6b71ae10')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd08c42be1fd6c1837c54a50067f2412d')"
     ]
   }
 }

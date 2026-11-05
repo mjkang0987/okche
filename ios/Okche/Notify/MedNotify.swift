@@ -22,22 +22,27 @@ enum MedNotify {
     static func alerts(_ schedules: [MedSchedule], records: [Record], pets: [Pet], rests: [RestPeriod], meds: [Medication],
                        medTimeOn: Bool, now: Date = .now) -> [Alert] {
         guard medTimeOn else { return [] }
+        let live = schedules.filter { $0.deletedAt == nil }
         let medById = Dictionary(meds.filter { $0.deletedAt == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let days = (0...3).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: now) }.map { OkcheDay.of($0) }
+        // 넷째 날 새벽 차례도 몇 분 전이면 72시간 안에 울릴 수 있어 하루 더 본다(창 밖은 아래에서 거름).
+        let days = (0...4).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: now) }.map { OkcheDay.of($0) }
         struct Entry { let kind: Kind; let fireAt: Date; let due: Date; let pet: Pet; let med: Medication; let schedule: MedSchedule }
         var entries: [Entry] = []
+        var seen = Set<String>() // 몇 시간마다 줄이 날 경계에서 두 번 잡히지 않게
         for pet in pets where pet.deletedAt == nil && pet.memorializedAt == nil {
             let petRests = rests.filter { $0.petId == pet.id && $0.deletedAt == nil }
             for day in Set(days) {
-                for slot in MedSlots.remaining(schedules, records: records, petId: pet.id, day: day) {
+                for slot in MedSlots.remaining(live, records: records, petId: pet.id, day: day) where seen.insert(slot.key).inserted {
                     let s = slot.schedule
                     guard s.reminder, s.frequency != .asNeeded, let med = medById[s.medicationId] else { continue }
                     // 휴양 중인 아이는 알림 멈춤(2-1).
                     if petRests.contains(where: { $0.startedAt <= slot.due && ($0.endedAt.map { slot.due < $0 } ?? true) }) { continue }
+                    // 울릴 시각은 분 단위로 내림 — 몇 시간마다 '준 시각부터'는 초가 붙어 같은 분이 따로 묶이고 id가 겹칠 수 있음.
+                    // 창은 내리기 전 시각으로 견줌(같은 분 안에 다시 걸어도 빠지지 않게).
                     var fires = [(Kind.due, slot.due.addingTimeInterval(-TimeInterval(s.leadMinutes * 60)))]
                     if s.remindAgainMinutes > 0 { fires.append((.again, slot.due.addingTimeInterval(TimeInterval(s.remindAgainMinutes * 60)))) }
                     for (kind, fireAt) in fires where fireAt > now && fireAt <= now.addingTimeInterval(window) {
-                        entries.append(Entry(kind: kind, fireAt: fireAt, due: slot.due, pet: pet, med: med, schedule: s))
+                        entries.append(Entry(kind: kind, fireAt: minute(fireAt), due: slot.due, pet: pet, med: med, schedule: s))
                     }
                 }
             }
@@ -60,5 +65,9 @@ enum MedNotify {
             alerts.append(Alert(id: "med.more", kind: .more, fireAt: last.fireAt.addingTimeInterval(60), title: "옥체", body: "옥체를 열면 알림이 이어져요", petId: nil))
         }
         return alerts
+    }
+
+    private static func minute(_ date: Date) -> Date {
+        Date(timeIntervalSince1970: (date.timeIntervalSince1970 / 60).rounded(.down) * 60)
     }
 }

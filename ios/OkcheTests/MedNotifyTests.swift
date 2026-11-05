@@ -88,6 +88,9 @@ final class MedNotifyTests: XCTestCase {
         XCTAssertEqual(list.filter { $0.kind == .due }.count, MedNotify.limit)
         XCTAssertEqual(list.last?.fireAt, list[62].fireAt.addingTimeInterval(60))
         XCTAssertEqual(Set(list.map(\.id)).count, 64)
+        // 초가 붙은 차례(12:30:12)도 분 단위로 내려 울림.
+        let odd = row(kong, p, [], lead: 0, freq: .everyNHours, hours: 8, firstAt: at(27, 12, 30).addingTimeInterval(12.345))
+        XCTAssertEqual(alerts([odd], meds: [p]).first?.fireAt, at(27, 12, 30))
     }
 
     /// 다시 알림만 바꾸면 그 줄을 고침(5장), 새 줄은 먹이는 방법·늦게 줬을 때도 그대로.

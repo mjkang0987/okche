@@ -114,5 +114,8 @@ class MedNotifyTest {
         assertEquals(list[62].fireAt + 60_000, list.last().fireAt)
         assertEquals(64, list.map { it.id }.toSet().size)
         assertEquals(list.map { it.fireAt }.sorted(), list.map { it.fireAt })
+        // 초가 붙은 차례(12:30:12)도 분 단위로 내려 울림.
+        val odd = alerts(listOf(row(kong, p, emptyList(), lead = 0, freq = MedFrequency.everyNHours, hours = 8, firstAt = at(27, 12, 30) + 12_345)), listOf(p))
+        assertEquals(at(27, 12, 30), odd.first().fireAt)
     }
 }

@@ -590,8 +590,10 @@ private fun Frequency(f: ScheduleFields, errors: Map<String, String>, edit: (Str
             { v -> edit("reminder") { copy(reminder = v) } },
         )
         if (f.reminder) {
-            OkcheMenuPicker("알림 보낼 때", medLeadChoices, f.leadMinutes, { v -> edit("lead") { copy(leadMinutes = v) } })
-            OkcheMenuPicker("안 줬으면 다시 알림", againChoices, f.remindAgainMinutes, { v -> edit("again") { copy(remindAgainMinutes = v) } })
+            // 두 칸을 같이 옆으로/아래로(긴 '안 줬으면 다시 알림'만 먼저 꺾이지 않게).
+            val inline = androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.1f
+            OkcheMenuPicker("알림 보낼 때", medLeadChoices, f.leadMinutes, { v -> edit("lead") { copy(leadMinutes = v) } }, inline = inline)
+            OkcheMenuPicker("안 줬으면 다시 알림", againChoices, f.remindAgainMinutes, { v -> edit("again") { copy(remindAgainMinutes = v) } }, inline = inline)
         }
     }
 }

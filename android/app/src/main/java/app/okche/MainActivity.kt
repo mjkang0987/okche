@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
     private var openMedPetId by mutableStateOf<String?>(null)
 
     private fun takeMedPetId(intent: Intent) {
-        intent.getStringExtra(OPEN_MED_PET_ID)?.let { openMedPetId = it }
+        // 최근 앱에서 다시 열면 처음 연 알림의 값이 남아 있어 시트를 또 띄우지 않음.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) intent.getStringExtra(OPEN_MED_PET_ID)?.let { openMedPetId = it }
         intent.removeExtra(OPEN_MED_PET_ID)
     }
 

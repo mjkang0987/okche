@@ -31,7 +31,8 @@ enum MedReminders {
         content.body = alert.body
         content.sound = .default
         if let petId = alert.petId { content.userInfo = ["petId": petId.uuidString] }
-        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: alert.fireAt)
+        // 시간대를 함께 넣어 휴대폰 시간대가 바뀌어도 같은 순간에 울림(안드로이드와 같음).
+        let parts = Calendar.current.dateComponents([.timeZone, .year, .month, .day, .hour, .minute], from: alert.fireAt)
         return UNNotificationRequest(identifier: alert.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
     }
 
@@ -41,8 +42,13 @@ enum MedReminders {
         // 화면 테스트는 `-notify-ask`일 때만(다른 테스트가 창에 막히지 않게).
         if ProcessInfo.processInfo.arguments.contains("-ui-testing"), !ProcessInfo.processInfo.arguments.contains("-notify-ask") { return false }
         #endif
+        // 한 번만 묻는다('나중에'여도 휴대폰 상태는 그대로라 기억해 둠 — 안드로이드와 같음).
+        guard !UserDefaults.standard.bool(forKey: askedKey) else { return false }
         return await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined
     }
+
+    static let askedKey = "notifyAsked"
+    static func markAsked() { UserDefaults.standard.set(true, forKey: askedKey) }
 
     static func requestPermission() async {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])

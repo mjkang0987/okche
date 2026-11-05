@@ -17,6 +17,7 @@ struct OkcheApp: App {
             if uiTesting, !ProcessInfo.processInfo.arguments.contains("-keep-settings") {
                 UserDefaults.standard.removeObject(forKey: "onboardingDone")
                 UserDefaults.standard.removeObject(forKey: "lastPetId")
+                UserDefaults.standard.removeObject(forKey: "notifyAsked")
             }
             let container = try OkcheStore.container(inMemory: uiTesting)
             _ = try Setting.loadOrCreate(in: container.mainContext)

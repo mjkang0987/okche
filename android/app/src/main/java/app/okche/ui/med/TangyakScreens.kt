@@ -356,7 +356,8 @@ fun MedAddScreen(
     val anchors = remember { app.okche.ui.pet.Anchors() }
     var adding by rememberSaveable { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
+    // 안내 창이 뜬 채 화면을 다시 만들어도(다크 모드·글자 크기) 다시 저장되지 않게 saveable.
+    var busy by rememberSaveable { mutableStateOf(false) }
     val listed = meds.filter { it.deletedAt == null }.sortedBy { it.createdAt }
     // 고른 약의 단위 — 고를 때 기억해 둔다(방금 들인 약이 목록에 아직 안 떠도 맞게).
     var pickedUnit by remember { mutableStateOf(editing?.unit) }
@@ -382,7 +383,7 @@ fun MedAddScreen(
         touched = touched + "med" + "dose"
     }
 
-    var asking by remember { mutableStateOf(false) }
+    var asking by rememberSaveable { mutableStateOf(false) }
     // 허락 창의 답과 상관없이 약은 이미 저장됨 — 답이 오면 저장 뒤처럼 나감.
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onBack() }
 

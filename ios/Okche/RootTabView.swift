@@ -48,13 +48,18 @@ struct RootTabView: View {
                              set: { if $0 == nil { router.openPetId = nil } })) { pet in
             MedTodaySheet(pet: pet)
         }
+        // 추억·지운 아이 알림이면 비워 둔다(나중에 되돌려도 시트가 갑자기 뜨지 않게).
+        .onChange(of: router.openPetId) { if let id = router.openPetId, !alive.contains(where: { $0.id == id }) { router.openPetId = nil } }
     }
 
     private func reschedule() {
-        rescheduling?.cancel()
+        let previous = rescheduling
+        previous?.cancel()
         rescheduling = Task {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
+            // 걸던 중인 앞 차례가 끝난 뒤에(옛 목록을 늦게 더해 지운 알림이 되살아나지 않게).
+            await previous?.value
             await MedReminders.reschedule(in: context)
         }
     }

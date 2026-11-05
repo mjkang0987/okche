@@ -56,6 +56,10 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
                 it.cancel()
             }
         }
+        // 첫 알림 전에도 휴대폰 설정에 '탕약 알림'이 보이게(만들기는 몇 번 불려도 같음).
+        app.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("med", "탕약 알림", NotificationManager.IMPORTANCE_HIGH))
+        // 걸기 전에 적어 둔다 — 걸다 멈춰도 다음에 지울 수 있게.
+        prefs.edit().putStringSet(ARMED, alerts.mapTo(mutableSetOf()) { it.id }).commit()
         val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
         for (a in alerts) {
             val intent = medAlarmIntent(app, a.id).putExtra("id", a.id).putExtra("title", a.title).putExtra("body", a.body).putExtra("petId", a.petId)
@@ -68,7 +72,6 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, a.fireAt, pi)
             }
         }
-        prefs.edit().putStringSet(ARMED, alerts.mapTo(mutableSetOf()) { it.id }).apply()
     }
 }
 

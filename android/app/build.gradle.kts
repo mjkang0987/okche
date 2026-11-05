@@ -19,6 +19,8 @@ android {
         versionCode = 1
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 화면 테스트는 알림 허락 안내 창 없이(안내 창 테스트만 켬 — androidTest NotifyAskOff).
+        testInstrumentationRunnerArguments["listener"] = "app.okche.NotifyAskOff"
     }
 
     // 원본을 복사하지 않고 design/ 의 파일을 그대로 쓴다: 토큰, 글꼴(res/font), 글꼴 라이선스.

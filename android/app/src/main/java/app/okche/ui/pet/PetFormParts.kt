@@ -286,14 +286,13 @@ internal fun FurColorPicker(species: Species, selected: String, onSelect: (Strin
 
 /**
  * 인슐린 맞는 시간과 양 줄들 + '+ 시간 추가'(아이 등록·인슐린 설정 공통). 바탕 상자는 쓰는 쪽이 둔다.
- * `onRows(오류 열쇠, 새 줄들)` — 열쇠가 있으면 그 칸 오류를 지운다.
+ * `onRows(만진 칸 열쇠, 새 줄들)` — 시간은 times(한 시간을 바꾸면 다른 줄의 '같은 시간'도 바뀜), 양은 units{i}, 줄 더하기·빼기는 null.
  */
 @Composable
 internal fun InsulinRowsEditor(
     rows: List<InsulinRow>,
     errors: Map<String, String>,
     onRows: (String?, List<InsulinRow>) -> Unit,
-    clearTimeErrors: () -> Unit,
     anchor: (String) -> Modifier,
 ) {
     val context = LocalContext.current
@@ -314,9 +313,7 @@ internal fun InsulinRowsEditor(
                                 val t = runCatching { LocalTime.parse(row.time) }.getOrDefault(LocalTime.NOON) // 다른 기기에서 온 틀린 글자
                                 TimePickerDialog(context, { _, h, min ->
                                     val time = "%02d:%02d".format(h, min)
-                                    // 시간 하나를 바꾸면 다른 줄의 '같은 시간' 오류도 풀릴 수 있어 시간 오류를 모두 지운다.
-                                    onRows(null, rows.toMutableList().also { it[i] = it[i].copy(time = time) })
-                                    clearTimeErrors()
+                                    onRows("times", rows.toMutableList().also { it[i] = it[i].copy(time = time) })
                                 }, t.hour, t.minute, DateFormat.is24HourFormat(context)).show()
                             },
                             anchor("time$i").then(m),

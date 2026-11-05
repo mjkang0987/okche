@@ -3,6 +3,7 @@ package app.okche
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -183,7 +184,7 @@ class YakbangFlowTest {
         waitFor(hasText("아직 들인 약이 없어요."))
         rule.onNode(hasText("+ 약 들이기")).performClick()
         waitFor(hasText("약방에 약 들이기"))
-        rule.onNode(hasText("약방에 들이기").and(hasClickAction())).performClick()
+        rule.onNode(hasText("약방에 들이기").and(hasClickAction())).assertIsNotEnabled() // 덜 채우면 흐리게 + 남은 것
         waitFor(hasText("약 이름을 넣어 주세요"))
         rule.onNode(hasSetTextAction().and(hasText("약 이름", substring = true))).performTextInput("위장약 시럽")
         rule.onNode(hasText("물약").and(hasClickAction())).performClick()
@@ -192,7 +193,7 @@ class YakbangFlowTest {
         waitFor(hasText("물약 · 1ml씩 · 남은 120ml"))
         rule.onNode(hasText("위장약 시럽")).performClick()
         waitFor(hasText("약 고치기"))
-        rule.onNode(hasText("약방에서 빼기")).performClick()
+        rule.onNode(hasText("약방에서 빼기")).performScrollTo().performClick() // 내용 맨 아래(고정 칸 밖)
         waitFor(hasText("위장약 시럽을 약방에서 뺄까요?"))
         rule.onNode(hasText("빼기").and(hasClickAction())).performClick()
         waitFor(hasText("아직 들인 약이 없어요."))

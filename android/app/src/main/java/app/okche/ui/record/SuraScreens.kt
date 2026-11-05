@@ -463,16 +463,17 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
         @Suppress("DEPRECATION") view.announceForAccessibility(message)
     }
 
+    // 고칠 것(있으면 저장 버튼은 흐리게): 시간 겹침 안 됨, 급식기는 끼니 1개 이상, 준 양은 0~2000 정수(비우면 없음).
+    val problem = when {
+        rows.map { it.first }.toSet().size != rows.size -> "같은 시간의 끼니가 있어요. 시간을 바꿔 주세요."
+        feeder && rows.isEmpty() -> "급식기는 끼니 시간을 하나 이상 넣어 주세요."
+        rows.any { (_, g) -> g.trim().let { it.isNotEmpty() && it.toIntOrNull() !in 0..2000 } } -> "준 양은 0에서 2000 사이 숫자로 넣어 주세요."
+        else -> null
+    }
+
     fun save() {
-        if (busy) return
-        if (rows.map { it.first }.toSet().size != rows.size) return fail("같은 시간의 끼니가 있어요. 시간을 바꿔 주세요.")
-        if (feeder && rows.isEmpty()) return fail("급식기는 끼니 시간을 하나 이상 넣어 주세요.")
-        val slots = rows.map { (time, g) ->
-            val text = g.trim()
-            val grams = text.toIntOrNull()
-            if (text.isNotEmpty() && (grams == null || grams !in 0..2000)) return fail("준 양은 0에서 2000 사이 숫자로 넣어 주세요.")
-            MealSlot("", time, if (text.isEmpty()) null else grams)
-        }
+        if (busy || problem != null) return // 두 번 눌러 계획 줄이 하나 더 생기지 않게
+        val slots = rows.map { (time, g) -> MealSlot("", time, g.trim().toIntOrNull()) }
         busy = true
         scope.launch {
             runCatching {
@@ -490,7 +491,7 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
 
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -571,8 +572,10 @@ private fun MealTimeSheet(petId: String, mode: MealMode, plan: MealPlan?, onClos
                 Modifier.fillMaxWidth().background(OkcheColor.NamsaekSoft, RoundedCornerShape(OkcheRadius.RadiusMd)).padding(horizontal = 14.dp, vertical = 12.dp),
                 color = OkcheColor.NamsaekDeep, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
             )
+        }
+        app.okche.ui.OkcheFooter {
             error?.let { OkcheErrorText(it) }
-            OkchePrimaryButton("저장하기", ::save)
+            app.okche.ui.OkcheFooterButton("저장하기", ::save, problem)
         }
     }
 }

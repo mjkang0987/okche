@@ -66,6 +66,8 @@ import app.okche.ui.ButtonLook
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheConfirmDialog
 import app.okche.ui.OkcheErrorText
+import app.okche.ui.OkcheFooter
+import app.okche.ui.OkcheFooterButton
 import app.okche.ui.OkcheFieldLabel
 import app.okche.ui.OkchePrimaryButton
 import app.okche.ui.OkcheSwitchRow
@@ -188,11 +190,7 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
     }
 
     fun save() {
-        if (name.isBlank()) {
-            nameError = "간식 이름을 넣어 주세요"
-            view.announceForAccessibility("간식 이름을 넣어 주세요")
-            return
-        }
+        if (name.isBlank()) return
         run {
             if (editing != null) updateSnack(dao, editing, name, kind, ok) else onAdded(addSnack(dao, name, kind, ok))
         }
@@ -223,26 +221,23 @@ fun SnackFormSheet(mode: SnackFormMode, onAdded: (Snack) -> Unit = {}, onClose: 
                 Text(title, Modifier.weight(1f).semantics { heading() }, color = OkcheColor.Ink, style = OkcheType.Heading.toTextStyle())
                 IconButton(onClose) { Icon(Icons.Outlined.Close, "닫기", tint = OkcheColor.Ink) }
             }
-            OkcheTextField(name, { name = it; if (it.isNotBlank()) nameError = null }, "간식 이름", placeholder = "예: 닭가슴살 동결건조", error = nameError)
+            OkcheTextField(name, { name = it; nameError = if (it.isBlank()) "간식 이름을 넣어 주세요" else null }, "간식 이름", placeholder = "예: 닭가슴살 동결건조", error = nameError)
             OkcheChoiceChips("종류", snackKinds, kind, { kind = it })
             OkcheSwitchRow("수라 바꾸기 중에도 괜찮은 간식", "병원에서 괜찮다고 한 간식만 켜 두길 권해요.", ok, { ok = it })
             Text(note, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-        }
-        HorizontalDivider(color = OkcheColor.Line)
-        Column(
-            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = OkcheSpacing.Space6),
-            verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
-        ) {
-            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton(button, ::save)
+            // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
             if (editing != null) {
                 Text(
                     "목록에서 빼기",
                     Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { removing = true }.padding(vertical = 12.dp),
-                    color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Bold),
+                    color = OkcheColor.Yeonji, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
+        }
+        OkcheFooter {
+            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
+            OkcheFooterButton(button, ::save, if (name.isBlank()) "간식 이름을 넣으면 저장할 수 있어요" else null)
         }
     }
 }
@@ -265,7 +260,6 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
     var timeChanged by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf(editing?.let(::snackIdOf)) }
     var amount by remember { mutableStateOf(editing?.let(::snackAmountOf).orEmpty()) }
-    var pickError by remember { mutableStateOf<String?>(null) }
     var adding by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -278,11 +272,7 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
 
     fun save() {
         val id = picked
-        if (id == null) {
-            pickError = "어떤 다과를 줬는지 골라 주세요"
-            view.announceForAccessibility("어떤 다과를 줬는지 골라 주세요")
-            return
-        }
+        if (id == null) return
         if (busy) return
         busy = true
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
@@ -301,10 +291,11 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
         }
     }
 
-    if (adding) SnackFormSheet(SnackFormMode.AddAndPick, onAdded = { picked = it.id; pickError = null }) { adding = false }
+    if (adding) SnackFormSheet(SnackFormMode.AddAndPick, onAdded = { picked = it.id }) { adding = false }
     ModalBottomSheet(onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OkcheColor.Hanji) {
+        Column {
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space6),
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, bottom = OkcheSpacing.Space4),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -332,7 +323,6 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
                         picked == snack.id,
                     ) {
                         picked = snack.id
-                        pickError = null
                     }
                 }
                 Text(
@@ -340,7 +330,6 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
                     Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { adding = true }.padding(vertical = 12.dp),
                     color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Medium),
                 )
-                pickError?.let { OkcheErrorText(it) }
             }
             OkcheTextField(amount, { amount = it }, "얼마나 줬나요?", hint = "(선택)", placeholder = "예: 3알, 반 개")
             if (inFoodChange(pet.id, OkcheDay.of(occurredAt), changes)) {
@@ -350,8 +339,11 @@ fun SnackRecordSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Uni
                     color = OkcheColor.NamsaekDeep, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
                 )
             }
+        }
+        OkcheFooter {
             if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
-            OkchePrimaryButton("기록하기", ::save)
+            OkcheFooterButton("기록하기", ::save, if (picked == null) "어떤 다과를 줬는지 고르면 기록할 수 있어요" else null)
+        }
         }
     }
 }

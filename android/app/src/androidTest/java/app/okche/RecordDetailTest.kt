@@ -154,7 +154,7 @@ class RecordDetailFlowTest {
         rule.onNode(hasText("3번 이상")).performScrollTo().performClick()
         rule.waitForIdle()
         rule.onAllNodes(layer).assertCountEquals(0) // 한 번만
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         waitFor(hasText("사료 · 헤어볼 · 붉은색 · 3번 이상", substring = true))
         rule.onNode(hasText("아뢰었사옵니다")).assertExists()
 
@@ -166,7 +166,7 @@ class RecordDetailFlowTest {
         waitFor(layer)
         rule.onNode(hasText("기록 이어 하기")).performClick()
         rule.onNode(hasText("이물질 (끈·비닐 등)")).assertIsOn() // 레이어를 닫아도 고른 값 그대로
-        rule.onNode(hasText("기록하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("기록하기").and(hasClickAction())).performClick()
         waitFor(hasText("사료 · 이물질 · 붉은색 · 3번 이상", substring = true))
     }
 }

@@ -3,6 +3,7 @@ package app.okche
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -148,8 +149,8 @@ class FoodFlowTest {
         waitFor(hasText("사료 · 처방식"))
         rule.onNode(hasText("사료 · 처방식")).performScrollTo().performClick()
         waitFor(hasText("콩이 · 사료 바꾸기"))
-        rule.onNode(hasText("바꾸기").and(hasClickAction())).performClick()
-        waitFor(hasText("사료 이름을 넣어 주세요"))
+        rule.onNode(hasText("바꾸기").and(hasClickAction())).assertIsNotEnabled() // 덜 채우면 흐리게 + 남은 것
+        waitFor(hasText("사료 이름을 넣으면 바꿀 수 있어요"))
         rule.onNode(hasSetTextAction()).performTextInput("가수분해 처방식")
         rule.onNode(hasText("바꾸기").and(hasClickAction())).performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("콩이 · 사료 바꾸기")).fetchSemanticsNodes().isEmpty() }

@@ -108,9 +108,59 @@ internal fun checkInsulinRows(rows: List<InsulinRow>): Pair<Map<String, String>,
     return errors to slots.sortedBy { it.time }
 }
 
+/** 만진 칸의 오류만(열자마자 빨간 글자가 뜨지 않게). 시간 오류(time{i}·insulinRows)는 만진 칸 'times' 하나로 묶는다. */
+internal fun Map<String, String>.touchedOnly(touched: Set<String>) =
+    filterKeys { it in touched || ("times" in touched && (it.startsWith("time") || it == "insulinRows")) }
+
+/** 인슐린 줄을 고친 뒤 만진 칸: 줄 수가 바뀌면 줄 번호가 밀리므로 양 표시는 버리고 시간은 만진 것으로. */
+internal fun Set<String>.afterRows(key: String?, before: Int, after: Int) =
+    (if (before != after) filterNot { it.startsWith("units") }.toSet() + "times" else this) + listOfNotNull(key)
+
+/** 남은 것 줄의 칸 이름(iOS `petFieldLabel`과 같음) — 인슐린 양은 몇 번째인지까지. */
+internal fun petFieldLabel(key: String): String? = when {
+    key == "name" -> "이름"
+    key == "birthDate" -> "생일"
+    key == "age" -> "나이"
+    key == "weight" -> "체중"
+    key == "familyDate" -> "가족 된 날"
+    key.startsWith("units") -> "${key.removePrefix("units").toInt() + 1}번째 인슐린 양"
+    key.startsWith("time") || key == "insulinRows" -> "인슐린 시간"
+    else -> null
+}
+
+/** 남은 것 줄 문구: [key] 칸 오류 앞에 칸 이름. */
+internal fun Map<String, String>.missingLine(key: String?) =
+    key?.let { k -> getValue(k).let { m -> petFieldLabel(k)?.let { app.okche.ui.okcheNamed(it, m) } ?: m } }
+
+/** 남은 것 줄을 눌렀을 때 만진 것으로 둘 칸 — 시간 오류는 times 하나로 묶임([touchedOnly]). */
+internal fun touchKey(key: String) = if (key.startsWith("time") || key == "insulinRows") "times" else key
+
+/** 인슐린 줄의 남은 것 순서(iOS와 같음): 양 칸들 → 시간. */
+internal fun insulinOrder(rows: Int) = List(rows) { "units$it" } + List(rows) { "time$it" } + "insulinRows"
+
+/** 체중 칸(kg). 그램으로 반올림해 0이 되는 값(0.0004 등)도 체중이 아니다. 비었거나 틀리면 null. */
+private fun weightKg(text: String) = text.toDecimal()?.takeIf { it > 0 && it <= 100 && Math.round(it * 1000) >= 1 }
+
 /**
- * 검사해서 오류가 있으면 아무것도 저장하지 않고 오류를 돌려준다(칸 열쇠 → 문구, 화면 위에서부터 순서).
- * 칸 열쇠: name · birthDate · age · weight · insulinRows · time{i} · units{i}, 저장소 오류는 save. 오류가 없으면 아이 + 체중 기록 + 인슐린 계획을 한 트랜잭션으로 저장하고 빈 맵.
+ * 아이 등록 칸 검사 — 화면은 바로바로(남은 것·만진 칸 오류), 저장도 같은 규칙.
+ * 칸 열쇠 → 문구(화면 위에서부터): name · birthDate · age · weight · insulinRows · time{i} · units{i}.
+ */
+internal fun registerErrors(form: PetForm, today: LocalDate = LocalDate.now()): Map<String, String> {
+    val errors = linkedMapOf<String, String>()
+    if (form.name.isBlank()) errors["name"] = "이름을 넣어 주세요"
+    if (form.birthUnknown) {
+        if (form.age.isNotBlank() && form.age.toWholeNumber()?.takeIf { it in 0..30 } == null) errors["age"] = AGE_ERROR
+    } else if (form.birthDate != null && form.birthDate > today) {
+        errors["birthDate"] = FUTURE_DAY_ERROR
+    }
+    if (form.weight.isNotBlank() && weightKg(form.weight) == null) errors["weight"] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
+    if (form.hasDiabetes) errors += checkInsulinRows(form.insulinRows).first
+    return errors
+}
+
+/**
+ * 검사해서 오류가 있으면 아무것도 저장하지 않고 오류를 돌려준다([registerErrors]), 저장소 오류는 save.
+ * 오류가 없으면 아이 + 체중 기록 + 인슐린 계획을 한 트랜잭션으로 저장하고 빈 맵.
  */
 suspend fun registerPet(
     dao: OkcheDao,
@@ -120,36 +170,13 @@ suspend fun registerPet(
     /** 새 아이 ID — 부르는 쪽이 저장 뒤 지금 보는 아이로 쓸 수 있게(6-3). */
     petId: String = newId(),
 ): Map<String, String> {
-    val errors = linkedMapOf<String, String>()
-    val name = form.name.trim()
-    if (name.isEmpty()) errors["name"] = "이름을 넣어 주세요"
-
-    var birth: LocalDate? = null
-    if (form.birthUnknown) {
-        if (form.age.isNotBlank()) {
-            val age = form.age.toWholeNumber()
-            // 2/29에서 해를 빼면 java.time 규칙대로 2/28.
-            if (age == null || age !in 0..30) errors["age"] = AGE_ERROR else birth = today.minusYears(age.toLong())
-        }
-    } else {
-        birth = form.birthDate
-        if (birth != null && birth > today) errors["birthDate"] = FUTURE_DAY_ERROR
-    }
-
-    var kg: Double? = null
-    if (form.weight.isNotBlank()) {
-        // 그램으로 반올림해 0이 되는 값(0.0004 등)도 체중이 아니다.
-        kg = form.weight.toDecimal()?.takeIf { it > 0 && it <= 100 && Math.round(it * 1000) >= 1 }
-        if (kg == null) errors["weight"] = "0보다 크고 100 이하인 숫자로 넣어 주세요"
-    }
-
-    var slots = emptyList<InsulinSlot>()
-    if (form.hasDiabetes) {
-        val (rowErrors, checked) = checkInsulinRows(form.insulinRows)
-        errors += rowErrors
-        slots = checked
-    }
+    val errors = registerErrors(form, today)
     if (errors.isNotEmpty()) return errors
+    val name = form.name.trim()
+    // 2/29에서 해를 빼면 java.time 규칙대로 2/28. 나이를 비우면 생일 없음.
+    val birth = if (form.birthUnknown) form.age.toWholeNumber()?.let { today.minusYears(it.toLong()) } else form.birthDate
+    val kg = weightKg(form.weight)
+    val slots = if (form.hasDiabetes) checkInsulinRows(form.insulinRows).second else emptyList()
 
     val pet = Pet(
         id = petId, createdAt = now, name = name, species = form.species, breed = form.breed, furColor = form.furColor,
@@ -176,5 +203,5 @@ suspend fun registerPet(
         Log.e("Okche", "아이 등록 저장 실패", e)
         return mapOf("save" to SAVE_ERROR)
     }
-    return errors
+    return emptyMap()
 }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
@@ -54,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -517,8 +519,9 @@ fun OkchePrimaryButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = if (plain) OkcheColor.Paper else OkcheColor.Namsaek,
             contentColor = if (danger) OkcheColor.Yeonji else if (emphasis) OkcheColor.NamsaekDeep else if (plain) OkcheColor.Ink else OkcheColor.Paper,
-            disabledContainerColor = if (plain) OkcheColor.Paper else OkcheColor.Namsaek,
-            disabledContentColor = if (danger) OkcheColor.Yeonji else if (emphasis) OkcheColor.NamsaekDeep else if (plain) OkcheColor.Ink else OkcheColor.Paper,
+            // 못 누를 때(덜 채움·저장 중) 꽉 찬 버튼은 회색(2026-11-05 사용자 — 투명하게 흐리지 않음).
+            disabledContainerColor = if (plain) OkcheColor.Paper else OkcheColor.Line,
+            disabledContentColor = if (danger) OkcheColor.Yeonji else if (emphasis) OkcheColor.NamsaekDeep else if (plain) OkcheColor.Ink else OkcheColor.InkMuted,
         ),
         contentPadding = when {
             pill -> PaddingValues(horizontal = 14.dp)
@@ -574,3 +577,48 @@ fun <T> OkcheMenuPicker(label: String, options: List<Pair<T, String>>, selected:
         field(Modifier.widthIn(min = 150.dp).width(IntrinsicSize.Max))
     }
 }
+
+// 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게).
+
+/** 화면·시트 아래에 붙은 주 버튼 칸: 위 선·바탕 없음(2026-11-05 사용자, 스크롤 밖에 두어 늘 보이게). iOS `okcheFooter`와 같은 모양. */
+@Composable
+fun OkcheFooter(content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = 8.dp), // 기기 아래 막대 자리는 바깥이 둠
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { content() }
+    }
+}
+
+/**
+ * 아래 고정 주 버튼: [missing]이 있으면(덜 채움) 흐리게 + 못 누름 + 바로 위에 남은 것 한 줄.
+ * 공용 버튼은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게. iOS `okcheMissing`과 같음.
+ */
+@Composable
+fun OkcheFooterButton(text: String, onClick: () -> Unit, missing: String?, onMissingTap: (() -> Unit)? = null) {
+    if (missing != null) {
+        val style = OkcheType.Label.toTextStyle(FontWeight.Normal)
+        if (onMissingTap == null) {
+            Text(missing, color = OkcheColor.InkMuted, style = style)
+        } else {
+            // 누르면 그 칸으로(긴 화면 — 위쪽 칸이 문제일 때 찾게). 화면 읽기는 '›' 없이 읽게.
+            Text(
+                "$missing ›",
+                Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .clickable(role = Role.Button, onClickLabel = "그 칸으로 가기", onClick = onMissingTap)
+                    .semantics { contentDescription = missing }
+                    .wrapContentHeight(Alignment.CenterVertically),
+                color = OkcheColor.InkMuted, style = style,
+            )
+        }
+    }
+    OkchePrimaryButton(
+        text, onClick,
+        Modifier.semantics { if (missing != null) stateDescription = missing },
+        enabled = missing == null,
+    )
+}
+
+/** 칸 오류 글자 앞에 칸 이름 — 아래 줄은 어느 칸인지 말해야 해서(이미 들어 있으면 그대로). iOS `okcheNamed`와 같음. */
+fun okcheNamed(label: String, message: String) = if (label in message) message else "$label · $message"

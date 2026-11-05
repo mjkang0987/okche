@@ -2,6 +2,7 @@ package app.okche
 
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -184,26 +185,26 @@ class TangyakFlowTest {
         waitFor(hasText("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."))
         rule.onNode(hasText("+ 약 추가")).performClick()
         waitFor(hasText("저장하기"))
-        rule.onNode(hasText("저장하기").and(hasClickAction())).performScrollTo().performClick()
-        waitFor(hasText("약을 골라 주세요"))
+        rule.onNode(hasText("저장하기").and(hasClickAction())).assertIsNotEnabled() // 약을 고르기 전엔 흐리게 + 남은 것
+        waitFor(hasText("약을 골라 주세요", substring = true)) // 남은 것 줄은 끝에 ' ›'
         rule.onNode(hasText("+ 약방에 새 약 들이기")).performScrollTo().performClick()
         waitFor(hasText("약방에 들이고 고르기"))
         rule.onNode(hasSetTextAction().and(hasText("약 이름", substring = true))).performTextInput("프레드니솔론")
         rule.onNode(hasText("약방에 들이고 고르기").and(hasClickAction())).performClick()
         rule.waitUntil(5_000) { rule.onAllNodes(isSelected().and(hasText("프레드니솔론", substring = true))).fetchSemanticsNodes().isNotEmpty() } // 들이면 골라짐
         rule.onNode(hasText("며칠마다").and(hasClickAction())).performScrollTo().performClick()
-        rule.onNode(hasText("저장하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("저장하기").and(hasClickAction())).performClick()
         waitFor(hasText("먹고 있는 약"))
         waitFor(androidx.compose.ui.test.hasContentDescription("콩이 · 이틀에 한 번 · 1알", substring = true))
         // 카드 → 고치기(매일로) → 다시 카드 → 이 약 그만 먹이기 (8-2b)
         rule.onNode(androidx.compose.ui.test.hasContentDescription("· 고치기", substring = true)).performClick()
         waitFor(hasText("아이나 약을 바꾸려면 이 약을 그만 먹이고 새로 추가해 주세요."))
         rule.onNode(hasText("매일").and(hasClickAction())).performScrollTo().performClick()
-        rule.onNode(hasText("저장하기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("저장하기").and(hasClickAction())).performClick()
         waitFor(androidx.compose.ui.test.hasContentDescription("콩이 · 하루 1번 · 1알", substring = true))
         rule.onNode(androidx.compose.ui.test.hasContentDescription("· 고치기", substring = true)).performClick()
         waitFor(hasText("이 약 그만 먹이기"))
-        rule.onNode(hasText("이 약 그만 먹이기")).performScrollTo().performClick()
+        rule.onNode(hasText("이 약 그만 먹이기")).performScrollTo().performClick() // 내용 맨 아래(고정 칸 밖)
         waitFor(hasText("프레드니솔론을 그만 먹일까요?"))
         rule.onNode(hasText("그만 먹이기").and(hasClickAction())).performClick()
         waitFor(hasText("아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."))

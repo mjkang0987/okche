@@ -15,9 +15,9 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["아이 등록하고 시작하기"].tap()
         XCTAssertTrue(app.staticTexts["새 아기씨 모시기"].waitForExistence(timeout: 5))
 
-        // 이름 없이 모시면 오류가 뜨고 그대로 남는다.
-        app.buttons["모시기"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        // 이름이 없으면 '모시기'는 흐리고 못 누름 + 남은 것 안내.
+        XCTAssertFalse(app.buttons["모시기"].firstMatch.isEnabled)
+        XCTAssertTrue(app.descendants(matching: .any)["이름을 넣어 주세요"].firstMatch.waitForExistence(timeout: 3))
 
         let name = app.textFields["이름"]
         name.tap()
@@ -41,7 +41,7 @@ final class OnboardingUITests: XCTestCase {
         start.tap()
         let diabetes = app.switches["당뇨가 있어요"].firstMatch
         XCTAssertTrue(diabetes.waitForExistence(timeout: 5))
-        while !diabetes.isHittable { app.swipeUp() }
+        reveal(diabetes, in: app)
         diabetes.tap()
         let units = app.textFields["첫 번째 양 (단위)"]
         XCTAssertTrue(units.waitForExistence(timeout: 3))
@@ -61,8 +61,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(weight.waitForExistence(timeout: 5))
         weight.tap()
         weight.typeText("0")
-        app.buttons["모시기"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["이름을 넣어 주세요"].firstMatch.waitForExistence(timeout: 3)) // 남은 것 안내
         app.textFields["이름"].tap()
         app.textFields["이름"].typeText("콩")
         XCTAssertFalse(app.staticTexts["이름을 넣어 주세요"].exists)
@@ -70,7 +69,9 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["완료"].firstMatch.tap()
 
         let birth = app.buttons["생일"]
+        reveal(birth, in: app)
         birth.tap()
+        XCTAssertTrue(app.buttons["고르기"].waitForExistence(timeout: 3))
         app.buttons["고르기"].tap()
         XCTAssertNotEqual(birth.value as? String, "안 고름")
         birth.tap()
@@ -81,7 +82,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertEqual(birth.value as? String, "안 고름")
 
         let diabetes = app.switches["당뇨가 있어요"].firstMatch
-        while !diabetes.isHittable { app.swipeUp() }
+        reveal(diabetes, in: app)
         diabetes.tap()
         let first = app.buttons["첫 번째 시간"]
         XCTAssertTrue(first.waitForExistence(timeout: 3))
@@ -111,7 +112,9 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertEqual(app.buttons["품종"].value as? String, "말티즈")
         XCTAssertTrue(app.buttons["누런색"].exists)
         // 생일을 모르면 나이 칸
-        app.switches["생일을 몰라요 (나이를 어림잡아 넣을게요)"].firstMatch.tap()
+        let unknown = app.switches["생일을 몰라요 (나이를 어림잡아 넣을게요)"].firstMatch
+        reveal(unknown, in: app)
+        unknown.tap()
         XCTAssertTrue(app.textFields["나이 (대략)"].waitForExistence(timeout: 3))
     }
 
@@ -136,11 +139,10 @@ final class OnboardingUITests: XCTestCase {
 
         // 당뇨를 켜고 인슐린 없이 저장하면 오류
         let diabetes = app.switches["당뇨가 있어요"].firstMatch
-        while !diabetes.isHittable { app.swipeUp() }
+        reveal(diabetes, in: app)
         diabetes.tap()
         let save = app.buttons["저장하기"].firstMatch
-        while !save.isHittable { app.swipeUp() }
-        save.tap()
+        XCTAssertFalse(save.isEnabled) // 인슐린 설정 전엔 흐리게
         XCTAssertTrue(app.staticTexts["인슐린 시간과 양을 먼저 설정해 주세요"].waitForExistence(timeout: 3))
 
         let setupLink = app.buttons["인슐린 이름·양·시간 설정"]
@@ -149,10 +151,11 @@ final class OnboardingUITests: XCTestCase {
         for nth in ["첫 번째", "두 번째"] {
             let units = app.textFields["\(nth) 양 (단위)"]
             XCTAssertTrue(units.waitForExistence(timeout: 3))
+            reveal(units, in: app)
             units.tap()
             units.typeText("2")
+            app.buttons["완료"].firstMatch.tap() // 자판이 다음 칸을 가리지 않게
         }
-        app.buttons["완료"].firstMatch.tap()
         let setupSave = app.buttons["저장하기"].firstMatch
         while !setupSave.isHittable { app.swipeUp() }
         setupSave.tap()
@@ -234,7 +237,7 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["다시 모시기"].tap()
         XCTAssertTrue(app.buttons["추억으로 간직하기"].waitForExistence(timeout: 3))
 
-        app.buttons["이 아이 기록 지우기"].tap()
+        tapBelow(app.buttons["이 아이 기록 지우기"], in: app)
         XCTAssertTrue(app.staticTexts["콩이의 기록을 지울까요?"].waitForExistence(timeout: 3))
         app.buttons["지우기"].tap()
         XCTAssertTrue(app.staticTexts["아직 모신 아이가 없어요."].waitForExistence(timeout: 5))
@@ -381,8 +384,8 @@ final class OnboardingUITests: XCTestCase {
         app.tabBars.buttons["더보기"].tap()
         tapBelow(app.buttons["사료 · 처방식"], in: app)
         XCTAssertTrue(app.staticTexts["콩이 · 사료 바꾸기"].waitForExistence(timeout: 3))
-        app.buttons["바꾸기"].tap()
-        XCTAssertTrue(app.staticTexts["사료 이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["바꾸기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
+        XCTAssertTrue(app.staticTexts["사료 이름을 넣으면 바꿀 수 있어요"].waitForExistence(timeout: 3))
         let field = app.textFields["사료 이름"]
         field.tap()
         field.typeText("가수분해 처방식")
@@ -401,8 +404,8 @@ final class OnboardingUITests: XCTestCase {
         more.tap()
         tapBelow(app.buttons["+ 다과 · 간식 남기기"], in: app)
         XCTAssertTrue(app.buttons["+ 새 다과 들이기"].waitForExistence(timeout: 3)) // 다과가 없으면 들이기만
-        app.buttons["기록하기"].tap()
-        XCTAssertTrue(app.staticTexts["어떤 다과를 줬는지 골라 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["기록하기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
+        XCTAssertTrue(app.staticTexts["어떤 다과를 줬는지 고르면 기록할 수 있어요"].waitForExistence(timeout: 3))
         app.buttons["+ 새 다과 들이기"].tap()
         let name = app.textFields["간식 이름"]
         XCTAssertTrue(name.waitForExistence(timeout: 3))
@@ -446,7 +449,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 들인 약이 없어요."].waitForExistence(timeout: 3))
         app.buttons["+ 약 들이기"].tap()
         XCTAssertTrue(app.staticTexts["약방에 약 들이기"].waitForExistence(timeout: 3))
-        app.buttons["약방에 들이기"].tap()
+        XCTAssertFalse(app.buttons["약방에 들이기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
         XCTAssertTrue(app.staticTexts["약 이름을 넣어 주세요"].waitForExistence(timeout: 3))
         let name = app.textFields["약 이름"]
         name.tap()
@@ -476,8 +479,8 @@ final class OnboardingUITests: XCTestCase {
         tapBelow(app.buttons["탕약 · 약 알림"], in: app)
         XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
         app.buttons["+ 약 추가"].tap()
-        tapBelow(app.buttons["저장하기"], in: app)
-        XCTAssertTrue(app.staticTexts["약을 골라 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["저장하기"].isEnabled) // 약을 고르기 전엔 흐리게 + 남은 것
+        XCTAssertTrue(app.descendants(matching: .any)["약을 골라 주세요"].firstMatch.waitForExistence(timeout: 3))
         tapBelow(app.buttons["+ 약방에 새 약 들이기"], in: app)
         let name = app.textFields["약 이름"]
         XCTAssertTrue(name.waitForExistence(timeout: 3))
@@ -575,8 +578,14 @@ final class OnboardingUITests: XCTestCase {
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))
-        for _ in 0..<15 where !element.isHittable { app.swipeUp() }
+        reveal(element, in: app)
         element.tap()
+    }
+
+    /// 아래 고정 버튼 칸에 가리지 않을 만큼 밀어 올린다 — 가려져도 '누를 수 있음'으로 나와서 고정 칸이 대신 눌림.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        let limit = app.windows.firstMatch.frame.maxY - 220
+        for _ in 0..<15 where !element.isHittable || element.frame.maxY > limit { app.swipeUp() }
     }
 
     /// 아이 등록 화면을 열어 이름만 넣고 모신다.

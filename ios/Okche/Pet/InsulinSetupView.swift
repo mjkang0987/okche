@@ -6,7 +6,22 @@ struct InsulinSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var form: InsulinSetup
-    @State private var errors: [PetRegistration.Field: String] = [:]
+    /// 한 번 만진 칸 — 칸 아래 오류는 만진 뒤부터. 저장 실패는 `failed`.
+    @State private var touched: Set<PetRegistration.Field> = []
+    @State private var failed = false
+    private var errors: [PetRegistration.Field: String] {
+        PetRegistration.insulinErrors(form.slots).filter { touched.contains($0.key) }
+            .merging(failed ? [.save: "저장하지 못했어요. 다시 해 주세요."] : [:]) { a, _ in a }
+    }
+    /// 첫 번째로 남은 것(위에서부터) — 있으면 저장 버튼은 흐리게.
+    private var missingField: PetRegistration.Field? {
+        let all = PetRegistration.insulinErrors(form.slots)
+        return (form.slots.map { PetRegistration.Field.insulinUnits($0.id) } + [.insulinTimes]).first { all[$0] != nil }
+    }
+    private var missing: String? {
+        guard let field = missingField, let message = PetRegistration.insulinErrors(form.slots)[field] else { return nil }
+        return petFieldLabel(field, slots: form.slots.map(\.id)).map { okcheNamed($0, message) } ?? message
+    }
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
 
@@ -17,7 +32,7 @@ struct InsulinSetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: "인슐린", note: "설정", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
-            ScrollViewReader { scroller in
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         OkcheTextField(label: "인슐린 이름", text: $form.name, placeholder: "예: 병원에서 받은 인슐린 이름")
@@ -39,19 +54,23 @@ struct InsulinSetupView: View {
                                        isOn: $form.ringDuringQuiet)
                         leadPicker
                         SourceNote(text: diabetesSourceNote)
-                        VStack(alignment: .leading, spacing: 8) {
-                            OkcheFieldError(message: errors[.save])
-                            Button("저장하기") { save(scroller) }
-                                .buttonStyle(.okchePrimary)
-                                .disabled(saved)
-                        }
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
                     .padding(.top, 4)
-                    .padding(.bottom, OkcheSpacing.space6)
+                    .padding(.bottom, OkcheSpacing.space4)
                 }
                 .scrollDismissesKeyboard(.interactively)
-            }
+                .okcheFooter {
+                    OkcheFieldError(message: errors[.save])
+                    // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing) {
+                        guard let field = missingField else { return }
+                        touched.insert(field)
+                        withAnimation { proxy.scrollTo(field, anchor: .center) }
+                        if field != .insulinTimes { focused = field }
+                    }
+                }
+                }
         }
         .background(OkcheColor.hanji)
         .toolbar(.hidden, for: .navigationBar)
@@ -62,10 +81,11 @@ struct InsulinSetupView: View {
                 Button("완료") { focused = nil }
             }
         }
+        // 만진 칸만 칸 아래 오류(시간을 고치면 시간, 양을 고치면 그 양).
         .onChange(of: form.slots) { old, new in
-            errors[.insulinTimes] = nil
+            if old.map(\.time) != new.map(\.time) || old.count != new.count { touched.insert(.insulinTimes) }
             for slot in new where old.first(where: { $0.id == slot.id })?.units != slot.units {
-                errors[.insulinUnits(slot.id)] = nil
+                touched.insert(.insulinUnits(slot.id))
             }
         }
     }
@@ -79,25 +99,16 @@ struct InsulinSetupView: View {
         Text(text).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
     }
 
-    private func save(_ scroller: ScrollViewProxy) {
-        guard !saved else { return }
+    private func save() {
+        guard !saved, missing == nil else { return }
         do {
             try form.save(in: context)
-            errors = [:]
+            failed = false
             saved = true
             dismiss()
-        } catch let invalid as PetRegistration.Invalid {
-            errors = invalid.errors
-            let order: [PetRegistration.Field] = form.slots.map { .insulinUnits($0.id) } + [.insulinTimes]
-            if let first = order.first(where: { errors[$0] != nil }) {
-                withAnimation { scroller.scrollTo(first, anchor: .center) }
-                if first != .insulinTimes { focused = first }
-                let message = errors.count == 1 ? errors[first]! : "고칠 곳 \(errors.count)개. \(errors[first]!)"
-                AccessibilityNotification.Announcement(message).post()
-            }
         } catch {
-            errors = [.save: "저장하지 못했어요. 다시 해 주세요."]
-            AccessibilityNotification.Announcement(errors[.save]!).post()
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
         }
     }
 }

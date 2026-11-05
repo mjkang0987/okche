@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import android.os.SystemClock
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -314,10 +315,10 @@ class PetEditFlowTest {
         // performTextInput은 커서(처음엔 맨 앞) 자리에 넣어서 바꾸기로.
         rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextReplacement("콩이이")
 
-        // 당뇨를 켜고 인슐린 없이 저장하면 오류
+        // 당뇨를 켜고 인슐린 설정 전엔 '저장하기'는 흐리게 + 남은 것
         rule.onNodeWithText("당뇨가 있어요").performScrollTo().performClick()
-        rule.onNodeWithText("저장하기").performScrollTo().performClick()
-        waitFor(hasText("인슐린 시간과 양을 먼저 설정해 주세요"))
+        rule.onNode(hasText("저장하기").and(hasClickAction())).assertIsNotEnabled()
+        waitFor(hasText("인슐린 시간과 양을 먼저 설정해 주세요", substring = true))
 
         rule.onNodeWithContentDescription("인슐린 이름·양·시간 설정").performScrollTo().performClick()
         waitFor(hasSetTextAction().and(hasContentDescription("첫 번째 양 (단위)")))
@@ -327,12 +328,12 @@ class PetEditFlowTest {
         rule.onNodeWithContentDescription("알림 보낼 때").performScrollTo().performClick()
         waitFor(hasText("30분 전"))
         rule.onNodeWithText("30분 전").performClick()
-        rule.onNodeWithText("저장하기").performScrollTo().performClick()
+        rule.onNodeWithText("저장하기").performClick()
 
         // 아이 정보로 돌아오면 고치던 이름이 남아 있고, 저장하면 더보기 줄 이름이 바뀐다.
         waitFor(hasText("콩이이"))
-        rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요")).assertCountEquals(0)
-        rule.onNodeWithText("저장하기").performScrollTo().performClick()
+        rule.onAllNodes(hasText("인슐린 시간과 양을 먼저 설정해 주세요", substring = true)).assertCountEquals(0)
+        rule.onNodeWithText("저장하기").performClick()
         waitFor(hasText("콩이이 아기씨"))
         val pet = runBlocking { OkcheDatabase.get(context).dao().pets().single() }
         assertEquals(listOf("콩이이", "true"), listOf(pet.name, pet.hasDiabetes.toString()))
@@ -350,7 +351,7 @@ class PetEditFlowTest {
         rule.onNodeWithText("아이 등록하고 시작하기").performScrollTo().performClick()
         waitFor(hasSetTextAction().and(hasText("이름")))
         rule.onNode(hasSetTextAction().and(hasText("이름"))).performTextInput("콩이")
-        rule.onNode(hasText("모시기").and(hasClickAction())).performScrollTo().performClick()
+        rule.onNode(hasText("모시기").and(hasClickAction())).performClick()
         val tabMore = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab).and(hasText("더보기"))
         waitFor(tabMore)
         rule.onNode(tabMore).performClick()

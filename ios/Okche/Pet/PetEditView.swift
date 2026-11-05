@@ -16,7 +16,31 @@ struct PetEditView: View {
 
     enum LifecycleDialog { case keep, delete, restore }
     @State private var form: PetEditing
-    @State private var errors: [PetRegistration.Field: String] = [:]
+    /// 열린 인슐린 계획 — 설정 화면을 다녀오면 바로 다시 셈(`@Query`라 바뀌면 다시 그림).
+    @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil && $0.activeUntil == nil }) private var plans: [InsulinPlan]
+    /// 한 번 만진 칸 — 칸 아래 오류는 만진 뒤부터. 저장 실패는 `failed`.
+    @State private var touched: Set<PetRegistration.Field> = []
+    @State private var failed = false
+    /// 지금 고칠 것 전부 — 당뇨를 켰는데 인슐린 계획이 없으면 '먼저 설정해 주세요'(저장 규칙과 같음, 추억 아이 빼고).
+    private var allErrors: [PetRegistration.Field: String] {
+        var all = form.validate()
+        if form.hasDiabetes, pet.memorializedAt == nil, !plans.contains(where: { $0.petId == pet.id }) {
+            all[.insulinPlan] = "인슐린 시간과 양을 먼저 설정해 주세요"
+        }
+        return all
+    }
+    private var errors: [PetRegistration.Field: String] {
+        allErrors.filter { touched.contains($0.key) }.merging(failed ? [.save: "저장하지 못했어요. 다시 해 주세요."] : [:]) { a, _ in a }
+    }
+    /// 첫 번째로 남은 것(화면 위에서부터) — 있으면 저장 버튼은 흐리게.
+    private var missingField: PetRegistration.Field? {
+        let all = allErrors
+        return [PetRegistration.Field.name, .birth, .age, .family, .insulinPlan].first { all[$0] != nil }
+    }
+    private var missing: String? {
+        guard let field = missingField, let message = allErrors[field] else { return nil }
+        return petFieldLabel(field, slots: []).map { okcheNamed($0, message) } ?? message
+    }
     @State private var saved = false
     @FocusState private var focused: PetRegistration.Field?
     @Query private var weights: [Record]
@@ -39,7 +63,7 @@ struct PetEditView: View {
     var body: some View {
         VStack(spacing: 0) {
             FormHeader(title: PetTitle.name(pet), note: "아이 정보", icon: "chevron.left", iconLabel: "뒤로") { dismiss() }
-            ScrollViewReader { scroller in
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         summary
@@ -79,20 +103,24 @@ struct PetEditView: View {
                                            detail: "알림을 멈추고, 이 기간은 약·끼니 챙긴 횟수에서 빼요. 휴양 중에도 기록할 수 있어요.",
                                            isOn: $form.resting)
                         }
-                        VStack(alignment: .leading, spacing: 8) {
-                            OkcheFieldError(message: errors[.save])
-                            Button("저장하기") { save(scroller) }
-                                .buttonStyle(.okchePrimary)
-                                .disabled(saved)
-                        }
                         lifecycleLinks
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
                     .padding(.top, 4)
-                    .padding(.bottom, OkcheSpacing.space6)
+                    .padding(.bottom, OkcheSpacing.space4)
                 }
                 .scrollDismissesKeyboard(.interactively)
-            }
+                .okcheFooter {
+                    OkcheFieldError(message: errors[.save])
+                    // 남은 것 줄을 누르면 그 칸으로 가서 칸 아래 오류를 보여 줌.
+                    Button("저장하기", action: save).buttonStyle(.okchePrimary).okcheMissing(missing) {
+                        guard let field = missingField else { return }
+                        touched.insert(field)
+                        withAnimation { proxy.scrollTo(field, anchor: .center) }
+                        if field == .name || field == .age { focused = field }
+                    }
+                }
+                }
         }
         .background(OkcheColor.hanji)
         .overlay { dialogView }
@@ -104,17 +132,12 @@ struct PetEditView: View {
                 Button("완료") { focused = nil }
             }
         }
-        .onChange(of: form.name) { errors[.name] = nil }
-        .onChange(of: form.approxAge) { errors[.age] = nil }
-        .onChange(of: form.birthDate) { errors[.birth] = nil }
-        .onChange(of: form.familyDate) { errors[.family] = nil }
-        .onChange(of: form.hasDiabetes) { errors[.insulinPlan] = nil }
-        // 인슐린 설정을 다녀와 계획이 생겼으면 '먼저 설정해 주세요' 오류를 지운다.
-        .onAppear {
-            if errors[.insulinPlan] != nil, !((try? InsulinPlan.open(for: pet.id, in: context)) ?? []).isEmpty {
-                errors[.insulinPlan] = nil
-            }
-        }
+        // 만진 칸만 칸 아래 오류(열자마자 빨간 글자가 뜨지 않게). 인슐린 계획은 설정을 다녀오면 저절로 다시 셈.
+        .onChange(of: form.name) { touched.insert(.name) }
+        .onChange(of: form.approxAge) { touched.insert(.age) }
+        .onChange(of: form.birthDate) { touched.insert(.birth) }
+        .onChange(of: form.familyDate) { touched.insert(.family) }
+        .onChange(of: form.hasDiabetes) { touched.insert(.insulinPlan) }
     }
 
     /// 이름 + '고양이 · 코리안숏헤어 · 동행 1,248일' (저장된 값).
@@ -245,25 +268,16 @@ struct PetEditView: View {
         }
     }
 
-    private func save(_ scroller: ScrollViewProxy) {
-        guard !saved else { return }
+    private func save() {
+        guard !saved, missing == nil else { return }
         do {
             try form.save(in: context)
-            errors = [:]
+            failed = false
             saved = true
             dismiss()
-        } catch let invalid as PetRegistration.Invalid {
-            errors = invalid.errors
-            let order: [PetRegistration.Field] = [.name, .birth, .age, .family, .insulinPlan]
-            if let first = order.first(where: { errors[$0] != nil }) {
-                withAnimation { scroller.scrollTo(first, anchor: .center) }
-                if first == .name || first == .age { focused = first }
-                let message = errors.count == 1 ? errors[first]! : "고칠 곳 \(errors.count)개. \(errors[first]!)"
-                AccessibilityNotification.Announcement(message).post()
-            }
         } catch {
-            errors = [.save: "저장하지 못했어요. 다시 해 주세요."]
-            AccessibilityNotification.Announcement(errors[.save]!).post()
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
         }
     }
 }

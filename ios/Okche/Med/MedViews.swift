@@ -81,7 +81,8 @@ struct MedFormSheet: View {
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }) private var pets: [Pet]
     @State private var form: MedRules.Form
     private let original: MedRules.Form
-    @State private var errors: [MedRules.Field: String] = [:]
+    /// 한 번 만진 칸 — 칸 아래 오류는 만진 뒤부터(열자마자 빨간 글자가 뜨지 않게).
+    @State private var touched: Set<MedRules.Field> = []
     @State private var failed = false
     @State private var saving = false
     @State private var dialog: Dialog?
@@ -104,6 +105,16 @@ struct MedFormSheet: View {
 
     private var editing: Medication? { if case .edit(let med) = mode { med } else { nil } }
     private var picking: Bool { if case .addAndPick = mode { true } else { false } }
+
+    /// 지금 칸 오류 — 만진 칸만 보임.
+    private var errors: [MedRules.Field: String] { MedRules.errors(form).filter { touched.contains($0.key) } }
+
+    /// 첫 번째로 남은 것(칸 순서) — 있으면 저장 버튼은 흐리게.
+    private var missing: String? {
+        let all = MedRules.errors(form)
+        let labels: [(MedRules.Field, String)] = [(.name, "약 이름"), (.shortName, "짧은 이름"), (.dose, "한 번에"), (.stock, "지금 남은 양")]
+        return labels.lazy.compactMap { field, label in all[field].map { okcheNamed(label, $0) } }.first
+    }
 
     var body: some View {
         let unit = MedRules.unitTitle(MedRules.unit(form.form))
@@ -142,27 +153,26 @@ struct MedFormSheet: View {
                          : picking ? "들이면 약 추가 화면으로 돌아가 이 약이 바로 골라져 있어요. 약방에도 그대로 남아요."
                          : "들인 약은 탕약 알림을 만들 때 골라 쓸 수 있어요.")
                         .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    // 빼기는 저장 버튼 바로 밑에서 잘못 누르지 않게 내용 맨 아래(아래 고정 칸 밖).
+                    if let editing {
+                        Button {
+                            dialog = MedRules.takers(editing, schedules: schedules, pets: pets).isEmpty ? .remove : .blocked
+                        } label: {
+                            Text("약방에서 빼기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
+                                .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, OkcheSpacing.space4)
                 .padding(.top, OkcheSpacing.space6)
                 .padding(.bottom, OkcheSpacing.space4)
             }
-            VStack(spacing: 4) {
+            .okcheFooter {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button(editing != nil ? "저장하기" : picking ? "약방에 들이고 고르기" : "약방에 들이기", action: save).buttonStyle(.okchePrimary)
-                if let editing {
-                    Button {
-                        dialog = MedRules.takers(editing, schedules: schedules, pets: pets).isEmpty ? .remove : .blocked
-                    } label: {
-                        Text("약방에서 빼기").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.yeonji)
-                            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
+                    .okcheMissing(missing)
             }
-            .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.top, 10).padding(.bottom, OkcheSpacing.space4)
-            .overlay(alignment: .top) { Rectangle().fill(OkcheColor.line).frame(height: 1) }
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -178,9 +188,9 @@ struct MedFormSheet: View {
         OkcheTextField(label: "지금 남은 양", note: "(선택)", text: field(\.stock, .stock), placeholder: "예: 120", unit: unit, keyboard: .decimalPad, error: errors[.stock])
     }
 
-    /// 칸을 고치면 그 칸 오류를 지운다.
+    /// 칸을 고치면 만진 칸으로(그 뒤로 칸 아래 오류가 보임).
     private func field(_ key: WritableKeyPath<MedRules.Form, String>, _ error: MedRules.Field) -> Binding<String> {
-        Binding(get: { form[keyPath: key] }, set: { form[keyPath: key] = $0; errors[error] = nil })
+        Binding(get: { form[keyPath: key] }, set: { form[keyPath: key] = $0; touched.insert(error) })
     }
 
     @ViewBuilder private var dialogView: some View {
@@ -199,14 +209,7 @@ struct MedFormSheet: View {
     }
 
     private func save() {
-        guard !saving else { return }
-        errors = MedRules.errors(form)
-        guard errors.isEmpty else {
-            // 칸 순서대로 첫 오류(안드로이드와 같음).
-            let first = [MedRules.Field.name, .shortName, .dose, .stock].lazy.compactMap { errors[$0] }.first
-            AccessibilityNotification.Announcement(first ?? "").post()
-            return
-        }
+        guard !saving, missing == nil else { return }
         saving = true
         do {
             if let editing {

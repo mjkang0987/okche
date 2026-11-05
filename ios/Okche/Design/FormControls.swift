@@ -288,6 +288,8 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
     /// `emphasis`: 남색 테두리·굵은 남색 글자(둘 중 권하는 답 — '다 바꿨어요', 7-4a).
     enum Look { case filled, outlined, dashed, pill, danger, emphasis }
     var look: Look = .filled
+    /// 못 누를 때(덜 채움·저장 중) 꽉 찬 버튼은 회색(2026-11-05 사용자 — 투명하게 흐리면 뒤가 비침).
+    @Environment(\.isEnabled) private var isEnabled
     @ScaledMetric(relativeTo: .title3) private var height: CGFloat = 52
     @ScaledMetric(relativeTo: .subheadline) private var pillHeight: CGFloat = 40
 
@@ -297,10 +299,10 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
             case .filled:
                 configuration.label
                     .okcheText(OkcheType.heading)
-                    .foregroundStyle(OkcheColor.paper)
+                    .foregroundStyle(isEnabled ? OkcheColor.paper : OkcheColor.inkMuted)
                     .padding(.horizontal, OkcheSpacing.space4)
                     .frame(maxWidth: .infinity, minHeight: height)
-                    .background(OkcheColor.namsaek, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                    .background(isEnabled ? OkcheColor.namsaek : OkcheColor.line, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
             case .outlined, .dashed, .danger, .emphasis:
                 configuration.label
                     .okcheText(OkcheType.body, weight: look == .danger || look == .emphasis ? .bold : nil)
@@ -314,10 +316,10 @@ struct OkchePrimaryButtonStyle: ButtonStyle {
             case .pill:
                 configuration.label
                     .okcheText(OkcheType.label, weight: .bold)
-                    .foregroundStyle(OkcheColor.paper)
+                    .foregroundStyle(isEnabled ? OkcheColor.paper : OkcheColor.inkMuted)
                     .padding(.horizontal, 14)
                     .frame(minHeight: pillHeight)
-                    .background(OkcheColor.namsaek, in: Capsule())
+                    .background(isEnabled ? OkcheColor.namsaek : OkcheColor.line, in: Capsule())
                     .frame(minHeight: 44) // 보이는 높이는 40, 누르는 영역은 44
                     .contentShape(Rectangle())
             }
@@ -377,4 +379,52 @@ struct OkcheMenuPicker<Value: Hashable>: View {
         .accessibilityLabel([label, note].compactMap { $0 }.joined(separator: " "))
         .accessibilityValue(title)
     }
+}
+
+// MARK: 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게)
+
+extension View {
+    /// 화면·시트 아래에 붙은 주 버튼 칸: 위 선·바탕 없음(2026-11-05 사용자), 내용이 많아도 늘 보인다. `show`가 거짓이면 칸 없음.
+    func okcheFooter<Footer: View>(show: Bool = true, @ViewBuilder _ footer: () -> Footer) -> some View {
+        let content = footer()
+        return safeAreaInset(edge: .bottom, spacing: 0) {
+            if show {
+                VStack(alignment: .leading, spacing: 8) { content }
+                    .padding(.horizontal, OkcheSpacing.space4).padding(.top, 10).padding(.bottom, 8)
+            }
+        }
+    }
+
+    /// 주 버튼에 붙여 덜 채웠으면(`missing`이 있으면) 흐리게 + 못 누름 + 바로 위에 남은 것 한 줄.
+    /// 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
+    /// `onShow`가 있으면 남은 것 줄을 누르면 그 칸으로(긴 화면 — 위쪽 칸이 문제일 때 찾게).
+    func okcheMissing(_ missing: String?, onShow: (() -> Void)? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let missing {
+                if let onShow {
+                    Button(action: onShow) {
+                        Text("\(missing) ›").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                            .multilineTextAlignment(.leading)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            // 아래 칸이 투명해서 뒤 내용과 겹치지 않게 글자 뒤에만 한지색.
+                            .background(OkcheColor.hanji, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(missing)
+                    .accessibilityHint("그 칸으로 가기")
+                } else {
+                    Text(missing).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(OkcheColor.hanji, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                }
+            }
+            disabled(missing != nil).accessibilityHint(missing ?? "") // 못 누를 땐 버튼 모양이 회색으로
+        }
+    }
+}
+
+/// 칸 오류 글자 앞에 칸 이름 — 아래 줄은 어느 칸인지 말해야 해서(이미 들어 있으면 그대로).
+func okcheNamed(_ label: String, _ message: String) -> String {
+    message.contains(label) ? message : "\(label) · \(message)"
 }

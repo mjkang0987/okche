@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -206,7 +207,20 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
     var medEditing by remember { mutableStateOf<Record?>(null) }
     medEditing?.let { app.okche.ui.med.MedExtraSheet(pet, it) { medEditing = null } } // 탕약은 기록 하나 고치기 시트(8-3b)
     editing?.let { RecordDetailSheet(it, pets, onSaved = { _, _ -> }, onClose = { editing = null }) }
-    val rows = records?.let { mainTodayRecords(it, pet.id, day) }
+    // '예정' 줄을 누르면 오늘 먹일 약 시트(8-3c).
+    var medSheet by remember { mutableStateOf(false) }
+    if (medSheet) app.okche.ui.med.MedTodaySheet(pet) { medSheet = false }
+    val schedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
+    // 몇 시간마다 밀림은 앞날 기록도 보니 탕약 기록 전체로.
+    val medRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
+    val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
+    // 오늘 남은 탕약 차례는 '21:00  탕약 · 약 … 예정' 줄로 기록 사이에 시간 순(보드 Main). 다 읽기 전엔 그리지 않음.
+    val rows: List<Pair<Long, Any>>? = records?.let { recs ->
+        val s = schedules ?: return@let null
+        val m = medRecords ?: return@let null
+        (mainTodayRecords(recs, pet.id, day).map { it.occurredAt to it as Any } +
+            app.okche.ui.med.remainingSlots(s, m, pet.id, day).map { it.due to it as Any }).sortedBy { it.first }
+    }
     Column(
         Modifier
             .fillMaxWidth()
@@ -235,8 +249,10 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
                 color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(),
             )
         } else if (rows != null) {
-            rows.forEachIndexed { index, record ->
-                RecordRow(record) {
+            rows.forEachIndexed { index, (_, item) ->
+                if (item is app.okche.ui.med.MedSlot) PendingRow(item, meds.firstOrNull { it.id == item.schedule.medicationId }?.name) { medSheet = true }
+                else if (item is Record) RecordRow(item) {
+                    val record = item
                     when (record.kind) {
                         RecordKind.meal -> onOpenSura(pet.id)
                         RecordKind.snack -> snackEditing = record
@@ -247,6 +263,35 @@ private fun TodayRecords(pets: List<Pet>, pet: Pet, day: String, onOpenSura: (St
                 if (index < rows.lastIndex) HorizontalDivider(color = OkcheColor.Line)
             }
         }
+    }
+}
+
+/** 예정 줄 52: '21:00  탕약 · 약 … 예정 ›', 누르면 오늘 먹일 약 시트. */
+@Composable
+private fun PendingRow(slot: app.okche.ui.med.MedSlot, medName: String?, onClick: () -> Unit) {
+    val time = app.okche.ui.med.hhmm(slot.due)
+    // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
+    val name = medName?.let { "$it " }.orEmpty()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics { contentDescription = "$time ${name}탕약 예정 · 오늘 먹일 약 보기"; role = Role.Button },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = OkcheColor.InkMuted)) { append(time) }
+                append("  탕약")
+                withStyle(SpanStyle(color = OkcheColor.InkMuted, fontSize = 0.85.em, fontWeight = FontWeight.Normal)) { append(" · 약") }
+            },
+            Modifier.weight(1f),
+            color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(),
+        )
+        Text("예정", color = OkcheColor.Namsaek, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = OkcheColor.Namsaek)
     }
 }
 

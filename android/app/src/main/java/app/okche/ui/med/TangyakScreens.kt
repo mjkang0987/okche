@@ -91,6 +91,8 @@ import app.okche.ui.theme.OkcheRadius
 import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
+import app.okche.ui.goldFrame
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -107,17 +109,59 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val scope = rememberCoroutineScope()
-    val schedules by remember { dao.medSchedulesFlow() }.collectAsState(emptyList())
+    val loadedSchedules by remember { dao.medSchedulesFlow() }.collectAsState(null)
+    val schedules = loadedSchedules.orEmpty()
     val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
-    val records by remember { dao.medRecordsFlow() }.collectAsState(emptyList())
+    val loadedRecords by remember { dao.medRecordsFlow() }.collectAsState(null)
+    val records = loadedRecords.orEmpty()
     var failed by remember { mutableStateOf(false) }
     val cards = medCards(schedules, pets)
+    val toasts = app.okche.ui.LocalUndoToasts.current
+    /** 띠 알림의 '되돌리기' = 방금 남긴 기록 지우기(확인 창 → 지움 → '기록을 지웠어요 · 되돌리기'). */
+    var deleting by remember { mutableStateOf<app.okche.store.Record?>(null) }
+    /** 띄운 알림 — 이 화면이 사라지면 닫는다(되돌리기가 이 화면의 확인 창을 쓰므로). */
+    var posted by remember { mutableStateOf<app.okche.ui.UndoToastItem?>(null) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { posted?.let { toasts?.dismiss(it) } } }
+    // shortcut: 켜 둔 채 6시를 넘겨도 다시 그리기 전까지 어제 차례가 보임, 일기 탭과 같이 날 바뀜을 다룰 때 함께.
+    // 일정·기록을 다 읽기 전엔 띠를 그리지 않음(이미 준 차례가 잠깐 남은 차례로 보이지 않게).
+    val next = if (loadedSchedules == null || loadedRecords == null) null else nextSlot(schedules, records, pets, OkcheDay.of(System.currentTimeMillis()))
+    /** 기록 직후 1초는 띠를 막는다(두 번 눌러 같은 차례·다음 차례가 또 기록되지 않게). */
+    var giving by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("탕약", "약 · 알림", Icons.AutoMirrored.Outlined.ArrowBack, "뒤로", onBack, trailing = seal)
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
+            // 다음 탕약 띠(보드 Tangyak, 2026-11-05 승인) — 오늘 남은 차례가 없으면 숨김.
+            next?.let { (slot, pet) ->
+                val med = meds.firstOrNull { it.id == slot.schedule.medicationId } ?: return@let
+                val amount = amountText(slot.schedule.amount, slot.schedule.unit)
+                val time = clockText(slot.due)
+                NextMedBand(time, "${pet.name} · ${med.name} $amount", "$time ${pet.name} ${med.name} $amount 줬어요", busy = giving) {
+                    // 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
+                    if (giving) return@NextMedBand
+                    giving = true
+                    scope.launch {
+                        launch { kotlinx.coroutines.delay(1000); giving = false }
+                        runCatching { recordSlot(dao, slot) }
+                            .onSuccess { saved ->
+                                failed = false
+                                val toast = app.okche.ui.UndoToastItem("${med.name} 줌 · ${hhmm(saved.occurredAt)}") {
+                                    toasts?.show(null)
+                                    // 그 사이 고쳤을 수 있어 지금 값으로.
+                                    deleting = records.firstOrNull { r -> r.id == saved.id }
+                                }
+                                posted = toast
+                                toasts?.show(toast)
+                            }
+                            .onFailure {
+                                failed = true
+                                @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+                            }
+                    }
+                }
+            }
             if (cards.isEmpty()) {
                 Text(
                     "아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요.",
@@ -139,6 +183,49 @@ fun TangyakScreen(pets: List<Pet>, seal: @Composable () -> Unit, onAdd: () -> Un
             }
             OkchePrimaryButton("+ 약 추가", onAdd)
         }
+    }
+    deleting?.let { app.okche.ui.record.DeleteRecordDialog(dao, it, pets) { deleting = null } }
+}
+
+/** 다음 탕약 띠(보드 Tangyak): 남색 바탕 금테 112, '다음 탕약 / 오후 9:00 / 콩이 · 프레드니솔론 1알' + 한지색 '줬어요'. 큰 글자에선 버튼을 아래로. */
+@Composable
+private fun NextMedBand(time: String, detail: String, label: String, busy: Boolean = false, onGive: () -> Unit) {
+    val modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 112.dp)
+        .background(OkcheColor.NamsaekDeep)
+        .goldFrame(inset = 12f, stroke = 1.1f) { size ->
+            androidx.compose.ui.graphics.Brush.linearGradient(
+                0f to OkcheColor.GeumLight, 0.5f to OkcheColor.Geum, 1f to OkcheColor.GeumShade,
+                start = Offset.Zero, end = Offset(size.width, size.height),
+            )
+        }
+        .padding(horizontal = 28.dp, vertical = 18.dp) // 금테(12 안쪽) 안에 머물고 보드 높이 112
+    val texts = @Composable { m: Modifier ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("다음 탕약", Modifier.semantics { heading() }, color = OkcheColor.OnDeepMuted, style = OkcheType.Label.toTextStyle(FontWeight.Medium))
+            // 보드는 본문 글꼴 22 굵게(제목 글꼴 아님).
+            Text(time, color = OkcheColor.GeumLight, style = OkcheType.Body.toTextStyle(FontWeight.Bold).copy(fontSize = 22.sp, lineHeight = 30.sp))
+            Text(detail, color = OkcheColor.Hanji, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+        }
+    }
+    val button = @Composable {
+        Box(
+            Modifier
+                .heightIn(min = 52.dp)
+                .background(OkcheColor.Hanji, RoundedCornerShape(OkcheRadius.RadiusMd))
+                .clickable(enabled = !busy, role = Role.Button, onClick = onGive)
+                .semantics { contentDescription = label }
+                .padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("줬어요", Modifier.clearAndSetSemantics {}, color = OkcheColor.NamsaekDeep, style = OkcheType.Body.toTextStyle(FontWeight.Bold))
+        }
+    }
+    if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) { texts(Modifier); button() }
+    } else {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { texts(Modifier.weight(1f)); button() }
     }
 }
 

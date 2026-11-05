@@ -134,6 +134,12 @@ fun todaySlots(schedules: List<MedSchedule>, records: List<Record>, petId: Strin
     return result.sortedWith(compareBy({ it.slot.due }, { it.slot.schedule.createdAt }, { it.slot.schedule.id }))
 }
 
+/** 다음 탕약(탕약 화면 띠, 8-3c): 모든 아이(추억·지운 아이 빼고)의 오늘 남은 차례 중 가장 이른 것 — 같으면 먼저 모신 아이. */
+fun nextSlot(schedules: List<MedSchedule>, records: List<Record>, pets: List<app.okche.store.Pet>, day: String, zone: ZoneId = ZoneId.systemDefault()): Pair<MedSlot, app.okche.store.Pet>? =
+    pets.filter { it.memorializedAt == null && it.deletedAt == null }
+        .mapNotNull { pet -> remainingSlots(schedules, records, pet.id, day, zone).firstOrNull()?.let { it to pet } }
+        .minWithOrNull(compareBy({ it.first.due }, { it.second.createdAt }))
+
 /** 일기 탕약 줄 버튼: 같은 약은 이른 차례 하나만, 최대 3개(8-3 정한 것 ②). */
 fun medButtons(slots: List<MedSlot>): List<MedSlot> = slots.distinctBy { it.schedule.medicationId }.take(3)
 

@@ -575,6 +575,24 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '탕약 프레드니솔론 먹고 토함'")).firstMatch.waitForExistence(timeout: 3))
     }
 
+    /// 8-3c: 문안 '예정' 줄 → 오늘 먹일 약 시트, 탕약 화면 '다음 탕약' 띠 '줬어요' → 기록 알림.
+    func testMainPendingAndNextBand() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        addHoursMedAndOpenRecord(app)
+        app.tabBars.buttons["문안"].tap()
+        let pending = app.buttons.matching(NSPredicate(format: "label ENDSWITH '탕약 예정 · 오늘 먹일 약 보기'")).firstMatch
+        tapBelow(pending, in: app)
+        XCTAssertTrue(app.staticTexts["다음 차례"].waitForExistence(timeout: 3))
+        app.buttons["닫기"].firstMatch.tap()
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["탕약 · 약 알림"], in: app)
+        let band = app.buttons.matching(NSPredicate(format: "label CONTAINS '콩이 프레드니솔론 1알 줬어요'")).firstMatch
+        XCTAssertTrue(band.waitForExistence(timeout: 3))
+        band.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '프레드니솔론 줌 · '")).firstMatch.waitForExistence(timeout: 3))
+    }
+
     /// 아래쪽 버튼이 보일 때까지 밀어 올리고 누른다(최대 15번).
     private func tapBelow(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 5))

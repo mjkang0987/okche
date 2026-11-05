@@ -124,12 +124,21 @@ struct TodayRecordSection: View {
     @State private var editing: DetailTarget?
     @State private var snackEditing: Record?
     @State private var medEditing: Record?
+    @Query(filter: #Predicate<MedSchedule> { $0.deletedAt == nil }) private var schedules: [MedSchedule]
+    @Query private var meds: [Medication]
+    /// '예정' 줄을 누르면 오늘 먹일 약 시트(8-3c).
+    @State private var medSheet: Pet?
     @ScaledMetric(relativeTo: .body) private var plainSize: CGFloat = 13.6
     @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 52
     private let titleStyle = OkcheTextStyle(family: .display, size: 18, lineHeight: 26, weight: .bold)
 
     var body: some View {
         let rows = MainCard.todayRecords(records, petId: petId, day: day)
+        // 오늘 남은 탕약 차례는 '21:00 탕약 · 약 — 예정' 줄로 기록 사이에 시간 순(보드 `Main`).
+        let pending = MedSlots.remaining(schedules, records: records.filter { $0.kind == RecordKind.med.rawValue }, petId: petId, day: day)
+        let items = (rows.map { (date: $0.occurredAt, id: $0.id.uuidString, record: Optional($0), slot: MedSlots.Slot?.none) }
+            + pending.map { (date: $0.due, id: $0.key, record: Record?.none, slot: Optional($0)) })
+            .sorted { $0.date < $1.date }
         VStack(alignment: .leading, spacing: 4) {
             // 큰 글자에서 한 줄에 안 들어가면 '오늘 기록'을 아래로(제목이 낱말 가운데서 끊기지 않게).
             ViewThatFits(in: .horizontal) {
@@ -138,15 +147,17 @@ struct TodayRecordSection: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            if rows.isEmpty {
+            if items.isEmpty {
                 Text("아직 오늘 남긴 기록이 없어요.").okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
                     .padding(.top, 8).padding(.bottom, 4)
             } else {
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, record in
-                    row(record)
-                        .overlay(alignment: .bottom) {
-                            if index < rows.count - 1 { Rectangle().fill(OkcheColor.line).frame(height: 1) }
-                        }
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    Group {
+                        if let record = item.record { row(record) } else if let slot = item.slot { pendingRow(slot) }
+                    }
+                    .overlay(alignment: .bottom) {
+                        if index < items.count - 1 { Rectangle().fill(OkcheColor.line).frame(height: 1) }
+                    }
                 }
             }
         }
@@ -157,6 +168,7 @@ struct TodayRecordSection: View {
         .sheet(item: $snackEditing) { record in
             if let pet = pets.first(where: { $0.id == petId }) { SnackRecordSheet(pet: pet, editing: record) }
         }
+        .sheet(item: $medSheet) { pet in MedTodaySheet(pet: pet) }
         .sheet(item: $medEditing) { record in
             if let pet = pets.first(where: { $0.id == petId }) { MedExtraSheet(pet: pet, editing: record) }
         }
@@ -191,6 +203,27 @@ struct TodayRecordSection: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(label)
         }
+    }
+
+    /// 예정 줄: '21:00  탕약 · 약 … 예정 ›', 누르면 오늘 먹일 약 시트.
+    private func pendingRow(_ slot: MedSlots.Slot) -> some View {
+        let time = MedSlots.hhmm(slot.due)
+        // 같은 시각 약이 여럿이어도 화면 읽기로 구분되게 약 이름을 넣는다.
+        let name = meds.first { $0.id == slot.schedule.medicationId }.map { "\($0.name) " } ?? ""
+        return Button { medSheet = pets.first { $0.id == petId } } label: {
+            HStack(spacing: 8) {
+                (Text(time).foregroundColor(OkcheColor.inkMuted) + Text("  탕약")
+                    + Text(" · 약").font(.system(size: plainSize)).foregroundColor(OkcheColor.inkMuted))
+                    .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("예정").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaek)
+                Image(systemName: "chevron.right").font(.body).foregroundStyle(OkcheColor.namsaek).accessibilityHidden(true)
+            }
+            .frame(minHeight: rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(time) \(name)탕약 예정 · 오늘 먹일 약 보기")
     }
 
     private func rowContent(_ record: Record, _ value: String) -> some View {

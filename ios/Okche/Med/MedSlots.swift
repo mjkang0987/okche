@@ -141,6 +141,13 @@ enum MedSlots {
         }
     }
 
+    /// 다음 탕약(탕약 화면 띠, 8-3c): 모든 아이(추억 빼고)의 오늘 남은 차례 중 가장 이른 것 — 같으면 먼저 모신 아이.
+    static func next(_ schedules: [MedSchedule], records: [Record], pets: [Pet], day: String) -> (slot: Slot, pet: Pet)? {
+        pets.filter { $0.memorializedAt == nil && $0.deletedAt == nil }
+            .compactMap { pet in remaining(schedules, records: records, petId: pet.id, day: day).first.map { (slot: $0, pet: pet) } }
+            .min { ($0.slot.due, $0.pet.createdAt) < ($1.slot.due, $1.pet.createdAt) }
+    }
+
     /// 일기 탕약 줄 버튼: 같은 약은 이른 차례 하나만, 최대 3개(8-3 정한 것 ②).
     static func buttons(_ slots: [Slot]) -> [Slot] {
         var seen = Set<UUID>()

@@ -82,7 +82,11 @@ struct NotifySettingsView: View {
     private func row(_ title: String, _ detail: String?, _ setting: Setting, _ key: WritableKeyPath<Setting, Bool>) -> some View {
         Toggle(isOn: Binding(get: { setting[keyPath: key] }, set: { on in save(setting) { $0[keyPath: key] = on } })) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                // '약방 · 남은 약': 점 뒤는 작은 회색(보드).
+                let parts = title.components(separatedBy: " · ")
+                (Text(parts[0]) + Text(parts.count > 1 ? " · " + parts[1...].joined(separator: " · ") : "")
+                    .font(.system(size: OkcheType.body.size * 0.85)).foregroundColor(OkcheColor.inkMuted))
+                    .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
                 if let detail { Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
             }
         }

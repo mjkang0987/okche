@@ -47,9 +47,9 @@ final class Setting {
     var lowMedDays: Int
     var celebrateTone: CelebrateTone
 
-    // shortcut: 밤 알림 쉬기·알림 켜짐·축하 문구의 처음 값은 문서에 없어 임시로 정함, 설정 화면 만들 때 디자인과 맞춘다.
+    // 밤 알림 쉬기·알림 켜짐 처음 값은 보드 `Notify`대로(켬 22:00~08:00·모두 켬, 8-4c). 축하 문구 처음 값은 그 단계에서.
     init(now: Date = .now,
-         quietHours: QuietHours = QuietHours(enabled: false, start: "22:00", end: "07:00"),
+         quietHours: QuietHours = QuietHours(enabled: true, start: "22:00", end: "08:00"),
          notify: NotifySettings = NotifySettings(medTime: true, insulinTime: true, lowMed: true, weighIn: true,
                                                  goodDay: true, lastYearToday: true),
          weightReminder: WeightReminder = WeightReminder(weekday: 7, time: "10:00"),

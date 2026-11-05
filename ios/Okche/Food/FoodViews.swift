@@ -33,7 +33,8 @@ struct FoodChangeSheet: View {
                         .accessibilityLabel("닫기")
                     }
                     OkcheTextField(label: "사료 이름", text: $name, placeholder: "예: 가수분해 처방식 1.5kg", error: nameError)
-                        .onChange(of: name) { if !name.trimmingCharacters(in: .whitespaces).isEmpty { nameError = nil } }
+                        // 만진 뒤 비우면 칸 아래 오류(열자마자 뜨지 않게).
+                        .onChange(of: name) { nameError = name.trimmingCharacters(in: .whitespaces).isEmpty ? "사료 이름을 넣어 주세요" : nil }
                     let previous = FoodRules.previousNames(petId: pet.id, today: OkcheDay.of(.now), changes: changes, foods: foods)
                     if !previous.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
@@ -65,6 +66,7 @@ struct FoodChangeSheet: View {
             VStack(spacing: 8) {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button("바꾸기", action: save).buttonStyle(.okchePrimary)
+                    .okcheMissing(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "사료 이름을 넣으면 바꿀 수 있어요" : nil)
             }
             .padding(.horizontal, OkcheSpacing.space4)
             .padding(.top, 10).padding(.bottom, OkcheSpacing.space4)
@@ -77,12 +79,7 @@ struct FoodChangeSheet: View {
     }
 
     private func save() {
-        guard !saving else { return }
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            nameError = "사료 이름을 넣어 주세요"
-            AccessibilityNotification.Announcement("사료 이름을 넣어 주세요").post()
-            return
-        }
+        guard !saving, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         do {
             // 오늘 뒤는 안 됨 — 오늘 = 6시 기준(달력에선 자정 뒤 날짜도 고를 수 있어 여기서 맞춤).
             let today = OkcheDay.of(.now)

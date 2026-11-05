@@ -378,3 +378,29 @@ struct OkcheMenuPicker<Value: Hashable>: View {
         .accessibilityValue(title)
     }
 }
+
+// MARK: 아래 고정 주 버튼(2026-11-05 사용자 — 꼭 눌러야 하는 버튼은 아래 고정, 덜 채우면 흐리게)
+
+extension View {
+    /// 화면·시트 아래에 붙은 주 버튼 칸: 위 선 + 한지 바탕, 내용이 많아도 늘 보인다. `show`가 거짓이면 칸 없음.
+    func okcheFooter<Footer: View>(show: Bool = true, @ViewBuilder _ footer: () -> Footer) -> some View {
+        let content = footer()
+        return safeAreaInset(edge: .bottom, spacing: 0) {
+            if show {
+                VStack(alignment: .leading, spacing: 8) { content }
+                    .padding(.horizontal, OkcheSpacing.space4).padding(.top, 10).padding(.bottom, 8)
+                    .background(OkcheColor.hanji)
+                    .overlay(alignment: .top) { OkcheColor.line.frame(height: 1) }
+            }
+        }
+    }
+
+    /// 주 버튼에 붙여 덜 채웠으면(`missing`이 있으면) 흐리게 + 못 누름 + 바로 위에 남은 것 한 줄.
+    /// 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게 하고, 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
+    func okcheMissing(_ missing: String?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let missing { Text(missing).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
+            disabled(missing != nil).opacity(missing == nil ? 1 : 0.45).accessibilityHint(missing ?? "")
+        }
+    }
+}

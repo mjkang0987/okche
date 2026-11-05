@@ -47,12 +47,11 @@ struct MedTodaySheet: View {
             .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
         }
         // 남은 차례가 없으면 버튼도 없음(모두 기록함).
-        .stickyFooter(show: entries.contains { $0.record == nil }) {
+        .okcheFooter(show: entries.contains { $0.record == nil }) {
             OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
             // 덜 채우면 흐리게 + 남은 것 안내(2026-11-05 사용자).
             Button("기록하기") { save(entries) }.buttonStyle(.okchePrimary)
-                .disabled(picks.isEmpty)
-                .footerHint(picks.isEmpty ? "먹인 약을 하나 이상 고르면 기록할 수 있어요" : nil)
+                .okcheMissing(picks.isEmpty ? "먹인 약을 하나 이상 고르면 기록할 수 있어요" : nil)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -200,11 +199,10 @@ struct MedExtraSheet: View {
             .padding(.horizontal, OkcheSpacing.space4)
             .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
         }
-        .stickyFooter {
+        .okcheFooter {
             OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
             Button("기록하기", action: save).buttonStyle(.okchePrimary)
-                .disabled(missing != nil)
-                .footerHint(missing)
+                .okcheMissing(missing)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
@@ -250,30 +248,6 @@ struct MedExtraSheet: View {
             saving = false
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
-        }
-    }
-}
-
-private extension View {
-    /// 흐린 주 버튼 바로 위 '무엇이 남았는지' 한 줄(화면 읽기는 버튼 앞에서 읽음).
-    func footerHint(_ hint: String?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let hint { Text(hint).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
-            // 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게. 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
-            self.opacity(hint == nil ? 1 : 0.45).accessibilityHint(hint ?? "")
-        }
-    }
-
-    /// 시트 아래에 붙은 '기록하기'(보드 MedSheet·MedExtra — 차례가 많아도 늘 보이게, 2026-11-05 사용자): 위 선 + 한지 바탕.
-    func stickyFooter<Footer: View>(show: Bool = true, @ViewBuilder _ footer: () -> Footer) -> some View {
-        let content = footer()
-        return safeAreaInset(edge: .bottom, spacing: 0) {
-            if show {
-                VStack(alignment: .leading, spacing: 8) { content }
-                    .padding(.horizontal, OkcheSpacing.space4).padding(.top, 10).padding(.bottom, 8)
-                    .background(OkcheColor.hanji)
-                    .overlay(alignment: .top) { OkcheColor.line.frame(height: 1) }
-            }
         }
     }
 }

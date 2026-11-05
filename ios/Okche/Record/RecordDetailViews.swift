@@ -54,11 +54,14 @@ struct RecordDetailSheet: View {
                 RecordTimeRow(occurredAt: $occurredAt, changed: $timeChanged, isNew: target.editing == nil)
                 ForEach(RecordDetail.fields(kind), id: \.key) { field in fieldView(field) }
                 warning
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                Button("기록하기", action: save).buttonStyle(.okchePrimary)
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
+        }
+        // 자세히 기록은 고를 칸이 모두 선택이라 늘 누를 수 있음.
+        .okcheFooter {
+            OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+            Button("기록하기", action: save).buttonStyle(.okchePrimary)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])

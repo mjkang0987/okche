@@ -137,7 +137,8 @@ struct SnackFormSheet: View {
                         .accessibilityLabel("닫기")
                     }
                     OkcheTextField(label: "간식 이름", text: $name, placeholder: "예: 닭가슴살 동결건조", error: nameError)
-                        .onChange(of: name) { if !name.trimmingCharacters(in: .whitespaces).isEmpty { nameError = nil } }
+                        // 만진 뒤 비우면 칸 아래 오류(열자마자 뜨지 않게).
+                        .onChange(of: name) { nameError = name.trimmingCharacters(in: .whitespaces).isEmpty ? "간식 이름을 넣어 주세요" : nil }
                     FieldGroup(title: "종류") {
                         OkcheChoiceChips(options: SnackRules.kinds, selection: Binding(get: { kind }, set: { kind = $0 ?? kind }), allowsNone: false)
                     }
@@ -151,6 +152,7 @@ struct SnackFormSheet: View {
             VStack(spacing: 8) {
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 Button(buttonTitle, action: save).buttonStyle(.okchePrimary)
+                    .okcheMissing(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "간식 이름을 넣으면 저장할 수 있어요" : nil)
                 if editing != nil {
                     Button { removing = true } label: {
                         Text("목록에서 빼기").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.yeonji)
@@ -201,12 +203,7 @@ struct SnackFormSheet: View {
     }
 
     private func save() {
-        guard !saving else { return }
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            nameError = "간식 이름을 넣어 주세요"
-            AccessibilityNotification.Announcement("간식 이름을 넣어 주세요").post()
-            return
-        }
+        guard !saving, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         saving = true
         do {
             if let editing {
@@ -255,7 +252,6 @@ struct SnackRecordSheet: View {
     @State private var timeChanged = false
     @State private var picked: UUID?
     @State private var amount = ""
-    @State private var pickError: String?
     @State private var adding = false
     @State private var failed = false
     @State private var saving = false
@@ -299,7 +295,6 @@ struct SnackRecordSheet: View {
                                           .joined(separator: " · "),
                                       isOn: picked == option.snack.id) {
                             picked = option.snack.id
-                            pickError = nil
                         }
                     }
                     Button { adding = true } label: {
@@ -307,7 +302,6 @@ struct SnackRecordSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    OkcheFieldError(message: pickError)
                 }
                 OkcheTextField(label: "얼마나 줬나요?", note: "(선택)", text: $amount, placeholder: "예: 3알, 반 개")
                 if SnackRules.inFoodChange(petId: pet.id, day: OkcheDay.of(occurredAt), changes: changes) {
@@ -317,30 +311,25 @@ struct SnackRecordSheet: View {
                         .padding(.vertical, 12).padding(.horizontal, 14)
                         .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                 }
-                OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
-                Button("기록하기", action: save).buttonStyle(.okchePrimary)
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
+        }
+        .okcheFooter {
+            OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
+            Button("기록하기", action: save).buttonStyle(.okchePrimary)
+                .okcheMissing(picked == nil ? "어떤 다과를 줬는지 고르면 기록할 수 있어요" : nil)
         }
         .background(OkcheColor.hanji)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .sheet(isPresented: $adding) {
-            SnackFormSheet(mode: .addAndPick) { snack in
-                picked = snack.id
-                pickError = nil
-            }
+            SnackFormSheet(mode: .addAndPick) { snack in picked = snack.id }
         }
     }
 
     private func save() {
-        guard !saving else { return }
-        guard let picked else {
-            pickError = "어떤 다과를 줬는지 골라 주세요"
-            AccessibilityNotification.Announcement("어떤 다과를 줬는지 골라 주세요").post()
-            return
-        }
+        guard !saving, let picked else { return }
         saving = true
         // 시간을 안 바꾼 새 기록은 누른 때가 '지금'.
         let at = editing == nil && !timeChanged ? Date.now : occurredAt

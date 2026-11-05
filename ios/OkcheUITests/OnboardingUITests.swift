@@ -381,8 +381,8 @@ final class OnboardingUITests: XCTestCase {
         app.tabBars.buttons["더보기"].tap()
         tapBelow(app.buttons["사료 · 처방식"], in: app)
         XCTAssertTrue(app.staticTexts["콩이 · 사료 바꾸기"].waitForExistence(timeout: 3))
-        app.buttons["바꾸기"].tap()
-        XCTAssertTrue(app.staticTexts["사료 이름을 넣어 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["바꾸기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
+        XCTAssertTrue(app.staticTexts["사료 이름을 넣으면 바꿀 수 있어요"].waitForExistence(timeout: 3))
         let field = app.textFields["사료 이름"]
         field.tap()
         field.typeText("가수분해 처방식")
@@ -401,8 +401,8 @@ final class OnboardingUITests: XCTestCase {
         more.tap()
         tapBelow(app.buttons["+ 다과 · 간식 남기기"], in: app)
         XCTAssertTrue(app.buttons["+ 새 다과 들이기"].waitForExistence(timeout: 3)) // 다과가 없으면 들이기만
-        app.buttons["기록하기"].tap()
-        XCTAssertTrue(app.staticTexts["어떤 다과를 줬는지 골라 주세요"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["기록하기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
+        XCTAssertTrue(app.staticTexts["어떤 다과를 줬는지 고르면 기록할 수 있어요"].waitForExistence(timeout: 3))
         app.buttons["+ 새 다과 들이기"].tap()
         let name = app.textFields["간식 이름"]
         XCTAssertTrue(name.waitForExistence(timeout: 3))
@@ -446,7 +446,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 들인 약이 없어요."].waitForExistence(timeout: 3))
         app.buttons["+ 약 들이기"].tap()
         XCTAssertTrue(app.staticTexts["약방에 약 들이기"].waitForExistence(timeout: 3))
-        app.buttons["약방에 들이기"].tap()
+        XCTAssertFalse(app.buttons["약방에 들이기"].isEnabled) // 덜 채우면 흐리게 + 남은 것
         XCTAssertTrue(app.staticTexts["약 이름을 넣어 주세요"].waitForExistence(timeout: 3))
         let name = app.textFields["약 이름"]
         name.tap()

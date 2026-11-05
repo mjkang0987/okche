@@ -120,6 +120,9 @@ class MedSlotsTest {
             listOf(given(o1, key(o1, "08:00"), at(27, 8)))))
         // 08:00 안 주고 10:00에 그만 먹이면 그날 남은 차례도 바로 빠짐(뒤를 잇는 줄 없음).
         assertTrue(remaining(listOf(row(times = listOf("08:00", "20:00"), from = at(20, 9), until = at(27, 10))), emptyList()).isEmpty())
+        // 추억으로 간직(10:00)했다가 같은 날 되돌려(11:00) 다시 연 줄이 있으면 그만 먹인 게 아님 — 안 준 08:00은 남음.
+        val kept = row(times = listOf("08:00", "20:00"), from = at(20, 9), until = at(27, 10))
+        assertEquals(listOf(at(27, 8), at(27, 20)), remaining(listOf(kept, row(times = listOf("08:00", "20:00"), series = kept, from = at(27, 11))), emptyList()))
         // 바꾼 다음 날은 새 줄 그대로.
         assertEquals(listOf(at(28, 9), at(28, 21)), remainingSlots(listOf(s1, s2), listOf(g), pet, "2026-10-28").map { it.due })
     }
@@ -233,7 +236,7 @@ class MedSlotsTest {
         // 그 사이 새 줄이 열렸으면 되살리지 않음(한 주기에 열린 줄 둘이 되지 않게).
         app.okche.ui.med.stopSchedule(dao, dao.medSchedules().single(), at(27, 22))
         dao.insert(row(times = listOf("21:00"), series = s, from = at(27, 23)))
-        app.okche.ui.med.resumeSchedule(dao, s)
+        assertTrue(runCatching { app.okche.ui.med.resumeSchedule(dao, s) }.isFailure) // '되돌리지 못했어요'로 알림
         assertTrue(dao.medSchedules().first { it.id == s.id }.activeUntil != null)
     }
 }

@@ -42,7 +42,7 @@ struct UndoToastItem: Equatable {
                 AccessibilityNotification.Announcement("되돌렸어요").post()
                 return true
             } catch {
-                show(.removed("되돌리지 못했어요. 다시 해 주세요.", show: show, restore: restore))
+                show(.removed("되돌리지 못했어요 · 다시 눌러 주세요", show: show, restore: restore))
                 return false
             }
         }

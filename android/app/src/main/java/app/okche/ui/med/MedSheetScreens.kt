@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -91,7 +92,7 @@ private fun StickyFooter(content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().background(OkcheColor.Hanji)) {
         HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
         Column(
-            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = OkcheSpacing.Space6),
+            Modifier.padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 10.dp, bottom = 8.dp), // 시트가 기기 아래 막대 자리를 따로 둠(iOS와 같게)
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) { content() }
     }
@@ -101,7 +102,12 @@ private fun StickyFooter(content: @Composable () -> Unit) {
 @Composable
 private fun FooterButton(text: String, onClick: () -> Unit, hint: String?) {
     if (hint != null) Text(hint, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
-    OkchePrimaryButton(text, onClick, enabled = hint == null)
+    // 공용 버튼은 못 누를 때도 같은 색이라 여기서 흐리게. 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
+    OkchePrimaryButton(
+        text, onClick,
+        Modifier.alpha(if (hint == null) 1f else 0.45f).semantics { if (hint != null) stateDescription = hint },
+        enabled = hint == null,
+    )
 }
 
 @Composable
@@ -241,7 +247,7 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
     // 아직 채우지 않은 것 — 있으면 '기록하기'는 흐리게.
     val missing = when {
         med == null -> "어떤 약인지 고르면 기록할 수 있어요"
-        amountValue == null -> "얼마나를 0보다 큰 숫자로 넣으면 기록할 수 있어요"
+        amountValue == null -> "'얼마나'에 0보다 큰 숫자를 넣으면 기록할 수 있어요"
         else -> null
     }
 
@@ -292,7 +298,6 @@ fun MedExtraSheet(pet: Pet, editing: Record? = null, onSaved: (Record) -> Unit =
                 if (editing == null) LinkText("+ 약방에 새 약 들이기") { adding = true }
             }
             OkcheTextField(amount, { amount = it }, "얼마나", suffix = med?.let { unitTitle(it.unit) },
-                error = if (amount.isEmpty() || amountValue != null) null else "0보다 큰 숫자로 넣어 주세요",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OkcheFieldLabel("언제")

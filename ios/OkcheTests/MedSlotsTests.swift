@@ -69,6 +69,9 @@ final class MedSlotsTests: XCTestCase {
                                  [given(o1, key: key(o1, "08:00"), at: at(27, 8))]), [at(27, 21)])
         // 08:00 안 주고 10:00에 그만 먹이면 그날 남은 차례도 바로 빠짐(뒤를 잇는 줄 없음).
         XCTAssertTrue(remaining([row(times: ["08:00", "20:00"], from: at(20, 9), until: at(27, 10))], []).isEmpty)
+        // 추억으로 간직(10:00)했다가 같은 날 되돌려(11:00) 다시 연 줄이 있으면 그만 먹인 게 아님 — 안 준 08:00은 남음.
+        let kept = row(times: ["08:00", "20:00"], from: at(20, 9), until: at(27, 10))
+        XCTAssertEqual(remaining([kept, row(times: ["08:00", "20:00"], series: kept, from: at(27, 11))], []), [at(27, 8), at(27, 20)])
         // 바꾼 다음 날은 새 줄 그대로.
         XCTAssertEqual(MedSlots.remaining([s1, s2], records: [g], petId: pet, day: "2026-10-28").map(\.due), [at(28, 9), at(28, 21)])
     }
@@ -188,7 +191,7 @@ final class MedSlotsTests: XCTestCase {
         // 그 사이 새 줄이 열렸으면 되살리지 않음(한 주기에 열린 줄 둘이 되지 않게).
         try MedSchedules.stop(s, now: at(27, 22), in: context)
         context.insert(row(times: ["21:00"], series: s, from: at(27, 23)))
-        try MedSchedules.resume(s, in: context)
+        XCTAssertThrowsError(try MedSchedules.resume(s, in: context)) // '되돌리지 못했어요'로 알림
         XCTAssertNotNil(s.activeUntil)
     }
 }

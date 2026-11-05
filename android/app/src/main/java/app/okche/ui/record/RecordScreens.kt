@@ -154,6 +154,9 @@ fun RecordTab(
     var checked by remember { mutableStateOf<CheckedMed?>(null) }
     /** 탕약 알림의 '되돌리기' = 방금 남긴 기록 지우기(확인 창 → 지움 → '기록을 지웠어요 · 되돌리기'). */
     var deleting by remember { mutableStateOf<Record?>(null) }
+    /** 띄운 탕약 알림 — 이 화면이 사라지면(기록 목록·수라로 감) 닫는다. 되돌리기가 이 화면의 확인 창을 쓰므로. */
+    var posted by remember { mutableStateOf<UndoToastItem?>(null) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { posted?.let { toasts?.dismiss(it) } } }
     // 탕약 줄: 그 아이에게 열린 약 주기가 있을 때만. 누른 버튼은 '✓'로 맨 앞, 같은 약 다음 차례는 그 뒤에 들어옴.
     val medLine = who?.let { id ->
         val all = schedules ?: return@let null
@@ -198,12 +201,14 @@ fun RecordTab(
                             failed = false
                             justSaved = it.id
                             val text = "${mine.name} 줌 · ${recordTime(it)}"
-                            val saved = it
-                            toasts?.show(UndoToastItem(text) {
-                                toasts.show(null)
-                                deleting = saved // 지우기 확인 창(지우면 '기록을 지웠어요 · 되돌리기')
-                            })
-                            @Suppress("DEPRECATION") view.announceForAccessibility("$text. 되돌리려면 되돌리기")
+                            val savedId = it.id
+                            val toast = UndoToastItem(text) {
+                                toasts?.show(null)
+                                // 그 사이 고쳤을 수 있어 지금 값으로(지우기 확인 창 → 지우면 '기록을 지웠어요 · 되돌리기').
+                                deleting = medRecords?.firstOrNull { r -> r.id == savedId }
+                            }
+                            posted = toast
+                            toasts?.show(toast)
                             kotlinx.coroutines.delay(1_000)
                             if (checked === mine) checked = null // 그새 다른 약을 눌렀으면 그 '✓'는 남김
                         }
@@ -237,7 +242,6 @@ fun RecordTab(
         // 아이를 읽기 전엔 이름 대신 '누군지 모름'이 잠깐 보이니 함께 기다린다.
         if (pets != null) RecentRecord(dao, pets, justSaved, onOpenLog, onOpenSura)
         // 되돌리기 알림이 맨 아래 내용을 가리지 않게 그만큼 더 내려가게.
-        Spacer(Modifier.height(LocalUndoInset.current))
     }
     }
     // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음(처음 그릴 때는 그대로).

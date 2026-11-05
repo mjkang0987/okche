@@ -49,12 +49,21 @@ class UndoToastItem(val text: String, val undo: () -> Unit) {
  * 앱 하나의 되돌리기 알림 자리(RootTabs): 어느 화면에서든 [show]로 띄운다. 탭 막대가 보이면 그 위, 없으면 화면 아래.
  * [scope]는 앱이 떠 있는 동안 살아 있어서, 알림을 띄운 창·시트가 닫힌 뒤에도 되돌리기를 끝까지 한다.
  */
-class UndoToasts(private val set: (UndoToastItem?) -> Unit, private val scope: kotlinx.coroutines.CoroutineScope, private val view: android.view.View) {
+class UndoToasts(
+    private val set: (UndoToastItem?) -> Unit,
+    private val get: () -> UndoToastItem?,
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val view: android.view.View,
+) {
     fun show(item: UndoToastItem?) = set(item)
+
+    /** 그 알림이 아직 떠 있을 때만 닫기(띄운 화면이 사라질 때 — 되돌리기가 그 화면 상태를 쓰면). */
+    fun dismiss(item: UndoToastItem) {
+        if (get()?.id == item.id) set(null)
+    }
 
     /** 지우기·빼기 뒤 '지웠어요 · 되돌리기'(2026-11-05 사용자 — 확인 창 → 지움 → 알림). 되돌리지 못하면 같은 알림에 실패 글자로 다시. */
     fun removed(text: String, restore: suspend () -> Unit) {
-        @Suppress("DEPRECATION") view.announceForAccessibility("$text. 되돌리려면 되돌리기")
         set(UndoToastItem(text) {
             scope.launch {
                 runCatching { restore() }
@@ -62,7 +71,7 @@ class UndoToasts(private val set: (UndoToastItem?) -> Unit, private val scope: k
                         set(null)
                         @Suppress("DEPRECATION") view.announceForAccessibility("되돌렸어요")
                     }
-                    .onFailure { removed("되돌리지 못했어요. 다시 해 주세요.", restore) }
+                    .onFailure { removed("되돌리지 못했어요 · 다시 눌러 주세요", restore) }
             }
         })
     }
@@ -87,6 +96,9 @@ fun UndoToast(item: UndoToastItem?, onDismiss: () -> Unit, onUndo: () -> Unit, m
     if (item != null) shown = item.text
     LaunchedEffect(item?.id) {
         if (item == null) return@LaunchedEffect
+        // 창·시트가 닫히며 읽는 말에 끊기지 않게 조금 뒤에, 알림마다 한 번.
+        delay(400)
+        @Suppress("DEPRECATION") view.announceForAccessibility("${item.text}. 되돌리려면 되돌리기")
         val am = view.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
         if (am?.isTouchExplorationEnabled == true) return@LaunchedEffect
         val flags = android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT or android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS

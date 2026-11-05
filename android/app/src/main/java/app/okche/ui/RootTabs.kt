@@ -93,15 +93,21 @@ fun RootTabs() {
     val density = LocalDensity.current
     val view = androidx.compose.ui.platform.LocalView.current
     val appScope = rememberCoroutineScope()
-    val toasts = remember { UndoToasts({ item = it }, appScope, view) }
+    val toasts = remember { UndoToasts({ item = it }, { item }, appScope, view) }
     androidx.compose.runtime.CompositionLocalProvider(LocalUndoToasts provides toasts, LocalUndoInset provides if (item != null) toastHeight else 0.dp) {
         Box(Modifier.fillMaxSize()) {
             RootTabsContent(barHeight)
             UndoToast(
                 item, onDismiss = { item = null }, onUndo = { item?.undo?.invoke() },
                 modifier = Modifier.align(Alignment.BottomCenter)
-                    .then(if (barHeight.value > 0.dp) Modifier.padding(bottom = barHeight.value) else Modifier.navigationBarsPadding())
-                    .onSizeChanged { toastHeight = with(density) { it.height.toDp() } },
+                    .then(
+                        // 탭 막대가 없으면 기기 아래 막대 자리까지 재서 화면 맨 아래 여백에 더함.
+                        if (barHeight.value > 0.dp) {
+                            Modifier.padding(bottom = barHeight.value).onSizeChanged { toastHeight = with(density) { it.height.toDp() } }
+                        } else {
+                            Modifier.onSizeChanged { toastHeight = with(density) { it.height.toDp() } }.navigationBarsPadding()
+                        },
+                    ),
             )
         }
     }

@@ -300,8 +300,9 @@ suspend fun changeSchedule(dao: OkcheDao, s: MedSchedule, original: ScheduleFiel
 /** 그만 먹이기 되돌리기(직후 알림의 '되돌리기'): 다시 연다 — 그 사이 같은 주기에 열린 줄이 생겼으면 그대로 둠. */
 suspend fun resumeSchedule(dao: OkcheDao, s: MedSchedule, now: Long = System.currentTimeMillis()) {
     val series = dao.medSchedules().filter { it.seriesId == s.seriesId && it.deletedAt == null }
-    val row = series.firstOrNull { it.id == s.id } ?: return
-    if (row.activeUntil == null || series.any { it.activeUntil == null }) return
+    // 그 사이 새 줄이 열렸거나 아이를 추억으로 간직했으면 되살리지 않음 — '되돌리지 못했어요'로 알림.
+    val row = series.firstOrNull { it.id == s.id }
+    check(row != null && row.activeUntil != null && series.none { it.activeUntil == null } && dao.pet(s.petId)?.memorializedAt == null) { "되살릴 수 없음" }
     dao.update(row.copy(activeUntil = null, updatedAt = now))
 }
 

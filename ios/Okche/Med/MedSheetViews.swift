@@ -44,7 +44,7 @@ struct MedTodaySheet: View {
                 }
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
         }
         // 남은 차례가 없으면 버튼도 없음(모두 기록함).
         .stickyFooter(show: entries.contains { $0.record == nil }) {
@@ -184,8 +184,7 @@ struct MedExtraSheet: View {
                         .buttonStyle(.plain)
                     }
                 }
-                OkcheTextField(label: "얼마나", text: $amount, unit: med.map { MedRules.unitTitle($0.unit) }, keyboard: .decimalPad,
-                               error: amount.isEmpty || amountValue != nil ? nil : "0보다 큰 숫자로 넣어 주세요")
+                OkcheTextField(label: "얼마나", text: $amount, unit: med.map { MedRules.unitTitle($0.unit) }, keyboard: .decimalPad)
                 VStack(alignment: .leading, spacing: 6) {
                     OkcheFieldLabel(title: "언제")
                     RecordTimeRow(occurredAt: $occurredAt, changed: $timeChanged, isNew: editing == nil)
@@ -199,7 +198,7 @@ struct MedExtraSheet: View {
                 }
             }
             .padding(.horizontal, OkcheSpacing.space4)
-            .padding(.vertical, OkcheSpacing.space6)
+            .padding(.top, OkcheSpacing.space6).padding(.bottom, OkcheSpacing.space4)
         }
         .stickyFooter {
             OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
@@ -226,7 +225,7 @@ struct MedExtraSheet: View {
     /// 아직 채우지 않은 것 — 있으면 '기록하기'는 흐리게.
     private var missing: String? {
         if !meds.contains(where: { $0.id == picked }) { return "어떤 약인지 고르면 기록할 수 있어요" }
-        if amountValue == nil { return "얼마나를 0보다 큰 숫자로 넣으면 기록할 수 있어요" }
+        if amountValue == nil { return "'얼마나'에 0보다 큰 숫자를 넣으면 기록할 수 있어요" }
         return nil
     }
 
@@ -260,7 +259,8 @@ private extension View {
     func footerHint(_ hint: String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if let hint { Text(hint).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
-            self
+            // 공용 버튼 모양은 못 누를 때도 같은 색이라 여기서 흐리게. 화면 읽기는 버튼을 바로 짚어도 이유를 듣게.
+            self.opacity(hint == nil ? 1 : 0.45).accessibilityHint(hint ?? "")
         }
     }
 

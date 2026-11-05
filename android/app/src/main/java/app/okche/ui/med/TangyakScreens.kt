@@ -313,14 +313,14 @@ fun MedAddScreen(
                 }
             },
             destructive = true,
-            message = "${pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()}의 탕약 줄과 알림에서 바로 빠져요(오늘 아직 안 준 차례도). 지난 기록과 약방의 약은 그대로 남아요.",
+            message = "${pets.firstOrNull { it.id == editing.petId }?.name.orEmpty()}의 탕약 줄과 알림에서 바로 빠지고, 오늘 아직 안 준 차례도 함께 빠져요. 지난 기록과 약방의 약은 그대로 남아요.",
             confirmLook = app.okche.ui.ButtonLook.Danger,
         )
     }
     Column(Modifier.fillMaxSize().background(OkcheColor.Hanji).statusBarsPadding()) {
         FormHeader("탕약", if (editing == null) "약 추가" else "약 고치기", Icons.AutoMirrored.Outlined.ArrowBack, "탕약으로 돌아가기", onBack)
         Column(
-            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6),
+            Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 8.dp, bottom = OkcheSpacing.Space6 + app.okche.ui.LocalUndoInset.current),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             if (editing != null) {

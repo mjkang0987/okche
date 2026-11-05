@@ -14,12 +14,15 @@ struct RootTabView: View {
                 .tabItem { Label("일기", systemImage: "doc.text").environment(\.symbolVariants, .none) }
                 .tag(AppTab.record)
             MainTab()
+                .undoToastHost()
                 .tabItem { Label("문안", systemImage: "heart").environment(\.symbolVariants, .none) }
                 .tag(AppTab.main)
             SillokTab()
+                .undoToastHost()
                 .tabItem { Label("실록", systemImage: "chart.bar").environment(\.symbolVariants, .none) }
                 .tag(AppTab.sillok)
             AlbumTab()
+                .undoToastHost()
                 .tabItem { Label("어진첩", systemImage: "photo").environment(\.symbolVariants, .none) }
                 .tag(AppTab.album)
             MoreTab()

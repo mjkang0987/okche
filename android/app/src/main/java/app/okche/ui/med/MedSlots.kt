@@ -127,7 +127,8 @@ fun todaySlots(schedules: List<MedSchedule>, records: List<Record>, petId: Strin
             entries[i] = MedSlotEntry(entries[i].slot, r)
         }
         // 그만 먹인 줄(뒤를 잇는 줄 없이 닫힘)의 안 준 차례는 빼기 — 그만 먹이면 바로 줄·시트에서 사라짐(2026-11-05 사용자).
-        val stopped = rows.filter { r -> r.activeUntil != null && series.none { it.activeFrom == r.activeUntil } }.map { it.id }.toSet()
+        // 그 뒤에 시작한 줄이 없음(추억에서 되돌려 다시 연 줄도 뒤를 잇는 줄로 침).
+        val stopped = rows.filter { r -> r.activeUntil?.let { until -> series.none { it.id != r.id && it.activeFrom >= until } } == true }.map { it.id }.toSet()
         result += entries.filter { it.record != null || it.slot.schedule.id !in stopped }
     }
     return result.sortedWith(compareBy({ it.slot.due }, { it.slot.schedule.createdAt }, { it.slot.schedule.id }))

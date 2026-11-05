@@ -40,7 +40,7 @@ fun TabScreen(
             .fillMaxSize()
             .background(OkcheColor.Hanji)
             .verticalScroll(rememberScrollState())
-            .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space6, bottom = OkcheSpacing.Space4),
+            .padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = OkcheSpacing.Space6, bottom = OkcheSpacing.Space4 + LocalUndoInset.current), // 되돌리기 알림만큼 더
         verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
     ) {
         // 머리 오른쪽 자리가 한 줄에 안 들어가면 제목 아래로 내려간다.

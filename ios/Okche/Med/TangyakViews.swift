@@ -189,7 +189,7 @@ struct MedAddView: View {
     }
     private var missing: String? {
         guard let field = missingField, let message = MedSchedules.errors(form)[field] else { return nil }
-        let labels: [MedSchedules.Field: String] = [.dose: "한 번에 얼마나", .everyDays: "며칠마다 간격", .everyHours: "몇 시간마다 간격", .times: "먹일 시간"]
+        let labels: [MedSchedules.Field: String] = [.dose: "한 번에", .everyDays: "며칠마다 간격", .everyHours: "몇 시간마다 간격", .times: "먹일 시간"]
         return labels[field].map { okcheNamed($0, message) } ?? message
     }
     @State private var started = false

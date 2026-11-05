@@ -219,7 +219,8 @@ struct InsulinSlotsEditor: View {
                     .padding(.vertical, 10)
                     .overlay(alignment: .top) { if index > 0 { Rectangle().fill(OkcheColor.line).frame(height: 1) } }
             }
-            OkcheFieldError(message: errors[.insulinTimes]).id(PetRegistration.Field.insulinTimes)
+            OkcheFieldError(message: errors[.insulinTimes])
+            // 스크롤 표시는 늘 있는 칸에(오류 글자는 만지기 전엔 없어 같은 순간 옮겨 갈 수 없음).
             Button { slots.append(.init(time: nextFreeTime())) } label: {
                 Text("+ 시간 추가")
                     .okcheText(OkcheType.body, weight: .medium)
@@ -227,6 +228,7 @@ struct InsulinSlotsEditor: View {
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
+            .id(PetRegistration.Field.insulinTimes)
         }
         .sheet(item: $pickingTime) { id in
             if let index = slots.firstIndex(where: { $0.id == id }) {

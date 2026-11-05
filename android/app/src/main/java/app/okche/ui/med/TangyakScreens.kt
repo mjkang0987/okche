@@ -553,7 +553,7 @@ private fun HoursPreview(lines: List<String>) {
 }
 
 /** 남은 것 줄의 칸 이름(iOS와 같음). 아이·약은 문구가 이미 말해 줘서 없음. */
-private val scheduleLabels = mapOf("dose" to "한 번에 얼마나", "everyDays" to "며칠마다 간격", "everyHours" to "몇 시간마다 간격", "times" to "먹일 시간")
+private val scheduleLabels = mapOf("dose" to "한 번에", "everyDays" to "며칠마다 간격", "everyHours" to "몇 시간마다 간격", "times" to "먹일 시간")
 
 /** 약 고치기(보드 MedChange): 그 줄·기록을 다 읽은 뒤 약 추가 화면을 고치기로 연다. 그 사이 그만 먹였으면 탕약으로. */
 @Composable

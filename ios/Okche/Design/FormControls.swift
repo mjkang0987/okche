@@ -405,7 +405,7 @@ extension View {
                     Button(action: onShow) {
                         Text("\(missing) ›").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                             .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading).contentShape(Rectangle())
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(missing)

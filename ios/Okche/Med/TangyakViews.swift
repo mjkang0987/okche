@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 /// 탕약(보드 `Tangyak`·`TangyakEmpty`): 더보기 '탕약 · 약 알림'. 모든 아이의 먹고 있는 약 카드(아이마다 따로), '+ 약 추가'.
 /// '다음 탕약' 띠는 8-3, 카드를 눌러 고치기는 8-2b.
@@ -18,6 +19,9 @@ struct TangyakView: View {
     @State private var giving = false
     /// 띄운 알림이 있으면 화면을 떠날 때 닫는다(되돌리기가 이 화면의 확인 창을 쓰므로).
     @State private var posted = false
+    /// 휴대폰 알림이 꺼져 있는지 — 화면에 올 때·앱으로 돌아올 때 다시 본다(8-4c).
+    @State private var phoneOff = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         let cards = MedSchedules.cards(schedules, pets: pets)
@@ -27,8 +31,10 @@ struct TangyakView: View {
             FormHeader(title: "탕약", note: "약 · 알림", icon: "chevron.left", iconLabel: "뒤로", trailing: AnyView(PetSeal())) { dismiss() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // 다음 탕약 띠(보드 `Tangyak`, 2026-11-05 승인) — 오늘 남은 차례가 없으면 숨김.
-                    if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
+                    // 알림 켠 약이 있는데 휴대폰 알림이 꺼져 있으면 꺼짐 띠(보드 `TangyakNotifyOff`), 다음 탕약 띠는 숨김.
+                    if phoneOff, MedNotify.wantsReminders(schedules) {
+                        NotifyOffBand()
+                    } else if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
                         let amount = MedSchedules.amountText(next.slot.schedule.amount, next.slot.schedule.unit)
                         // 시간이 지났는데 안 준 차례는 '놓친 탕약'(2026-11-05 사용자).
                         NextMedBand(title: next.slot.due < .now ? "놓친 탕약" : "다음 탕약", time: MedSlots.clockText(next.slot.due), detail: "\(next.pet.name) · \(med.name) \(amount)",
@@ -73,6 +79,10 @@ struct TangyakView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onDisappear { if posted { showUndo(nil); posted = false } }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            phoneOff = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
+        }
     }
 
     /// 띠 '줬어요': 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
@@ -717,5 +727,32 @@ struct NextMedBand: View {
         .buttonStyle(.plain)
         .disabled(busy)
         .accessibilityLabel(label)
+    }
+}
+
+/// 휴대폰 알림 꺼짐 띠(보드 `TangyakNotifyOff`, 2026-11-05 승인): 흰 카드 연지색 테두리, 제목·안내, '설정 열기'(휴대폰의 이 앱 알림 설정).
+struct NotifyOffBand: View {
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("휴대폰 알림이 꺼져 있어요").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.yeonji)
+                .accessibilityAddTraits(.isHeader)
+            Text("그래서 탕약 알림이 오지 않아요. 휴대폰 설정에서 옥체 알림을 켜 주세요.")
+                .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.ink)
+            Button {
+                if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
+            } label: {
+                Text("설정 열기").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaek).underline()
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+        .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(OkcheColor.yeonji, lineWidth: 1.5))
+        .accessibilityElement(children: .contain)
     }
 }

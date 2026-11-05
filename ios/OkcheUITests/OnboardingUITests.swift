@@ -508,6 +508,23 @@ final class OnboardingUITests: XCTestCase {
     }
 
     /// 몇 시간마다 약(처음 먹일 때 = 지금)을 하나 추가하고 일기 탭으로.
+    /// 8-4c: 더보기 → 기별, 스위치를 바꾸면 바로 저장(나갔다 와도 그대로).
+    func testNotifySettingsSaves() {
+        let app = launch()
+        register("콩이", in: app, from: app.buttons["아이 등록하고 시작하기"])
+        XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["더보기"].tap()
+        tapBelow(app.buttons["기별 · 알림 설정"], in: app)
+        let med = app.switches["탕약 시간"]
+        XCTAssertTrue(med.waitForExistence(timeout: 3))
+        XCTAssertEqual(med.value as? String, "1")
+        med.switches.firstMatch.tap()
+        XCTAssertEqual(med.value as? String, "0")
+        app.buttons["뒤로"].firstMatch.tap()
+        tapBelow(app.buttons["기별 · 알림 설정"], in: app)
+        XCTAssertEqual(app.switches["탕약 시간"].value as? String, "0")
+    }
+
     /// 8-4b: 알림 켠 약을 처음 저장하면 허락 안내 창 — '나중에'여도 약은 저장되고 탕약 목록으로.
     func testNotifyAskOnFirstSave() {
         let app = launch(extra: ["-notify-ask"])

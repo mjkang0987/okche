@@ -49,6 +49,7 @@ struct RootTabView: View {
             MedTodaySheet(pet: pet)
         }
         // 추억·지운 아이 알림이면 비워 둔다(나중에 되돌려도 시트가 갑자기 뜨지 않게).
+        .onChange(of: router.openMedId, initial: true) { if router.openMedId != nil { tab = .more } }
         .onChange(of: router.openPetId) { if let id = router.openPetId, !alive.contains(where: { $0.id == id }) { router.openPetId = nil } }
     }
 

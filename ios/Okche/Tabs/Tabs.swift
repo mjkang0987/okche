@@ -20,6 +20,7 @@ struct AlbumTab: View {
 struct MoreTab: View {
     /// 더보기 안 화면은 경로로 쌓는다 — 탕약 안에서 `NavigationLink { MedAddView() }`로 약 추가를 열면 두 화면이 끝없이 다시 그려져 멈춰서(2026-11-04 확인).
     @State private var path: [MoreRoute] = []
+    @State private var router = NotifyRouter.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -33,14 +34,17 @@ struct MoreTab: View {
                     case .medAdd: MedAddView()
                     case .medEdit(let id): MedAddView(scheduleId: id)
                     case .yakbang: YakbangView()
+                    case .notify: NotifySettingsView()
                     }
                 }
         }
+        // 남은 약 알림을 누르면 약방으로(그 약 고치기는 약방이 연다, 8-4c).
+        .onChange(of: router.openMedId, initial: true) { if router.openMedId != nil, path.last != .yakbang { path = [.yakbang] } }
     }
 }
 
 /// 더보기 안 화면.
-enum MoreRoute: Hashable { case snacks, tangyak, medAdd, medEdit(UUID), yakbang }
+enum MoreRoute: Hashable { case snacks, tangyak, medAdd, medEdit(UUID), yakbang, notify }
 
 /// 더보기 메뉴(보드 `More`): 흰 칸 안 52 줄, 이름 + 쉬운 말 + ›. 사료 · 처방식은 지금 보는 아이의 사료 바꾸기 시트.
 private struct MoreMenu: View {
@@ -67,6 +71,9 @@ private struct MoreMenu: View {
                 .buttonStyle(.plain)
             Rectangle().fill(OkcheColor.line).frame(height: 1)
             NavigationLink(value: MoreRoute.yakbang) { MoreMenuLabel(title: "약방", note: "약 목록") }
+                .buttonStyle(.plain)
+            Rectangle().fill(OkcheColor.line).frame(height: 1)
+            NavigationLink(value: MoreRoute.notify) { MoreMenuLabel(title: "기별", note: "알림 설정") }
                 .buttonStyle(.plain)
         }
         .padding(.horizontal, OkcheSpacing.space4)

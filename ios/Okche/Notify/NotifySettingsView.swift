@@ -34,15 +34,15 @@ struct NotifySettingsView: View {
                         }
                         section("조용한 시간") {
                             row("밤에는 알림 쉬기", "탕약·인슐린 알림은 이 시간에도 울려요", setting, \.quietHours.enabled)
-                            // 끄면 시간 칸은 흐리게(값은 남김).
-                            HStack(spacing: 8) {
-                                timeButton("시작", setting.quietHours.start) { editing = .start }
-                                Text("~").okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).accessibilityHidden(true)
-                                timeButton("끝", setting.quietHours.end) { editing = .end }
+                            // 끄면 시간 칸은 숨김(값은 남김 — 약 추가의 '알림 보낼 때'와 같음).
+                            if setting.quietHours.enabled {
+                                HStack(spacing: 8) {
+                                    timeButton("시작", setting.quietHours.start) { editing = .start }
+                                    Text("~").okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).accessibilityHidden(true)
+                                    timeButton("끝", setting.quietHours.end) { editing = .end }
+                                }
+                                .padding(.bottom, 14)
                             }
-                            .disabled(!setting.quietHours.enabled)
-                            .opacity(setting.quietHours.enabled ? 1 : 0.45)
-                            .padding(.bottom, 14)
                         }
                         if failed { OkcheFieldError(message: "저장하지 못했어요. 다시 해 주세요.") }
                         Text("알림은 앱을 마지막으로 연 날부터 3일치만 걸어 둬요. 3일 동안 열지 않으면 멈추고, 다시 열면 이어져요.")

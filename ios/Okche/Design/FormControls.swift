@@ -196,6 +196,8 @@ struct OkcheChoiceCards<Value: Hashable>: View {
     private let icons: [Value: String]
     /// 고른 카드를 다시 눌러 풀 수 있으면 화면 읽기에 '선택 해제' 동작.
     private let deselectable: Bool
+    /// 체크 카드(혈당 '함께 보였나요?' — 9-1): 세로로, 왼쪽 체크 칸, 고르면 연지색 테두리.
+    private var checklist = false
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 52
     @ScaledMetric(relativeTo: .body) private var iconHeight: CGFloat = 96
 
@@ -207,16 +209,47 @@ struct OkcheChoiceCards<Value: Hashable>: View {
         deselectable = false
     }
 
-    init(options: [(value: Value, title: String)], icons: [Value: String] = [:], deselectable: Bool = true,
+    init(options: [(value: Value, title: String)], icons: [Value: String] = [:], deselectable: Bool = true, checklist: Bool = false,
          isOn: @escaping (Value) -> Bool, onTap: @escaping (Value) -> Void) {
         self.options = options
         self.icons = icons
         self.isOn = isOn
         self.onTap = onTap
         self.deselectable = deselectable
+        self.checklist = checklist
     }
 
     var body: some View {
+        if checklist {
+            VStack(spacing: 8) { checks }
+        } else {
+            row
+        }
+    }
+
+    private var checks: some View {
+        ForEach(options, id: \.value) { option in
+            let on = isOn(option.value)
+            Button { onTap(option.value) } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: on ? "checkmark.square.fill" : "square").font(.title3)
+                        .foregroundStyle(on ? OkcheColor.yeonji : OkcheColor.lineStrong).accessibilityHidden(true)
+                    Text(option.title).okcheText(OkcheType.body, weight: on ? .bold : .regular).foregroundStyle(OkcheColor.ink)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: height)
+                .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(on ? OkcheColor.yeonji : OkcheColor.line, lineWidth: 1.5))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(on ? .isSelected : [])
+        }
+    }
+
+    private var row: some View {
         // 큰 글자에서 나란히 안 들어가면 세로로 쌓는다(넘친 칸이 화면을 옆으로 밀지 않게).
         ViewThatFits(in: .horizontal) {
             HStack(spacing: icons.isEmpty ? 8 : 6) { cards }

@@ -47,6 +47,7 @@ enum QuickRecord {
             // 약방에서 뺀 약도 이름은 남음(1-4) — 다과와 같이 지운 약까지 읽는다.
             return MedSlots.value(record, meds: (try? record.modelContext?.fetch(FetchDescriptor<Medication>())) ?? [])
         }
+        if record.kind == RecordKind.glucose.rawValue { return GlucoseRules.value(record) }
         if record.kind == RecordKind.weight.rawValue {
             let grams = (try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any])?["grams"] as? Int
             return grams.map(kgText) ?? ""

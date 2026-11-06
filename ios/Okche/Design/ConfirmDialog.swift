@@ -13,6 +13,8 @@ struct OkcheConfirmDialog<Extra: View>: View {
     var showsCancel = true
     /// 닫기 버튼 글자(허락 안내 창은 '나중에', 8-4b).
     var cancel = "그냥 둘게요"
+    /// 거짓이면 아래 버튼 없이 `extra`의 버튼만(혈당 '언제 쟀나요?' — 9-1).
+    var showsButtons = true
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @ViewBuilder var extra: Extra
@@ -44,11 +46,13 @@ struct OkcheConfirmDialog<Extra: View>: View {
                         }
                     }
                     extra
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { buttons }
-                        VStack(spacing: 8) { buttons }
+                    if showsButtons {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 8) { buttons }
+                            VStack(spacing: 8) { buttons }
+                        }
+                        .padding(.top, 4)
                     }
-                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 24)

@@ -26,6 +26,11 @@ struct RecordTab: View {
     @Environment(\.showUndo) private var showUndo
     /// 탕약 알림의 '되돌리기' = 방금 남긴 기록 지우기(확인 창 → 지움 → '기록을 지웠어요 · 되돌리기').
     @State private var deleting: Record?
+    /// 혈당 줄 숫자 칸(9-1)과 '언제 쟀나요?' 창에 띄울 수치.
+    @State private var glucoseText = ""
+    @State private var askingGlucose: Int?
+    @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil }) private var plans: [InsulinPlan]
+    @Query(filter: #Predicate<Record> { $0.kind == "insulin" && $0.deletedAt == nil }) private var insulinRecords: [Record]
 
     /// 칩에 나오는 아이: 추억·지운 아이를 뺀 아이들(모신 순).
     private var chipPets: [Pet] { pets.filter { $0.memorializedAt == nil } }
@@ -50,7 +55,8 @@ struct RecordTab: View {
                     if kind == .meal { path.append(.sura(nil)) }
                     else if kind == .med { medSheet = pets.first { $0.id == who } }
                     else { detail = DetailTarget(kind: kind, petId: who) }
-                }, mealMore: suraPet, med: medLine, onGive: give)
+                }, mealMore: suraPet, med: medLine, onGive: give,
+                   glucose: showsGlucose ? $glucoseText : nil, onLeaveGlucose: leaveGlucose)
                 Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                      : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
@@ -74,11 +80,52 @@ struct RecordTab: View {
             }
         }
         .sheet(item: $detail) { target in
-            RecordDetailSheet(target: target) { record, isNew in
+            DetailSheet(target: target, prefill: glucoseText) { record, isNew in
                 guard isNew else { return }
                 justSaved = record.id
+                if record.kind == RecordKind.glucose.rawValue { glucoseText = "" }
                 AccessibilityNotification.Announcement("아뢰었사옵니다").post()
             }
+        }
+        .fullScreenCover(item: Binding(get: { askingGlucose.map { GlucoseAsk(mgdl: $0) } }, set: { askingGlucose = $0?.mgdl })) { ask in
+            GlucoseAskDialog(mgdl: ask.mgdl, onPick: { timing in
+                askingGlucose = nil
+                saveGlucose(ask.mgdl, timing)
+            }, onCancel: { askingGlucose = nil })
+            .presentationBackground(.clear)
+        }
+        .transaction { $0.disablesAnimations = askingGlucose != nil }
+    }
+
+    private struct GlucoseAsk: Identifiable { let mgdl: Int; var id: Int { mgdl } }
+
+    /// 혈당 줄: 고른 아이가 당뇨일 때만(누군지 모르면 없음).
+    private var showsGlucose: Bool { pets.first { $0.id == who }?.hasDiabetes == true }
+
+    /// '남기기': 지금 차례 인슐린 기록이 있으면 맞고 난 뒤, 계획이 없으면 그 밖으로 바로, 아니면 '언제 쟀나요?'(9-1).
+    private func leaveGlucose() {
+        guard let who, let mgdl = GlucoseRules.number(glucoseText) else { return }
+        if let timing = GlucoseRules.guess(petId: who, plans: plans, insulinRecords: insulinRecords) {
+            saveGlucose(mgdl, timing)
+        } else {
+            askingGlucose = mgdl
+        }
+    }
+
+    private func saveGlucose(_ mgdl: Int, _ timing: GlucoseRules.Timing) {
+        do {
+            let saved = try GlucoseRules.save(petId: who, mgdl: mgdl, timing: timing, signs: [], at: .now, in: context)
+            failed = false
+            glucoseText = ""
+            justSaved = saved.id
+            showUndo(UndoToastItem(text: "혈당 \(GlucoseRules.value(saved))") {
+                deleting = saved // 지우기 확인 창(지우면 '기록을 지웠어요 · 되돌리기')
+                return true
+            })
+            AccessibilityNotification.Announcement("아뢰었사옵니다").post()
+        } catch {
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
         }
     }
 
@@ -169,6 +216,9 @@ struct QuickRecordCard: View {
     /// 탕약 줄(소피 다음) — 없으면 줄 없음(보드 `RecordNoMed`).
     var med: MedLine? = nil
     var onGive: (MedSlots.Slot) -> Void = { _ in }
+    /// 혈당 줄(탕약 다음, 당뇨 아이만 — 9-1) 숫자 칸.
+    var glucose: Binding<String>? = nil
+    var onLeaveGlucose: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
@@ -179,6 +229,10 @@ struct QuickRecordCard: View {
                 if index > 0 { OkcheColor.line.frame(height: 1) }
                 if row.kind == .meal, let med {
                     medRow(med)
+                    OkcheColor.line.frame(height: 1)
+                }
+                if row.kind == .meal, let glucose {
+                    GlucoseRow(text: glucose, onLeave: onLeaveGlucose) { onDetail(.glucose) }
                     OkcheColor.line.frame(height: 1)
                 }
                 ViewThatFits(in: .horizontal) {
@@ -364,7 +418,7 @@ struct RecentRecordSection: View {
                 .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
             }
             .deleteRecordDialog($deleting, pets: pets)
-            .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
+            .sheet(item: $editing) { DetailSheet(target: $0) }
         }
     }
 }
@@ -426,7 +480,7 @@ struct EditRecordButton: View {
             // 탕약은 기록 하나 고치기 시트(8-3b — 약은 고정).
             MedEditButton(record: record, pet: pet, color: color,
                           label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
-        } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty {
+        } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty || kind == .glucose {
             RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
                 onEdit(DetailTarget(kind: kind, editing: record))
             }
@@ -529,7 +583,7 @@ struct RecordLogView: View {
         .toolbar(.hidden, for: .tabBar)
         .deleteRecordDialog($deleting, pets: pets)
         .sheet(item: $assigning) { record in AssignSheet(record: record) }
-        .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
+        .sheet(item: $editing) { DetailSheet(target: $0) }
     }
 
     /// 날짜 이동: 전날·다음 날(오늘에서 다음 날은 안 눌림), 6시 기준 날.

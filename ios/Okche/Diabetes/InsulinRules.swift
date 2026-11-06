@@ -43,7 +43,7 @@ enum InsulinRules {
     static func twice(petId: UUID, records: [Record], slot: Slot, editing: Record?) -> Record? {
         records.filter { $0.petId == petId && $0.deletedAt == nil && $0.kind == RecordKind.insulin.rawValue && $0.id != editing?.id
             && $0.occurredAt >= slot.start && $0.occurredAt < slot.end && [Status.full, .partial].contains(status($0)) }
-            .min { $0.occurredAt < $1.occurredAt }
+            .max { $0.occurredAt < $1.occurredAt } // 여럿이면 가장 늦은 것(안드로이드와 같음)
     }
 
     /// 맞은 양: 0보다 크고 100 이하(인슐린 설정과 같음).
@@ -71,12 +71,13 @@ enum InsulinRules {
                      editing: Record? = nil, now: Date = .now, in context: ModelContext) throws -> Record {
         let at = min(at, now) // 앞날 기록 막기
         let picked = plan.flatMap { InsulinRules.slot($0, at: at) }
-        let json = data(planId: plan?.id, units: units, status: status, mealBefore: mealBefore)
+        // 열린 계획 없이 고치면 그 기록의 계획·차례는 그대로.
+        let json = data(planId: plan?.id ?? editing.flatMap(planId), units: units, status: status, mealBefore: mealBefore)
         let record: Record
         if let editing {
             if editing.occurredAt != at { editing.setOccurredAt(at, now: now) }
             editing.data = json
-            editing.slotKey = picked?.key
+            if let picked { editing.slotKey = picked.key }
             editing.updatedAt = now
             record = editing
         } else {

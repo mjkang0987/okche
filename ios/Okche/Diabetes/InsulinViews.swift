@@ -103,21 +103,18 @@ struct InsulinRow: View {
         .accessibilityLabel(label)
     }
 
-    @ViewBuilder private var more: some View {
-        if case .noPlan = line {
-            EmptyView()
-        } else {
-            Button(action: onDetail) {
-                Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
-                    .frame(width: min(moreSize, 72), height: min(moreSize, 72))
-                    .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                    .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
-                        .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("인슐린 자세히 남기기")
+    /// ⋯: 계획이 없어도 시트로 남길 수 있게 늘 보임(안드로이드와 같음).
+    private var more: some View {
+        Button(action: onDetail) {
+            Image(systemName: "ellipsis").font(.body.weight(.bold)).foregroundStyle(OkcheColor.namsaek)
+                .frame(width: min(moreSize, 72), height: min(moreSize, 72))
+                .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+                .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd)
+                    .strokeBorder(OkcheColor.lineStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("인슐린 자세히 남기기")
     }
 }
 

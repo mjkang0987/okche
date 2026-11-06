@@ -247,7 +247,10 @@ struct DetailSheet: View {
     var onSaved: (Record, Bool) -> Void = { _, _ in }
 
     var body: some View {
-        if target.kind == .glucose { GlucoseSheet(target: target, prefill: prefill, onSaved: onSaved) }
-        else { RecordDetailSheet(target: target, onSaved: onSaved) }
+        switch target.kind {
+        case .glucose: GlucoseSheet(target: target, prefill: prefill, onSaved: onSaved)
+        case .insulin: InsulinSheet(target: target, onSaved: onSaved)
+        default: RecordDetailSheet(target: target, onSaved: onSaved)
+        }
     }
 }

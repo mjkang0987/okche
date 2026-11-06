@@ -250,28 +250,40 @@ struct RecordTimeRow: View {
     @Binding var occurredAt: Date
     @Binding var changed: Bool
     let isNew: Bool
+    /// 시간 아래 회색 한 줄(인슐린 '글라진 인슐린 · 정해 둔 양 2단위' — 9-2).
+    var detail: String? = nil
+    /// 연지색 테두리(이미 맞은 시간대 — 9-2 `InsulinTwice`).
+    var warning = false
     @State private var picking = false
 
     var body: some View {
         // 큰 글자에서 한 줄에 안 들어가면 버튼을 아래로.
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
-                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink).fixedSize()
+                texts.fixedSize()
                 Spacer(minLength: 0)
                 timeButton
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+                texts
                 timeButton
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, detail == nil ? 6 : 10)
         .padding(.horizontal, 14)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
+        .overlay { if warning { RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(OkcheColor.yeonji, lineWidth: 1.5) } }
         .sheet(isPresented: $picking) {
             TimeSheet(time: Binding(get: { occurredAt }, set: { occurredAt = $0; changed = true }),
                       components: [.date, .hourAndMinute], notAfterNow: true)
+        }
+    }
+
+    private var texts: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(timeText).okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
+            if let detail { Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
         }
     }
 

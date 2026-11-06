@@ -510,24 +510,7 @@ final class OnboardingUITests: XCTestCase {
     /// 9-1: 당뇨 아이 혈당 줄 — 숫자 → 남기기 → (이번 인슐린 기록 없음) 언제 쟀나요? → 그만두기면 값 남음 → 맞고 난 뒤 → 알림·방금 남긴 기록.
     func testGlucoseLeaveAsk() {
         let app = launch()
-        app.buttons["아이 등록하고 시작하기"].tap()
-        let name = app.textFields["이름"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        name.typeText("콩이")
-        let diabetes = app.switches["당뇨가 있어요"].firstMatch
-        reveal(diabetes, in: app)
-        diabetes.tap()
-        let units = app.textFields.matching(NSPredicate(format: "label ENDSWITH '양 (단위)'"))
-        XCTAssertTrue(units.firstMatch.waitForExistence(timeout: 3))
-        for i in 0..<units.count {
-            let field = units.element(boundBy: i)
-            reveal(field, in: app)
-            field.tap()
-            field.typeText("2")
-            if app.buttons["완료"].exists { app.buttons["완료"].tap() }
-        }
-        tapBelow(app.buttons["모시기"].firstMatch, in: app)
+        registerDiabetic(app)
         let field = app.textFields["혈당 수치 (mg/dL)"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["혈당 남기기"].isEnabled) // 빈칸이면 흐림
@@ -560,6 +543,53 @@ final class OnboardingUITests: XCTestCase {
         a.name = name
         a.lifetime = .keepAlways
         add(a)
+    }
+
+    /// 9-2: 인슐린 줄 — 맞음 → 처리한 상태·알림 → 되돌리기(지우기 확인) → 버튼 돌아옴, ⋯ → 시트 → 기록하기 → 처리한 상태.
+    func testInsulinGiveUndoAndSheet() {
+        let app = launch()
+        registerDiabetic(app)
+        let give = app.buttons.matching(NSPredicate(format: "label ENDSWITH '단위 맞음 · 바로 기록'")).firstMatch
+        XCTAssertTrue(give.waitForExistence(timeout: 5))
+        reveal(give, in: app)
+        shot(app, "ios-insulin-row")
+        give.tap()
+        let done = app.buttons.matching(NSPredicate(format: "label ENDSWITH '단위 맞음 · 눌러서 고치기'")).firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH '인슐린 2단위 맞음 · '")).firstMatch.exists)
+        shot(app, "ios-insulin-done")
+        app.buttons["되돌리기"].tap()
+        XCTAssertTrue(app.staticTexts["이 기록을 지울까요?"].waitForExistence(timeout: 3))
+        app.buttons["지우기"].tap()
+        XCTAssertTrue(give.waitForExistence(timeout: 3))
+        app.buttons["인슐린 자세히 남기기"].tap()
+        XCTAssertTrue(app.staticTexts["콩이 · 인슐린"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '정해 둔 양 2단위'")).firstMatch.exists)
+        shot(app, "ios-insulin-sheet")
+        app.buttons["기록하기"].tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+    }
+
+    /// 당뇨 아이 등록(인슐린 칸마다 2단위).
+    private func registerDiabetic(_ app: XCUIApplication) {
+        app.buttons["아이 등록하고 시작하기"].tap()
+        let name = app.textFields["이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("콩이")
+        let diabetes = app.switches["당뇨가 있어요"].firstMatch
+        reveal(diabetes, in: app)
+        diabetes.tap()
+        let units = app.textFields.matching(NSPredicate(format: "label ENDSWITH '양 (단위)'"))
+        XCTAssertTrue(units.firstMatch.waitForExistence(timeout: 3))
+        for i in 0..<units.count {
+            let field = units.element(boundBy: i)
+            reveal(field, in: app)
+            field.tap()
+            field.typeText("2")
+            if app.buttons["완료"].exists { app.buttons["완료"].tap() }
+        }
+        tapBelow(app.buttons["모시기"].firstMatch, in: app)
     }
 
     /// 8-4c: 더보기 → 기별, 스위치를 바꾸면 바로 저장(나갔다 와도 그대로).

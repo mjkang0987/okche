@@ -48,6 +48,7 @@ enum QuickRecord {
             return MedSlots.value(record, meds: (try? record.modelContext?.fetch(FetchDescriptor<Medication>())) ?? [])
         }
         if record.kind == RecordKind.glucose.rawValue { return GlucoseRules.value(record) }
+        if record.kind == RecordKind.insulin.rawValue { return InsulinRules.value(record) }
         if record.kind == RecordKind.weight.rawValue {
             let grams = (try? JSONSerialization.jsonObject(with: Data(record.data.utf8)) as? [String: Any])?["grams"] as? Int
             return grams.map(kgText) ?? ""

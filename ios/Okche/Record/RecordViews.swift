@@ -32,6 +32,9 @@ struct RecordTab: View {
     /// 묻는 수치와 그 아이(창이 떠 있는 사이 아이가 바뀌어도 물은 아이로).
     @State private var askingGlucose: GlucoseAsk?
     @State private var savingGlucose = false
+    /// 인슐린 '설정하기 ›'(열린 계획이 없을 때 — 9-2).
+    @State private var insulinSetup: Pet?
+    @State private var savingInsulin = false
     @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil }) private var plans: [InsulinPlan]
     @Query(filter: #Predicate<Record> { $0.kind == "insulin" && $0.deletedAt == nil }) private var insulinRecords: [Record]
 
@@ -57,11 +60,15 @@ struct RecordTab: View {
                 QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
                     if kind == .meal { path.append(.sura(nil)) }
                     else if kind == .med { medSheet = pets.first { $0.id == who } }
+                    else if kind == .insulin, case .handled(_, let record, _) = insulinLine { detail = DetailTarget(kind: .insulin, editing: record) }
                     else { detail = DetailTarget(kind: kind, petId: who) }
                 }, mealMore: suraPet, med: medLine, onGive: give,
-                   glucose: showsGlucose ? $glucoseText : nil, glucoseFocused: $glucoseFocused, onLeaveGlucose: leaveGlucose)
-                Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
-                     : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                   glucose: showsGlucose ? $glucoseText : nil, glucoseFocused: $glucoseFocused, onLeaveGlucose: leaveGlucose,
+                   insulin: insulinLine, onInsulin: giveInsulin, onInsulinEdit: { detail = DetailTarget(kind: .insulin, editing: $0) },
+                   onInsulinSetup: { insulinSetup = pets.first { $0.id == who } })
+                // 보드 `RecordGlucose`: 인슐린·탕약 줄이 있을 때만 그 안내.
+                Text("누르면 바로 기록돼요. " + (insulinLine == nil ? "" : "인슐린은 '맞음'을 누르면 정해 둔 양과 지금 시각으로 남아요. ")
+                     + (medLine == nil ? "" : "탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. ") + "빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
                 RecentRecordSection(justSaved: justSaved)
             }
@@ -109,6 +116,39 @@ struct RecordTab: View {
             .presentationBackground(.clear)
         }
         .transaction { $0.disablesAnimations = askingGlucose != nil }
+        .sheet(item: $insulinSetup) { pet in NavigationStack { InsulinSetupScreen(pet: pet) } }
+    }
+
+    /// 인슐린 줄: 당뇨 아이만. 열린 계획이 없으면 설정 안내, 지금 구간에 기록이 있으면 처리한 상태.
+    private var insulinLine: InsulinLine? {
+        guard showsGlucose, let who else { return nil }
+        guard let plan = GlucoseRules.openPlan(plans, petId: who) else { return .noPlan }
+        guard let slot = InsulinRules.slot(plan, at: .now) else { return .noPlan }
+        if let record = InsulinRules.handled(petId: who, records: insulinRecords, slot: slot) {
+            return .handled(slot, record, next: InsulinRules.next(slot))
+        }
+        return .ready(slot)
+    }
+
+    /// '맞음'(그 차례 정해 둔 양)·'건너뜀'(0): 바로 기록 → 처리한 상태, 탭 바 위 되돌리기(= 지우기 확인 창).
+    private func giveInsulin(_ slot: InsulinRules.Slot, _ status: InsulinRules.Status) {
+        guard !savingInsulin, let who, let plan = GlucoseRules.openPlan(plans, petId: who) else { return }
+        savingInsulin = true
+        defer { savingInsulin = false }
+        do {
+            let saved = try InsulinRules.save(petId: who, plan: plan, units: slot.units, status: status, mealBefore: nil, at: .now, in: context)
+            failed = false
+            justSaved = saved.id
+            let text = status == .skipped ? "인슐린 건너뜀" : "인슐린 \(MedRules.number(slot.units))단위 맞음"
+            showUndo(UndoToastItem(text: "\(text) · \(QuickRecord.time(saved))") {
+                deleting = saved // 지우기 확인 창(지우면 버튼이 돌아옴)
+                return true
+            })
+            AccessibilityNotification.Announcement("아뢰었사옵니다").post()
+        } catch {
+            failed = true
+            AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
+        }
     }
 
     private struct GlucoseAsk: Identifiable { let mgdl: Int; let petId: UUID; let id = UUID() }
@@ -238,6 +278,11 @@ struct QuickRecordCard: View {
     var glucose: Binding<String>? = nil
     var glucoseFocused: FocusState<Bool>.Binding? = nil
     var onLeaveGlucose: () -> Void = {}
+    /// 인슐린 줄(혈당 다음 — 9-2).
+    var insulin: InsulinLine? = nil
+    var onInsulin: (InsulinRules.Slot, InsulinRules.Status) -> Void = { _, _ in }
+    var onInsulinEdit: (Record) -> Void = { _ in }
+    var onInsulinSetup: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
@@ -252,6 +297,10 @@ struct QuickRecordCard: View {
                 }
                 if row.kind == .meal, let glucose, let glucoseFocused {
                     GlucoseRow(text: glucose, focused: glucoseFocused, onLeave: onLeaveGlucose) { onDetail(.glucose) }
+                    OkcheColor.line.frame(height: 1)
+                }
+                if row.kind == .meal, let insulin {
+                    InsulinRow(line: insulin, onGive: onInsulin, onEdit: onInsulinEdit, onDetail: { onDetail(.insulin) }, onSetup: onInsulinSetup)
                     OkcheColor.line.frame(height: 1)
                 }
                 ViewThatFits(in: .horizontal) {
@@ -499,7 +548,7 @@ struct EditRecordButton: View {
             // 탕약은 기록 하나 고치기 시트(8-3b — 약은 고정).
             MedEditButton(record: record, pet: pet, color: color,
                           label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기")
-        } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty || kind == .glucose {
+        } else if let kind = RecordKind(rawValue: record.kind), !RecordDetail.fields(kind).isEmpty || kind == .glucose || kind == .insulin {
             RowIconButton(icon: "pencil", label: "\(QuickRecord.time(record)) \(RecordText.speech(record, pets: pets)) 기록 고치기", color: color) {
                 onEdit(DetailTarget(kind: kind, editing: record))
             }

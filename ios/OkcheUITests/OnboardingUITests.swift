@@ -507,6 +507,61 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
     }
 
+    /// 9-1: 당뇨 아이 혈당 줄 — 숫자 → 남기기 → (이번 인슐린 기록 없음) 언제 쟀나요? → 그만두기면 값 남음 → 맞고 난 뒤 → 알림·방금 남긴 기록.
+    func testGlucoseLeaveAsk() {
+        let app = launch()
+        app.buttons["아이 등록하고 시작하기"].tap()
+        let name = app.textFields["이름"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("콩이")
+        let diabetes = app.switches["당뇨가 있어요"].firstMatch
+        reveal(diabetes, in: app)
+        diabetes.tap()
+        let units = app.textFields.matching(NSPredicate(format: "label ENDSWITH '양 (단위)'"))
+        XCTAssertTrue(units.firstMatch.waitForExistence(timeout: 3))
+        for i in 0..<units.count {
+            let field = units.element(boundBy: i)
+            reveal(field, in: app)
+            field.tap()
+            field.typeText("2")
+            if app.buttons["완료"].exists { app.buttons["완료"].tap() }
+        }
+        tapBelow(app.buttons["모시기"].firstMatch, in: app)
+        let field = app.textFields["혈당 수치 (mg/dL)"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["혈당 남기기"].isEnabled) // 빈칸이면 흐림
+        field.tap()
+        field.typeText("186")
+        shot(app, "ios-glucose-row")
+        app.buttons["혈당 남기기"].tap()
+        XCTAssertTrue(app.staticTexts["혈당 186 · 언제 쟀나요?"].waitForExistence(timeout: 3))
+        shot(app, "ios-glucose-ask")
+        app.buttons["그만두기"].tap()
+        XCTAssertEqual(field.value as? String, "186")
+        app.buttons["혈당 남기기"].tap()
+        XCTAssertTrue(app.buttons["맞고 난 뒤"].waitForExistence(timeout: 3))
+        app.buttons["맞고 난 뒤"].tap()
+        XCTAssertTrue(app.staticTexts["혈당 186 · 맞고 난 뒤"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '혈당 186 · 맞고 난 뒤'")).count >= 1)
+        shot(app, "ios-glucose-saved")
+        // ⋯ 혈당 시트: 증상을 고르면 저혈당 안내.
+        app.buttons["혈당 자세히 남기기"].tap()
+        XCTAssertTrue(app.staticTexts["콩이 · 혈당"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons.containing(NSPredicate(format: "label BEGINSWITH '인슐린 맞는 아이가'")).firstMatch.exists)
+        app.descendants(matching: .any)["비틀거리거나 떨어요"].firstMatch.tap()
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label BEGINSWITH '인슐린 맞는 아이가'")).firstMatch.waitForExistence(timeout: 3))
+        shot(app, "ios-glucose-sheet")
+    }
+
+    /// 보드 대조용 화면 사진(테스트 결과에 남김).
+    private func shot(_ app: XCUIApplication, _ name: String) {
+        let a = XCTAttachment(screenshot: app.screenshot())
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
+    }
+
     /// 8-4c: 더보기 → 기별, 스위치를 바꾸면 바로 저장(나갔다 와도 그대로).
     func testNotifySettingsSaves() {
         let app = launch()

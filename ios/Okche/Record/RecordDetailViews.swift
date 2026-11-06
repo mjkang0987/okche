@@ -214,6 +214,8 @@ enum GuideText {
             limp,
         ]
         case .stool: ["변이 짜장처럼 새까매요", "변에 피가 많이 섞였고, 처지거나 토해요", urinary, limp]
+        // shortcut: 혈당은 의서의 공통 줄 하나만, 의서 저혈당 문구가 정해지면 더한다.
+        case .glucose: [limp]
         default: [urinary, limp]
         }
     }
@@ -222,6 +224,7 @@ enum GuideText {
         switch kind {
         case .vomit: "토한 것 사진과 실록을 보여 주면 진료에 도움이 돼요."
         case .stool: "변 사진과 실록을 보여 주면 진료에 도움이 돼요."
+        case .glucose: "언제부터 그랬는지와 실록을 보여 주면 진료에 도움이 돼요."
         default: "언제부터 못 봤는지와 실록을 보여 주면 진료에 도움이 돼요."
         }
     }

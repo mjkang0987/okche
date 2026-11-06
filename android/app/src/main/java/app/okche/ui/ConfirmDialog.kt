@@ -1,12 +1,15 @@
 package app.okche.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -18,9 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.okche.ui.theme.OkcheColor
@@ -31,6 +36,7 @@ import app.okche.ui.theme.OkcheType
  * 확인 창(빼기·지우기·간직 등, 디자인 MemoryKeep·PetDelete·MemoryRestore): 어두운 바탕 위 가운데 카드.
  * 제목(되돌릴 수 없는 일은 [destructive] — 연지색), 본문([text] — 검은 글씨), 안내 글·점 목록, 덧붙일 칸([extra]), [cancel]과 확인 버튼.
  * 허락 안내 창(NotifyAsk, 8-4b)도 이 창 — 본문 + 회색 안내 한 줄, '나중에'·'계속하기'.
+ * [choices]를 주면 두 버튼 대신 고르는 버튼을 세로로 쌓고 [cancel]은 아래 글자 버튼(혈당 '언제 쟀나요?', 9-1 — [confirm]은 안 씀).
  */
 @Composable
 fun OkcheConfirmDialog(
@@ -46,6 +52,7 @@ fun OkcheConfirmDialog(
     confirmLook: ButtonLook = ButtonLook.Filled,
     /** 거짓이면 '그냥 둘게요' 없이 버튼 하나(안내 창 — '지금은 뺄 수 없어요', 8-1). */
     showsCancel: Boolean = true,
+    choices: List<Pair<String, () -> Unit>> = emptyList(),
     extra: @Composable ColumnScope.() -> Unit = {},
 ) {
     Dialog(onDismissRequest = onCancel) {
@@ -74,6 +81,16 @@ fun OkcheConfirmDialog(
                 }
             }
             extra()
+            if (choices.isNotEmpty()) {
+                Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((label, onPick) in choices) OkchePrimaryButton(label, onPick, look = ButtonLook.Emphasis)
+                    Text(
+                        cancel,
+                        Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onCancel).wrapContentHeight(Alignment.CenterVertically),
+                        color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle(FontWeight.Normal), textAlign = TextAlign.Center,
+                    )
+                }
+            } else
             // 큰 글자에서는 두 버튼을 세로로 쌓는다(아이 바꾸기 시트와 같은 기준).
             if (LocalDensity.current.fontScale >= 1.15f) {
                 Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

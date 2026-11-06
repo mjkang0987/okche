@@ -164,7 +164,7 @@ struct TodayRecordSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
-        .sheet(item: $editing) { RecordDetailSheet(target: $0) { _, _ in } }
+        .sheet(item: $editing) { DetailSheet(target: $0) }
         .sheet(item: $snackEditing) { record in
             if let pet = pets.first(where: { $0.id == petId }) { SnackRecordSheet(pet: pet, editing: record) }
         }

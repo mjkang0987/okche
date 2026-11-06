@@ -44,11 +44,12 @@ private val mealTitles = mealResults.toMap()
 /** 체중 글자: 그램 → kg 소수 둘째 자리(반올림, 0은 뺌 — iOS `kgText`와 같음). */
 fun kgText(grams: Long): String = java.math.BigDecimal.valueOf(grams, 3).setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "kg"
 
-/** 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙([detailLine]), 수라는 '다 먹음', 체중은 kg, 다과는 '연어 퓨레 · 반 개'([snacks]), 탕약은 '프레드니솔론 1알'([meds]). 모르는 값이면 빈 글자. */
+/** 기록 줄 값 글자: 구토·매화·소피는 자세히 시트 규칙([detailLine]), 수라는 '다 먹음', 체중은 kg, 다과는 '연어 퓨레 · 반 개'([snacks]), 탕약은 '프레드니솔론 1알'([meds]), 혈당은 '186 · 맞고 난 뒤'. 모르는 값이면 빈 글자. */
 fun recordValue(record: Record, snacks: List<app.okche.store.Snack> = emptyList(), meds: List<app.okche.store.Medication> = emptyList()): String {
     detailLine(record)?.let { return it }
     if (record.kind == RecordKind.snack) return app.okche.ui.food.snackValue(record, snacks)
     if (record.kind == RecordKind.med) return app.okche.ui.med.medValue(record, meds)
+    if (record.kind == RecordKind.glucose) return app.okche.ui.diabetes.glucoseValue(record)
     if (record.kind == RecordKind.weight) {
         return runCatching { JSONObject(record.data) }.getOrNull()?.optLong("grams", -1)?.takeIf { it >= 0 }?.let(::kgText).orEmpty()
     }

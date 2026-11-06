@@ -38,8 +38,8 @@ fun mainDayTitle(day: String): String {
     return "${date.monthValue}월 ${date.dayOfMonth}일 ${weekday}요일"
 }
 
-/** 오늘 기록에 넣는 종류(탕약·혈당·인슐린·옥체는 그 단계에서). */
-private val mainKinds = setOf(RecordKind.vomit, RecordKind.stool, RecordKind.urine, RecordKind.meal, RecordKind.snack, RecordKind.med)
+/** 오늘 기록에 넣는 종류(인슐린·옥체는 그 단계에서). */
+private val mainKinds = setOf(RecordKind.vomit, RecordKind.stool, RecordKind.urine, RecordKind.meal, RecordKind.snack, RecordKind.med, RecordKind.glucose)
 
 /** 오늘 기록: 그 아이의 그날 지우지 않은 기록, 이른 것 위. */
 fun mainTodayRecords(records: List<Record>, petId: String, day: String) =

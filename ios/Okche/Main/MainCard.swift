@@ -32,8 +32,8 @@ enum MainCard {
         return "\(c.month!)월 \(c.day!)일 \(weekday)요일"
     }
 
-    /// 오늘 기록에 넣는 종류(탕약·혈당·인슐린·옥체는 그 단계에서).
-    static let kinds = Set([RecordKind.vomit, .stool, .urine, .meal, .snack, .med].map(\.rawValue))
+    /// 오늘 기록에 넣는 종류(인슐린·옥체는 그 단계에서).
+    static let kinds = Set([RecordKind.vomit, .stool, .urine, .meal, .snack, .med, .glucose].map(\.rawValue))
 
     /// 오늘 기록: 그 아이의 그날 지우지 않은 기록, 이른 것 위.
     static func todayRecords(_ records: [Record], petId: UUID, day: String) -> [Record] {

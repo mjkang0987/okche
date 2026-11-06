@@ -245,7 +245,9 @@ struct OkcheChoiceCards<Value: Hashable>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityAddTraits(on ? .isSelected : [])
+            // 여러 개 고르는 체크 칸으로 읽히게.
+            .accessibilityAddTraits(.isToggle)
+            .accessibilityValue(on ? "선택됨" : "선택 안 됨")
         }
     }
 

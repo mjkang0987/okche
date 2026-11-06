@@ -28,7 +28,10 @@ struct RecordTab: View {
     @State private var deleting: Record?
     /// 혈당 줄 숫자 칸(9-1)과 '언제 쟀나요?' 창에 띄울 수치.
     @State private var glucoseText = ""
-    @State private var askingGlucose: Int?
+    @FocusState private var glucoseFocused: Bool
+    /// 묻는 수치와 그 아이(창이 떠 있는 사이 아이가 바뀌어도 물은 아이로).
+    @State private var askingGlucose: GlucoseAsk?
+    @State private var savingGlucose = false
     @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil }) private var plans: [InsulinPlan]
     @Query(filter: #Predicate<Record> { $0.kind == "insulin" && $0.deletedAt == nil }) private var insulinRecords: [Record]
 
@@ -56,7 +59,7 @@ struct RecordTab: View {
                     else if kind == .med { medSheet = pets.first { $0.id == who } }
                     else { detail = DetailTarget(kind: kind, petId: who) }
                 }, mealMore: suraPet, med: medLine, onGive: give,
-                   glucose: showsGlucose ? $glucoseText : nil, onLeaveGlucose: leaveGlucose)
+                   glucose: showsGlucose ? $glucoseText : nil, glucoseFocused: $glucoseFocused, onLeaveGlucose: leaveGlucose)
                 Text(medLine == nil ? "누르면 바로 기록돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로."
                      : "누르면 바로 기록돼요. 탕약은 오늘 줄 약이 먹일 시간 순으로 버튼이 돼요. 빛깔·모양 같은 자세한 기록은 ⋯ 버튼으로.").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                 OkcheFieldError(message: failed ? "저장하지 못했어요. 다시 해 주세요." : nil)
@@ -64,7 +67,18 @@ struct RecordTab: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .deleteRecordDialog($deleting, pets: pets)
-            .onChange(of: who) { showUndo(nil) } // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫음
+            // 다른 아이로 바꾸면 앞 아이 되돌리기는 닫고, 적던 혈당은 비움(다른 아이 기록으로 남지 않게).
+            .onChange(of: who) {
+                showUndo(nil)
+                glucoseText = ""
+                askingGlucose = nil
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("완료") { glucoseFocused = false }
+                }
+            }
             .navigationDestination(for: RecordRoute.self) { route in
                 switch route {
                 case .sura(let petId): SuraScreen(petId: petId)
@@ -87,17 +101,17 @@ struct RecordTab: View {
                 AccessibilityNotification.Announcement("아뢰었사옵니다").post()
             }
         }
-        .fullScreenCover(item: Binding(get: { askingGlucose.map { GlucoseAsk(mgdl: $0) } }, set: { askingGlucose = $0?.mgdl })) { ask in
+        .fullScreenCover(item: $askingGlucose) { ask in
             GlucoseAskDialog(mgdl: ask.mgdl, onPick: { timing in
                 askingGlucose = nil
-                saveGlucose(ask.mgdl, timing)
+                saveGlucose(ask.mgdl, timing, petId: ask.petId)
             }, onCancel: { askingGlucose = nil })
             .presentationBackground(.clear)
         }
         .transaction { $0.disablesAnimations = askingGlucose != nil }
     }
 
-    private struct GlucoseAsk: Identifiable { let mgdl: Int; var id: Int { mgdl } }
+    private struct GlucoseAsk: Identifiable { let mgdl: Int; let petId: UUID; let id = UUID() }
 
     /// 혈당 줄: 고른 아이가 당뇨일 때만(누군지 모르면 없음).
     private var showsGlucose: Bool { pets.first { $0.id == who }?.hasDiabetes == true }
@@ -105,16 +119,20 @@ struct RecordTab: View {
     /// '남기기': 지금 차례 인슐린 기록이 있으면 맞고 난 뒤, 계획이 없으면 그 밖으로 바로, 아니면 '언제 쟀나요?'(9-1).
     private func leaveGlucose() {
         guard let who, let mgdl = GlucoseRules.number(glucoseText) else { return }
+        glucoseFocused = false
         if let timing = GlucoseRules.guess(petId: who, plans: plans, insulinRecords: insulinRecords) {
-            saveGlucose(mgdl, timing)
+            saveGlucose(mgdl, timing, petId: who)
         } else {
-            askingGlucose = mgdl
+            askingGlucose = GlucoseAsk(mgdl: mgdl, petId: who)
         }
     }
 
-    private func saveGlucose(_ mgdl: Int, _ timing: GlucoseRules.Timing) {
+    private func saveGlucose(_ mgdl: Int, _ timing: GlucoseRules.Timing, petId: UUID) {
+        guard !savingGlucose else { return } // 두 번 눌러 둘 남지 않게
+        savingGlucose = true
+        defer { savingGlucose = false }
         do {
-            let saved = try GlucoseRules.save(petId: who, mgdl: mgdl, timing: timing, signs: [], at: .now, in: context)
+            let saved = try GlucoseRules.save(petId: petId, mgdl: mgdl, timing: timing, signs: [], at: .now, in: context)
             failed = false
             glucoseText = ""
             justSaved = saved.id
@@ -218,6 +236,7 @@ struct QuickRecordCard: View {
     var onGive: (MedSlots.Slot) -> Void = { _ in }
     /// 혈당 줄(탕약 다음, 당뇨 아이만 — 9-1) 숫자 칸.
     var glucose: Binding<String>? = nil
+    var glucoseFocused: FocusState<Bool>.Binding? = nil
     var onLeaveGlucose: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
     @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
@@ -231,8 +250,8 @@ struct QuickRecordCard: View {
                     medRow(med)
                     OkcheColor.line.frame(height: 1)
                 }
-                if row.kind == .meal, let glucose {
-                    GlucoseRow(text: glucose, onLeave: onLeaveGlucose) { onDetail(.glucose) }
+                if row.kind == .meal, let glucose, let glucoseFocused {
+                    GlucoseRow(text: glucose, focused: glucoseFocused, onLeave: onLeaveGlucose) { onDetail(.glucose) }
                     OkcheColor.line.frame(height: 1)
                 }
                 ViewThatFits(in: .horizontal) {

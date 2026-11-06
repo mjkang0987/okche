@@ -16,14 +16,14 @@ enum GlucoseRules {
 
     /// 앞뒤 빈칸 뺀 숫자만 1~999(6-1 숫자 규칙).
     static func number(_ text: String) -> Int? {
-        let t = text.trimmingCharacters(in: .whitespaces)
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, t.allSatisfy({ $0.isASCII && $0.isNumber }), let n = Int(t), (1...999).contains(n) else { return nil }
         return n
     }
 
     /// 빈칸이면 안내 없음(버튼만 흐림), 틀리면 '1에서 999 사이로 넣어 주세요'.
     static func error(_ text: String) -> String? {
-        text.trimmingCharacters(in: .whitespaces).isEmpty || number(text) != nil ? nil : "1에서 999 사이로 넣어 주세요"
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || number(text) != nil ? nil : "1에서 999 사이로 넣어 주세요"
     }
 
     // MARK: 지금 차례 구간(7장)
@@ -38,12 +38,14 @@ enum GlucoseRules {
     static func window(_ plan: InsulinPlan, now: Date, calendar: Calendar = .current) -> (start: Date, end: Date)? {
         let times = Array(Set(plan.slots.map(\.time))).sorted()
         guard !times.isEmpty else { return nil }
-        // 어제·오늘·내일의 구간 시작(차례 − 1시간)을 이어 놓고 지금이 든 칸을 찾는다.
-        let starts: [Date] = (-1...1).flatMap { offset -> [Date] in
+        // 어제~모레의 구간 시작(차례 − 1시간)을 이어 놓고 지금이 든 칸을 찾는다(자정 근처 차례도 다음 시작이 있게).
+        let starts: [Date] = (-1...2).flatMap { offset -> [Date] in
             guard let day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: now)) else { return [] }
+            // `HH:mm`만 읽음 — 틀린 시간은 빼기(안드로이드 `LocalTime.parse`와 같음).
             return times.compactMap { t in
-                let p = t.split(separator: ":").compactMap { Int($0) }
-                return calendar.date(bySettingHour: p.first ?? 0, minute: p.count > 1 ? p[1] : 0, second: 0, of: day)?.addingTimeInterval(-3600)
+                let p = t.split(separator: ":").map(String.init)
+                guard p.count == 2, p[0].count == 2, p[1].count == 2, let h = Int(p[0]), let m = Int(p[1]), (0..<24).contains(h), (0..<60).contains(m) else { return nil }
+                return calendar.date(bySettingHour: h, minute: m, second: 0, of: day)?.addingTimeInterval(-3600)
             }
         }.sorted()
         for (a, b) in zip(starts, starts.dropFirst()) where a <= now && now < b { return (a, b) }
@@ -75,12 +77,12 @@ enum GlucoseRules {
                      now: Date = .now, in context: ModelContext) throws -> Record {
         let record: Record
         if let editing {
-            if editing.occurredAt != at { editing.setOccurredAt(at, now: now) }
+            if editing.occurredAt != min(at, now) { editing.setOccurredAt(min(at, now), now: now) } // 앞날 기록 막기(자세히 시트와 같음)
             editing.data = data(mgdl: mgdl, timing: timing, signs: signs)
             editing.updatedAt = now
             record = editing
         } else {
-            record = Record(now: now, petId: petId, kind: .glucose, occurredAt: at, data: data(mgdl: mgdl, timing: timing, signs: signs))
+            record = Record(now: now, petId: petId, kind: .glucose, occurredAt: min(at, now), data: data(mgdl: mgdl, timing: timing, signs: signs))
             context.insert(record)
         }
         do {
@@ -98,7 +100,7 @@ enum GlucoseRules {
 
     /// 값 글자 '186 · 맞고 난 뒤 · 비틀거림'(줄 이름 '혈당'은 앞에서 붙음).
     static func value(_ r: Record) -> String {
-        guard let n = mgdl(r) else { return "" }
+        guard let n = mgdl(r), n > 0 else { return "" }
         let parts = ["\(n)"] + [timing(r).flatMap { timingWords[$0] }].compactMap { $0 }
             + Sign.allCases.filter(signs(r).contains).compactMap { signWords[$0] }
         return parts.joined(separator: " · ")

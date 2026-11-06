@@ -45,6 +45,8 @@ final class GlucoseRulesTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(GlucoseRules.window(p, now: at(28, 1))).start, at(27, 19))
         XCTAssertEqual(try XCTUnwrap(GlucoseRules.window(p, now: at(28, 1))).end, at(28, 7))
         XCTAssertNil(GlucoseRules.window(plan([]), now: at(27, 7)))
+        // 자정 넘은 차례 하나(00:30) — 23:45는 23:30~다음 날 23:30.
+        XCTAssertEqual(try XCTUnwrap(GlucoseRules.window(plan(["00:30"]), now: at(27, 23, 45))).end, at(28, 23, 30))
     }
 
     func testGuess() {

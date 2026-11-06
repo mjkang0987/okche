@@ -4,6 +4,8 @@ import SwiftUI
 /// 일기 혈당 줄(보드 `RecordGlucose`, 2026-11-06 승인): 숫자 칸(mg/dL) + '남기기'(빈칸·틀린 값이면 흐림) + ⋯ 혈당 시트.
 struct GlucoseRow: View {
     @Binding var text: String
+    /// 숫자 칸 포커스 — 키보드 '완료'·남기기에서 내린다.
+    var focused: FocusState<Bool>.Binding
     let onLeave: () -> Void
     let onDetail: () -> Void
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 44
@@ -26,11 +28,15 @@ struct GlucoseRow: View {
             OkcheFieldError(message: GlucoseRules.error(text))
         }
         .padding(.vertical, 10)
+        // 틀린 값이 되면 한 번 읽어 줌(흐린 남기기의 이유).
+        .onChange(of: GlucoseRules.error(text)) { _, message in
+            if let message { AccessibilityNotification.Announcement(message).post() }
+        }
     }
 
     private var label: some View {
         HStack(spacing: 4) {
-            Image(systemName: "drop.degreesign").font(.body).frame(minWidth: 22).accessibilityHidden(true)
+            Image(systemName: "syringe").font(.body).frame(minWidth: 22).accessibilityHidden(true)
             Text("혈당").okcheText(OkcheType.body, weight: .bold).fixedSize()
         }
         .foregroundStyle(OkcheColor.namsaekDeep)
@@ -43,7 +49,9 @@ struct GlucoseRow: View {
                 TextField(text: $text, prompt: Text("수치").foregroundStyle(OkcheColor.inkMuted)) { Text("혈당 수치 (mg/dL)") }
                     .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
                     .keyboardType(.numberPad)
+                    .focused(focused)
                     .accessibilityLabel("혈당 수치 (mg/dL)")
+                    .accessibilityHint(GlucoseRules.error(text) ?? "")
                 Text("mg/dL").okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted).accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
@@ -55,6 +63,7 @@ struct GlucoseRow: View {
                 .okcheText(OkcheType.body, weight: .bold)
                 .buttonStyle(GlucoseLeaveStyle(height: height))
                 .disabled(GlucoseRules.number(text) == nil)
+                .accessibilityLabel("혈당 남기기")
         }
     }
 
@@ -99,15 +108,8 @@ struct GlucoseAskDialog: View {
                            confirm: "", showsButtons: false, onCancel: onCancel, onConfirm: {}) {
             VStack(spacing: 10) {
                 ForEach(GlucoseRules.timingTitles, id: \.value) { option in
-                    // 보드: 남색 테두리·짙은 남색 굵은 글자.
-                    Button { onPick(option.value) } label: {
-                        Text(option.title).okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaekDeep)
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                            .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
-                            .overlay(RoundedRectangle(cornerRadius: OkcheRadius.radiusMd).strokeBorder(OkcheColor.namsaek, lineWidth: 1.5))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    // 보드: 남색 테두리·짙은 남색 굵은 글자(있는 `emphasis`).
+                    Button(option.title) { onPick(option.value) }.buttonStyle(.okchePrimary(.emphasis))
                 }
                 Button("그만두기", action: onCancel)
                     .okcheText(OkcheType.body).foregroundStyle(OkcheColor.inkMuted)
@@ -180,7 +182,13 @@ struct GlucoseSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     OkcheFieldLabel(title: "함께 보였나요?", note: "(여러 개 고를 수 있어요)").accessibilityAddTraits(.isHeader)
                     OkcheChoiceCards(options: GlucoseRules.signTitles.map { ($0.value, $0.title) }, checklist: true,
-                                     isOn: { signs.contains($0) }, onTap: { s in if signs.contains(s) { signs.remove(s) } else { signs.insert(s) } })
+                                     isOn: { signs.contains($0) }, onTap: { s in
+                                         if signs.contains(s) { signs.remove(s) } else { signs.insert(s) }
+                                         // 안내가 새로 뜨면 화면 읽기로 알림.
+                                         if signs.count == 1, signs.contains(s) {
+                                             AccessibilityNotification.Announcement("인슐린 맞는 아이가 이런 모습을 보이면 저혈당일 수 있어요. 바로 병원에 연락하길 권해요.").post()
+                                         }
+                                     })
                     // 고른 뒤에만 저혈당 안내(디자인 고침 — 2026-11-02).
                     if !signs.isEmpty {
                         Button { guiding = true } label: {
@@ -222,6 +230,7 @@ struct GlucoseSheet: View {
         do {
             let record = try GlucoseRules.save(petId: petId, mgdl: mgdl, timing: picked, signs: signs, at: at, editing: target.editing, in: context)
             onSaved(record, target.editing == nil)
+            if target.editing != nil { AccessibilityNotification.Announcement("고쳤어요").post() }
             dismiss()
         } catch {
             saving = false

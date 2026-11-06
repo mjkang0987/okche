@@ -530,16 +530,16 @@ final class OnboardingUITests: XCTestCase {
         tapBelow(app.buttons["모시기"].firstMatch, in: app)
         let field = app.textFields["혈당 수치 (mg/dL)"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["남기기"].isEnabled) // 빈칸이면 흐림
+        XCTAssertFalse(app.buttons["혈당 남기기"].isEnabled) // 빈칸이면 흐림
         field.tap()
         field.typeText("186")
         shot(app, "ios-glucose-row")
-        app.buttons["남기기"].tap()
+        app.buttons["혈당 남기기"].tap()
         XCTAssertTrue(app.staticTexts["혈당 186 · 언제 쟀나요?"].waitForExistence(timeout: 3))
         shot(app, "ios-glucose-ask")
         app.buttons["그만두기"].tap()
         XCTAssertEqual(field.value as? String, "186")
-        app.buttons["남기기"].tap()
+        app.buttons["혈당 남기기"].tap()
         XCTAssertTrue(app.buttons["맞고 난 뒤"].waitForExistence(timeout: 3))
         app.buttons["맞고 난 뒤"].tap()
         XCTAssertTrue(app.staticTexts["혈당 186 · 맞고 난 뒤"].waitForExistence(timeout: 3))
@@ -549,7 +549,7 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["혈당 자세히 남기기"].tap()
         XCTAssertTrue(app.staticTexts["콩이 · 혈당"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons.containing(NSPredicate(format: "label BEGINSWITH '인슐린 맞는 아이가'")).firstMatch.exists)
-        app.buttons["비틀거리거나 떨어요"].tap()
+        app.descendants(matching: .any)["비틀거리거나 떨어요"].firstMatch.tap()
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label BEGINSWITH '인슐린 맞는 아이가'")).firstMatch.waitForExistence(timeout: 3))
         shot(app, "ios-glucose-sheet")
     }

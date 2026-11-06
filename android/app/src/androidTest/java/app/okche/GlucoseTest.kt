@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isNotSelected
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.performClick
@@ -141,13 +142,12 @@ class GlucoseFlowTest {
     private fun waitFor(matcher: SemanticsMatcher) = rule.waitUntil(5_000) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
 
     /** 당뇨면 열린 인슐린 계획(08:00·20:00, 기록 없음 → 남기기는 묻기)과 함께. */
-    private fun launch(diabetic: Boolean) {
+    private fun launch(diabetic: Boolean, names: List<String> = listOf("콩이")) {
         runBlocking {
             val dao = OkcheDatabase.get(context).dao()
             OkcheDatabase.get(context).clearAllTables()
-            registerPet(dao, PetForm(name = "콩이"))
-            if (diabetic) {
-                val pet = dao.pets().first()
+            for (name in names) registerPet(dao, PetForm(name = name))
+            if (diabetic) for (pet in dao.pets()) {
                 dao.update(pet.copy(hasDiabetes = true))
                 dao.insert(InsulinPlan(petId = pet.id, slots = listOf(InsulinSlot("08:00", 2.0), InsulinSlot("20:00", 2.0)), activeFrom = System.currentTimeMillis() - 86_400_000))
             }
@@ -181,6 +181,16 @@ class GlucoseFlowTest {
         rule.waitUntil(5_000) { rule.onAllNodes(hasText("혈당 186 · 언제 쟀나요?")).fetchSemanticsNodes().isEmpty() }
         rule.onNode(field).assert(hasText("186"))
         rule.onAllNodes(hasText("방금 남긴 기록")).assertCountEquals(0)
+    }
+
+    /** 다른 아이로 바꾸면 앞 아이 수치는 비움(그대로 남기면 남의 아이에 남음). */
+    @Test fun petChangeClearsValue() {
+        launch(diabetic = true, names = listOf("콩이", "보리"))
+        waitFor(field)
+        rule.onNode(field).performTextInput("186")
+        rule.onNode(isSelectable().and(isNotSelected()).and(hasText("콩이").or(hasText("보리")))).performClick() // 안 고른 아이로
+        rule.waitUntil(5_000) { rule.onAllNodes(field.and(hasText("186"))).fetchSemanticsNodes().isEmpty() }
+        rule.onNode(field).assert(hasText(""))
     }
 
     @Test fun noRowForNonDiabeticOrUnknown() {

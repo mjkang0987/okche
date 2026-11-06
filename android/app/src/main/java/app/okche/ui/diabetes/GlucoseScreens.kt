@@ -31,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -145,7 +147,8 @@ fun GlucoseSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, Boolea
                             append("인슐린 맞는 아이가 이런 모습을 보이면 저혈당일 수 있어요. 바로 병원에 연락하길 권해요. ")
                             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("의서 보기") }
                         },
-                        Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "의서 안내 열기") { guiding = true },
+                        Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite } // 나타날 때 읽히게
+                            .clickable(role = Role.Button, onClickLabel = "의서 안내 열기") { guiding = true },
                         color = OkcheColor.Yeonji, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
                     )
                 }

@@ -107,7 +107,7 @@ import app.okche.ui.diabetes.glucoseTimingTitles
 import app.okche.ui.diabetes.glucoseValue
 import app.okche.ui.diabetes.saveGlucose
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.outlined.Bloodtype
+import androidx.compose.material.icons.outlined.Vaccines
 import androidx.compose.ui.text.input.KeyboardType
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheConfirmDialog
@@ -170,10 +170,16 @@ fun RecordTab(
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { posted?.let { toasts?.dismiss(it) } } }
     // 혈당 줄(9-1): 당뇨 아이일 때만. 남기기 짐작에 인슐린 계획·기록.
     val glucosePet = current?.takeIf { it.id == who && it.hasDiabetes }
-    var glucoseText by remember { mutableStateOf("") }
+    var glucoseText by state.glucoseText
+    var glucoseWho by state.glucoseWho
+    // 칸 값은 친 아이 것만 — 아이를 바꾸면(다른 탭에서 바꾸고 와도) 비워 남의 아이에 남지 않게.
+    if (glucoseWho != who) {
+        glucoseWho = who
+        glucoseText = ""
+    }
     var glucoseBusy by remember { mutableStateOf(false) }
-    /** '언제 쟀나요?' 창에 띄운 수치. */
-    var asking by remember { mutableStateOf<Int?>(null) }
+    /** '언제 쟀나요?' 창에 띄운 아이 id와 수치 — 고르면 물은 그 아이로 남긴다. */
+    var asking by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val insulinPlans by remember { dao.insulinPlansFlow() }.collectAsState(null)
     val insulinRecords by remember { dao.insulinRecordsFlow() }.collectAsState(null)
 
@@ -240,7 +246,7 @@ fun RecordTab(
                         val mgdl = glucoseNumber(glucoseText) ?: return@GlucoseRow
                         // 짐작이 있으면 바로, 없으면 묻는다(계획·기록을 읽기 전이면 묻기).
                         val guess = insulinPlans?.let { p -> insulinRecords?.let { r -> glucoseGuess(pet.id, p, r, System.currentTimeMillis()) } }
-                        if (guess != null) saveGlucoseNow(pet.id, mgdl, guess) else asking = mgdl
+                        if (guess != null) saveGlucoseNow(pet.id, mgdl, guess) else asking = pet.id to mgdl
                     }
                 }
             }
@@ -305,9 +311,10 @@ fun RecordTab(
     if (lastWho != who) {
         lastWho = who
         toasts?.show(null)
+        asking = null // 앞 아이 수치를 묻던 창도 닫음(칸 값은 위 glucoseWho에서 비움)
     }
     deleting?.let { DeleteRecordDialog(dao, it, pets.orEmpty()) { deleting = null } }
-    asking?.let { mgdl ->
+    asking?.let { (petId, mgdl) ->
         // 고르면 바로 남기고, '그만두기'는 칸 값 그대로(보드 GlucoseAsk).
         OkcheConfirmDialog(
             "혈당 $mgdl · 언제 쟀나요?", "", onCancel = { asking = null }, onConfirm = {},
@@ -315,8 +322,7 @@ fun RecordTab(
             choices = glucoseTimingTitles.map { (timing, title) ->
                 title to {
                     asking = null
-                    glucosePet?.let { saveGlucoseNow(it.id, mgdl, timing) }
-                    Unit
+                    saveGlucoseNow(petId, mgdl, timing)
                 }
             },
         )
@@ -341,16 +347,23 @@ fun RecordTab(
 }
 
 /**
- * 일기 탭 상태: '누군지 몰라요'를 골랐는지(이 화면에서만 — 지금 보는 아이는 그대로), 방금 누른 기록 id('아뢰었사옵니다').
- * 탭을 바꾸거나 기록 목록을 다녀와도 남게 RootTabs가 쥔다(iOS는 탭·push라 그대로 남음).
+ * 일기 탭 상태: '누군지 몰라요'를 골랐는지(이 화면에서만 — 지금 보는 아이는 그대로), 방금 누른 기록 id('아뢰었사옵니다'),
+ * 혈당 칸에 친 수치와 그 아이 id. 탭을 바꾸거나 기록 목록을 다녀와도 남게 RootTabs가 쥔다(iOS는 탭·push라 그대로 남음).
  */
-class QuickRecordState(val unknownPicked: MutableState<Boolean>, val justSaved: MutableState<String?>)
+class QuickRecordState(
+    val unknownPicked: MutableState<Boolean>,
+    val justSaved: MutableState<String?>,
+    val glucoseText: MutableState<String>,
+    val glucoseWho: MutableState<String?>,
+)
 
 @Composable
 fun rememberQuickRecordState(): QuickRecordState {
     val unknownPicked = rememberSaveable { mutableStateOf(false) }
     val justSaved = rememberSaveable { mutableStateOf<String?>(null) }
-    return remember(unknownPicked, justSaved) { QuickRecordState(unknownPicked, justSaved) }
+    val glucoseText = rememberSaveable { mutableStateOf("") }
+    val glucoseWho = rememberSaveable { mutableStateOf<String?>(null) }
+    return remember(unknownPicked, justSaved, glucoseText, glucoseWho) { QuickRecordState(unknownPicked, justSaved, glucoseText, glucoseWho) }
 }
 
 /** 디자인 아이콘(물방울·알약·물방울 둘·그릇)에 가까운 머티리얼 아이콘. */
@@ -491,7 +504,7 @@ private fun GlucoseRow(text: String, onText: (String) -> Unit, large: Boolean, m
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.Bloodtype, null, Modifier.size(22.dp), tint = OkcheColor.NamsaekDeep)
+            Icon(Icons.Outlined.Vaccines, null, Modifier.size(22.dp), tint = OkcheColor.NamsaekDeep)
             Text("혈당", color = OkcheColor.NamsaekDeep, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
         }
     }
@@ -500,7 +513,7 @@ private fun GlucoseRow(text: String, onText: (String) -> Unit, large: Boolean, m
             OkcheTextField(
                 text, onText, "혈당 수치 (mg/dL)", Modifier.weight(1f), showLabel = false, placeholder = "수치",
                 suffix = "mg/dL", suffixStyle = OkcheType.Caption, error = error, showError = false,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), inRow = true,
             )
             QuickButton("남기기", "혈당 남기기", softWrap = false, filled = true, enabled = glucoseNumber(text) != null, onClick = onSave)
         }
@@ -523,14 +536,14 @@ private fun GlucoseRow(text: String, onText: (String) -> Unit, large: Boolean, m
     }
 }
 
-/** 바로 기록 버튼. [filled]면 남색 채움·흰 굵은 글자·칸 높이 52(혈당 '남기기' — 탕약 '✓' 버튼 모양), 못 누르면 회색. */
+/** 바로 기록 버튼(높이 44). [filled]면 남색 채움·흰 굵은 글자(혈당 '남기기' — 탕약 '✓' 버튼 모양), 못 누르면 회색. */
 @Composable
 private fun QuickButton(title: String, label: String, softWrap: Boolean = true, filled: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Box(
         Modifier
             .widthIn(min = 52.dp)
-            .heightIn(min = if (filled) 52.dp else 44.dp)
+            .heightIn(min = 44.dp)
             .clip(shape)
             .then(
                 if (filled) Modifier.background(if (enabled) OkcheColor.Namsaek else OkcheColor.Line, shape)

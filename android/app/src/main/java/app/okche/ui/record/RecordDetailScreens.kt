@@ -338,6 +338,7 @@ private fun guideLines(kind: RecordKind): List<String> {
             limp,
         )
         RecordKind.stool -> listOf("변이 짜장처럼 새까매요", "변에 피가 많이 섞였고, 처지거나 토해요", urinary, limp)
+        // shortcut: 혈당은 의서의 공통 줄 하나만, 의서 저혈당 문구가 정해지면 더한다.
         RecordKind.glucose -> listOf(limp) // 의서에 있는 줄만(새 의학 문구는 지어내지 않음 — 9-1)
         else -> listOf(urinary, limp)
     }

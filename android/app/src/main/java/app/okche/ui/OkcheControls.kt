@@ -126,17 +126,21 @@ fun OkcheErrorText(message: String, modifier: Modifier = Modifier) {
 
 
 
-/** 52 높이·테두리 1.5·모서리 8·흰 바탕 칸 틀. 포커스면 남색 2 테두리. */
-private fun Modifier.fieldBox(focused: Boolean) = this
-    .heightIn(min = FieldHeight)
-    .background(OkcheColor.Paper, FieldShape)
-    .border(if (focused) 2.dp else 1.5.dp, if (focused) OkcheColor.Namsaek else OkcheColor.LineStrong, FieldShape)
-    .padding(horizontal = FieldPadding)
+/** 52 높이·테두리 1.5·모서리 8·흰 바탕 칸 틀. 포커스면 남색 2 테두리. [inRow]면 버튼 줄에 맞춘 44·모서리 14, 틀리면 연지 테두리. */
+private fun Modifier.fieldBox(focused: Boolean, inRow: Boolean = false, error: Boolean = false): Modifier {
+    val shape = if (inRow) RoundedCornerShape(OkcheRadius.RadiusMd) else FieldShape
+    val color = if (inRow && error) OkcheColor.Yeonji else if (focused) OkcheColor.Namsaek else OkcheColor.LineStrong
+    return heightIn(min = if (inRow) 44.dp else FieldHeight)
+        .background(OkcheColor.Paper, shape)
+        .border(if (focused) 2.dp else 1.5.dp, color, shape)
+        .padding(horizontal = FieldPadding)
+}
 
 /**
  * 글자 입력칸: 위 이름표 + 52 칸(+ 끝 단위 글자) + 오류 글자. 이름표·오류가 입력칸 안에 함께 묶여(TalkBack 한 덩어리),
  * 이름표를 눌러도 입력칸으로 간다(HTML label과 같음). 이름표를 숨기면(`showLabel` 거짓) 이름은 contentDescription으로.
  * `showError`가 거짓이면 오류 글자는 부르는 쪽이 보이고 여기선 읽기용 오류만 단다. `description`은 칸 설명(aria-describedby)으로 함께 읽는다.
+ * `inRow`는 바로 기록 줄 안 칸(44·모서리 14·틀리면 연지 테두리 — 보드 RecordGlucose).
  */
 @Composable
 fun OkcheTextField(
@@ -153,6 +157,7 @@ fun OkcheTextField(
     showError: Boolean = true,
     description: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    inRow: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -171,7 +176,7 @@ fun OkcheTextField(
         decorationBox = { inner ->
             Column(verticalArrangement = Arrangement.spacedBy(FieldGap)) {
                 if (showLabel) OkcheFieldLabel(label, hint = hint)
-                Row(Modifier.fieldBox(focused), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fieldBox(focused, inRow, error != null), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         if (value.isEmpty() && placeholder != null) {
                             Text(placeholder, color = OkcheColor.InkMuted, style = OkcheType.Body.toTextStyle())

@@ -139,6 +139,9 @@ final class MedNotifyTests: XCTestCase {
         XCTAssertEqual(early.first?.body, "프레드니솔론이 2일분 남았어요")
         XCTAssertEqual(early.first?.medId, p.id)
         XCTAssertEqual(low(p, now: at(27, 12)).map(\.fireAt), [at(28, 10)])
+        // 내일로 밀리면 하루 적게, 하루분도 안 남으면 '거의 다 떨어졌어요'.
+        XCTAssertEqual(low(p, now: at(27, 12)).first?.body, "프레드니솔론이 1일분 남았어요")
+        XCTAssertEqual(MedNotify.lowMedBody("프레드니솔론", days: 0), "프레드니솔론이 거의 다 떨어졌어요")
         // 5일분, 기준 3 → 이틀 뒤 10시 '3일분'.
         p.stockAmount = 5
         let ahead = low(p, now: at(27, 12))

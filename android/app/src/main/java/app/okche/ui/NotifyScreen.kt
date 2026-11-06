@@ -69,11 +69,15 @@ fun NotifyScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) { setting = dao.loadOrCreateSetting() }
 
     fun save(change: Setting.() -> Setting) {
-        val next = setting?.change()?.copy(updatedAt = System.currentTimeMillis()) ?: return
+        val before = setting ?: return
+        val next = before.change().copy(updatedAt = System.currentTimeMillis())
         setting = next
         scope.launch {
             failed = runCatching { lock.withLock { dao.update(next) } }.isFailure
-            @Suppress("DEPRECATION") if (failed) view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+            if (failed) {
+                setting = before // 저장 안 된 값을 보여 주지 않게 되돌림
+                @Suppress("DEPRECATION") view.announceForAccessibility("저장하지 못했어요. 다시 해 주세요.")
+            }
         }
     }
     fun notify(change: NotifySettings.() -> NotifySettings) = save { copy(notify = notify.change()) }
@@ -85,7 +89,6 @@ fun NotifyScreen(onBack: () -> Unit) {
             Modifier.verticalScroll(rememberScrollState()).padding(start = OkcheSpacing.Space4, end = OkcheSpacing.Space4, top = 4.dp, bottom = OkcheSpacing.Space6),
             verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space4),
         ) {
-            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
             NotifySection("돌봄") {
                 OkcheSwitchRow("탕약 시간", "약마다 정한 시간에", s.notify.medTime, { v -> notify { copy(medTime = v) } }, framed = false)
                 HorizontalDivider(color = OkcheColor.Line)
@@ -122,6 +125,7 @@ fun NotifyScreen(onBack: () -> Unit) {
                     }
                 }
             }
+            if (failed) OkcheErrorText("저장하지 못했어요. 다시 해 주세요.")
             Text(
                 "알림은 앱을 마지막으로 연 날부터 3일치만 걸어 둬요. 3일 동안 열지 않으면 멈추고, 다시 열면 이어져요.",
                 color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),

@@ -9,21 +9,23 @@ enum MedReminders {
 
     /// 앱을 열 때·저장할 때마다 부른다. 허락이 없으면 휴대폰이 받지 않을 뿐 그대로 둔다.
     static func reschedule(in context: ModelContext, now: Date = .now) async {
-        guard let alerts = try? alerts(in: context, now: now) else { return }
         let center = UNUserNotificationCenter.current()
+        let status = await center.notificationSettings().authorizationStatus
+        guard let alerts = try? alerts(in: context, delivered: [.authorized, .provisional, .ephemeral].contains(status), now: now) else { return }
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { id in prefixes.contains { id.hasPrefix($0) } }
         center.removePendingNotificationRequests(withIdentifiers: pending)
         for request in alerts.map(request) { try? await center.add(request) }
     }
 
     /// 남은 약 알림을 먼저(몇 개 안 됨) 넣고, 탕약은 남은 자리(이어짐 알림 하나 빼고 64개)만큼.
-    static func alerts(in context: ModelContext, now: Date = .now) throws -> [MedNotify.Alert] {
+    /// `delivered`: 휴대폰 알림이 허락돼 걸어 둔 남은 약 알림이 실제로 떴을 때만 보낸 것으로 친다.
+    static func alerts(in context: ModelContext, delivered: Bool = true, now: Date = .now) throws -> [MedNotify.Alert] {
         let setting = try Setting.loadOrCreate(in: context)
         let schedules = try context.fetch(FetchDescriptor<MedSchedule>(predicate: #Predicate { $0.deletedAt == nil }))
         let records = try context.fetch(FetchDescriptor<Record>(predicate: #Predicate { $0.deletedAt == nil })).filter { $0.kind == RecordKind.med.rawValue }
         let meds = try context.fetch(FetchDescriptor<Medication>())
         let low = MedNotify.lowMedAlerts(meds: meds, schedules: schedules, records: records, on: setting.notify.lowMed, days: setting.lowMedDays,
-                                         quiet: setting.quietHours, sent: LowMedLog.sent(now: now), now: now)
+                                         quiet: setting.quietHours, sent: LowMedLog.sent(now: now, delivered: delivered), now: now)
         LowMedLog.armed(low)
         return low + MedNotify.alerts(schedules, records: records, pets: try context.fetch(FetchDescriptor<Pet>()),
                                       rests: try context.fetch(FetchDescriptor<RestPeriod>()), meds: meds,
@@ -66,11 +68,12 @@ enum MedReminders {
 enum LowMedLog {
     private static let sentKey = "lowMedSent", armedKey = "lowMedArmed"
 
-    static func sent(now: Date) -> Set<String> {
+    static func sent(now: Date, delivered: Bool = true) -> Set<String> {
         let d = UserDefaults.standard
         var sent = Set(d.stringArray(forKey: sentKey) ?? [])
         let armed = d.dictionary(forKey: armedKey) as? [String: Double] ?? [:]
-        for (key, at) in armed where at <= now.timeIntervalSince1970 { sent.insert(key) }
+        // 알림이 꺼져 있던 동안 지난 것은 안 보낸 것 — 켜면 다시 건다.
+        for (key, at) in armed where delivered && at <= now.timeIntervalSince1970 { sent.insert(key) }
         d.set(Array(sent), forKey: sentKey)
         return sent
     }

@@ -87,9 +87,17 @@ enum MedNotify {
                   var fireAt = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: day) else { return nil }
             if fireAt <= now, let next = calendar.date(byAdding: .day, value: 1, to: fireAt) { fireAt = next }
             guard fireAt <= now.addingTimeInterval(window) else { return nil }
+            // 울리는 날에 남을 일수(하루에 하루분씩 줄어듦) — 10시가 지나 내일로 밀리면 하루 적게.
+            let days = left - (calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: fireAt)).day ?? 0)
             return Alert(id: "low.\(med.id.uuidString.lowercased())", kind: .low, fireAt: fireAt, title: "약방",
-                         body: "\(MedRules.withSubjectParticle(med.name)) \(min(left, threshold))일분 남았어요", petId: nil, medId: med.id, sentKey: sentKey(med))
+                         body: lowMedBody(med.name, days: days), petId: nil, medId: med.id, sentKey: sentKey(med))
         }
+        .prefix(limit).map { $0 }
+    }
+
+    /// '프레드니솔론이 3일분 남았어요', 하루분도 안 남으면 '프레드니솔론이 거의 다 떨어졌어요'.
+    static func lowMedBody(_ name: String, days: Int) -> String {
+        days > 0 ? "\(MedRules.withSubjectParticle(name)) \(days)일분 남았어요" : "\(MedRules.withSubjectParticle(name)) 거의 다 떨어졌어요"
     }
 
     /// 알림 켠 약(열린 줄, 필요할 때만 아님)이 하나라도 있는지 — 꺼짐 띠를 띄울 때.

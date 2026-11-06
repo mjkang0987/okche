@@ -71,7 +71,7 @@ struct NotifySettingsView: View {
                 .padding(.top, 12).padding(.bottom, 4)
             content()
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 14).padding(.vertical, 4)
         .background(OkcheColor.paper, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusLg))
         .accessibilityElement(children: .contain)
     }
@@ -85,7 +85,7 @@ struct NotifySettingsView: View {
                 // '약방 · 남은 약': 점 뒤는 작은 회색(보드).
                 let parts = title.components(separatedBy: " · ")
                 (Text(parts[0]) + Text(parts.count > 1 ? " · " + parts[1...].joined(separator: " · ") : "")
-                    .font(.system(size: OkcheType.body.size * 0.85)).foregroundColor(OkcheColor.inkMuted))
+                    .font(.subheadline).foregroundColor(OkcheColor.inkMuted)) // 큰 글자에서 같이 커지게(더보기 줄과 같음)
                     .okcheText(OkcheType.body).foregroundStyle(OkcheColor.ink)
                 if let detail { Text(detail).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted) }
             }

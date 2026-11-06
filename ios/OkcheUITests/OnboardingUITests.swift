@@ -507,7 +507,6 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["아직 먹이는 약이 없어요. 약을 추가하면 일기 탕약 줄과 알림에 나와요."].waitForExistence(timeout: 3))
     }
 
-    /// 몇 시간마다 약(처음 먹일 때 = 지금)을 하나 추가하고 일기 탭으로.
     /// 8-4c: 더보기 → 기별, 스위치를 바꾸면 바로 저장(나갔다 와도 그대로).
     func testNotifySettingsSaves() {
         let app = launch()
@@ -544,8 +543,13 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["나중에"].tap()
         XCTAssertTrue(app.staticTexts["먹고 있는 약"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["프레드니솔론"].exists)
+        // 아직 허락 안 함 → 탕약 맨 위 알림 꺼짐 띠(8-4c), 다음 탕약 띠는 숨김.
+        XCTAssertTrue(app.staticTexts["휴대폰 알림이 꺼져 있어요"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["설정 열기"].exists)
+        XCTAssertFalse(app.staticTexts["다음 탕약"].exists)
     }
 
+    /// 몇 시간마다 약(처음 먹일 때 = 지금)을 하나 추가하고 일기 탭으로.
     private func addHoursMedAndOpenRecord(_ app: XCUIApplication) {
         XCTAssertTrue(app.tabBars.buttons["더보기"].waitForExistence(timeout: 5))
         app.tabBars.buttons["더보기"].tap()

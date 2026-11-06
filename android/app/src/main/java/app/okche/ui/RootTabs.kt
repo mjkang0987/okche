@@ -155,6 +155,7 @@ private fun RootTabsContent(
     var notifyOpen by rememberSaveable { mutableStateOf(false) }
     /** 남은 약 알림으로 연 약 — 약방이 그 약 고치기를 열면 비운다. */
     var yakbangMedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var medSheetPetId by rememberSaveable { mutableStateOf<String?>(null) }
     androidx.compose.runtime.LaunchedEffect(openMedId) {
         if (openMedId == null) return@LaunchedEffect
         // 약방이 보이게 그 앞에 그려지는 탕약 화면들은 닫는다.
@@ -162,6 +163,7 @@ private fun RootTabsContent(
         medAddOpen = false
         tangyakOpen = false
         notifyOpen = false
+        medSheetPetId = null // 오늘 먹일 약 시트가 약방을 가리지 않게(iOS와 같음)
         selected = Tab.More.ordinal
         yakbangOpen = true
         yakbangMedId = openMedId
@@ -169,7 +171,6 @@ private fun RootTabsContent(
     }
     val quickState = rememberQuickRecordState()
     // 탕약 알림으로 연 아이: 아이 목록을 읽은 뒤, 지웠거나 추억이면 앱만 연다.
-    var medSheetPetId by rememberSaveable { mutableStateOf<String?>(null) }
     androidx.compose.runtime.LaunchedEffect(openMedPetId, pets != null) {
         if (openMedPetId == null || pets == null) return@LaunchedEffect
         medSheetPetId = pets.firstOrNull { it.id == openMedPetId && it.memorializedAt == null }?.id

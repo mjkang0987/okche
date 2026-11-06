@@ -21,6 +21,8 @@ struct TangyakView: View {
     @State private var posted = false
     /// 휴대폰 알림이 꺼져 있는지 — 화면에 올 때·앱으로 돌아올 때 다시 본다(8-4c).
     @State private var phoneOff = false
+    /// 아직 묻지 않았으면 '설정 열기' 대신 허락 창(휴대폰 설정에 알림 칸이 아직 없음).
+    @State private var notAsked = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -33,7 +35,12 @@ struct TangyakView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // 알림 켠 약이 있는데 휴대폰 알림이 꺼져 있으면 꺼짐 띠(보드 `TangyakNotifyOff`), 다음 탕약 띠는 숨김.
                     if phoneOff, MedNotify.wantsReminders(schedules) {
-                        NotifyOffBand()
+                        NotifyOffBand(ask: notAsked ? {
+                            Task {
+                                await MedReminders.requestPermission()
+                                await refreshPhoneOff()
+                            }
+                        } : nil)
                     } else if let next, let med = meds.first(where: { $0.id == next.slot.schedule.medicationId }) {
                         let amount = MedSchedules.amountText(next.slot.schedule.amount, next.slot.schedule.unit)
                         // 시간이 지났는데 안 준 차례는 '놓친 탕약'(2026-11-05 사용자).
@@ -81,8 +88,20 @@ struct TangyakView: View {
         .onDisappear { if posted { showUndo(nil); posted = false } }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
-            phoneOff = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
+            await refreshPhoneOff()
         }
+    }
+
+    /// 거절했거나 아직 안 물었으면 알림이 안 옴(안드로이드 `areNotificationsEnabled`와 같음).
+    private func refreshPhoneOff() async {
+        var status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        #if DEBUG
+        // 화면 테스트는 `-notify-ask`일 때만 '안 물음 = 꺼짐'(다른 테스트가 다음 탕약 띠를 보게).
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-ui-testing"), !args.contains("-notify-ask"), status == .notDetermined { status = .authorized }
+        #endif
+        phoneOff = status == .denied || status == .notDetermined
+        notAsked = status == .notDetermined
     }
 
     /// 띠 '줬어요': 일기 탕약 버튼과 같은 기록·알림(되돌리기 = 지우기 확인 창).
@@ -732,6 +751,8 @@ struct NextMedBand: View {
 
 /// 휴대폰 알림 꺼짐 띠(보드 `TangyakNotifyOff`, 2026-11-05 승인): 흰 카드 연지색 테두리, 제목·안내, '설정 열기'(휴대폰의 이 앱 알림 설정).
 struct NotifyOffBand: View {
+    /// 있으면 '설정 열기'가 허락 창을 띄움(아직 묻지 않았을 때).
+    var ask: (() -> Void)?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -741,7 +762,7 @@ struct NotifyOffBand: View {
             Text("그래서 탕약 알림이 오지 않아요. 휴대폰 설정에서 옥체 알림을 켜 주세요.")
                 .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.ink)
             Button {
-                if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
+                if let ask { ask() } else if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
             } label: {
                 Text("설정 열기").okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.namsaek).underline()
                     .frame(minHeight: 44)

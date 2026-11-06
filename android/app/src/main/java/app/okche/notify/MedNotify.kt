@@ -71,7 +71,7 @@ fun medAlerts(
             MedAlert("med.${kind.name}.${fireAt / 1000}", kind, fireAt, title, body, entries.first().pet.id)
         }
         .sortedWith(compareBy({ it.fireAt }, { it.kind.ordinal }))
-        .take(limit)
+        .take(limit.coerceAtLeast(0))
     val last = alerts.lastOrNull() ?: return alerts
     return alerts + MedAlert("med.more", MedAlertKind.more, last.fireAt + MINUTE, "옥체", "옥체를 열면 알림이 이어져요", null)
 }
@@ -96,15 +96,18 @@ fun lowMedAlerts(
     return meds.filter { it.deletedAt == null && it.stockAmount != null }.mapNotNull { med ->
         val d = daysLeft(med, schedules, medRecords) ?: return@mapNotNull null
         if (lowMedKey(med) in sent) return@mapNotNull null
-        val (fireAt, left) = if (d <= lowMedDays) {
-            at(today).let { if (it > now) it else at(today.plusDays(1)) } to d
-        } else {
-            at(today.plusDays((d - lowMedDays).toLong())) to lowMedDays
-        }
+        val day = if (d <= lowMedDays) today.let { if (at(it) > now) it else it.plusDays(1) } else today.plusDays((d - lowMedDays).toLong())
+        val fireAt = at(day)
         if (fireAt <= now || fireAt > now + WINDOW) return@mapNotNull null
-        MedAlert("low.${med.id}", MedAlertKind.low, fireAt, "약방", "${withSubjectParticle(med.name)} ${left}일분 남았어요", null, med.id)
-    }.sortedBy { it.fireAt }
+        // 울리는 날에 남을 일수(하루에 하루분씩 줄어듦) — 10시가 지나 내일로 밀리면 하루 적게.
+        val left = d - java.time.temporal.ChronoUnit.DAYS.between(today, day).toInt()
+        MedAlert("low.${med.id}", MedAlertKind.low, fireAt, "약방", lowMedBody(med.name, left), null, med.id)
+    }.sortedBy { it.fireAt }.take(LIMIT)
 }
+
+/** '프레드니솔론이 3일분 남았어요', 하루분도 안 남으면 '프레드니솔론이 거의 다 떨어졌어요'. */
+fun lowMedBody(name: String, days: Int): String =
+    if (days > 0) "${withSubjectParticle(name)} ${days}일분 남았어요" else "${withSubjectParticle(name)} 거의 다 떨어졌어요"
 
 /** 남은 약 알림을 한 번만 보내려고 기억하는 열쇠 — 남은 양을 다시 적으면 바뀐다. */
 fun lowMedKey(med: Medication) = "${med.id}|${med.stockCountedAt}"

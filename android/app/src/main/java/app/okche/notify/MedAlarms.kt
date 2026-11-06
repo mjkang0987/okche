@@ -33,8 +33,6 @@ private const val ACTION = "app.okche.MED_ALARM"
 const val OPEN_MED_PET_ID = "openMedPetId"
 /** 남은 약 알림을 누르면 MainActivity가 받아 약방의 그 약 고치기를 연다(8-4c). */
 const val OPEN_MED_ID = "openMedId"
-/** 걸어 둔 남은 약 알림: 열쇠(약 id|stockCountedAt) → 울릴 시각. 울릴 시각이 지나면 보낸 것(LOW_SENT)으로 옮긴다. */
-private const val LOW_ARMED_PREFS = "med_low_armed"
 private const val LOW_SENT = "lowMedSent"
 private val lock = Mutex()
 private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -51,10 +49,8 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
         val dao = OkcheDatabase.get(app).dao()
         val now = System.currentTimeMillis()
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val lowArmed = app.getSharedPreferences(LOW_ARMED_PREFS, Context.MODE_PRIVATE)
-        // 시각이 지난 남은 약 알림은 울린 것으로 본다(같은 남은 양이면 다시 안 보냄).
-        val sent = prefs.getStringSet(LOW_SENT, null).orEmpty() + lowArmed.all.filterValues { (it as? Long ?: 0L) <= now }.keys
-        prefs.edit().putStringSet(LOW_SENT, sent).commit()
+        // 보낸 남은 약 알림(같은 남은 양이면 다시 안 보냄) — 실제로 뜰 때 리시버가 적는다.
+        val sent = prefs.getStringSet(LOW_SENT, null).orEmpty()
         val setting = dao.loadOrCreateSetting()
         val schedules = dao.medSchedules()
         val records = dao.medRecords()
@@ -63,7 +59,6 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
         // 남은 약 알림 몫을 빼고 탕약 알림(+ 이어짐 알림)을 건다 — 합쳐 64개 안.
         val alerts = low + medAlerts(schedules, records, dao.pets(), dao.restPeriods(), meds, setting.notify.medTime, now, limit = LIMIT - low.size)
         val medById = meds.associateBy { it.id }
-        lowArmed.edit().clear().apply { for (a in low) medById[a.medId]?.let { putLong(lowMedKey(it), a.fireAt) } }.commit()
         val am = app.getSystemService(AlarmManager::class.java)
         for (id in prefs.getStringSet(ARMED, null).orEmpty()) {
             PendingIntent.getBroadcast(app, id.hashCode(), medAlarmIntent(app, id), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE)?.let {
@@ -78,6 +73,7 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
         val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
         for (a in alerts) {
             val intent = medAlarmIntent(app, a.id).putExtra("id", a.id).putExtra("title", a.title).putExtra("body", a.body).putExtra("petId", a.petId).putExtra("medId", a.medId)
+                .putExtra("sentKey", medById[a.medId]?.let(::lowMedKey))
             val pi = PendingIntent.getBroadcast(app, a.id.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             // 권한은 걸던 중에도 꺼질 수 있어 막히면 대략으로.
             if (exact) {
@@ -122,6 +118,11 @@ class MedAlarmReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
         nm.notify(id.hashCode(), notification)
+        // 남은 약 알림은 뜬 뒤에야 보낸 것으로(늦게 뜨거나 허락이 없어 안 뜬 것은 다시 걸림).
+        intent.getStringExtra("sentKey")?.let { key ->
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit().putStringSet(LOW_SENT, prefs.getStringSet(LOW_SENT, null).orEmpty() + key).apply()
+        }
     }
 }
 

@@ -60,6 +60,9 @@ class MedLowNotifyTest {
         val a = before.single()
         assertEquals(listOf("low.${m.id}", MedAlertKind.low, "약방", "프레드니솔론이 2일분 남았어요", m.id), listOf(a.id, a.kind, a.title, a.body, a.medId))
         assertEquals(listOf(at(28, 10)), low(m, at(27, 12)).map { it.fireAt })
+        // 내일로 밀리면 하루 적게, 하루분도 안 남으면 '거의 다 떨어졌어요'.
+        assertEquals("프레드니솔론이 1일분 남았어요", low(m, at(27, 12)).single().body)
+        assertEquals("프레드니솔론이 거의 다 떨어졌어요", low(med(1.0), at(27, 12)).single().body)
     }
 
     @Test fun projectedDayUsesThreshold() {

@@ -426,9 +426,9 @@ private fun LifecycleLinks(pet: Pet, enabled: Boolean, onBusy: (Boolean) -> Unit
     }
 }
 
-/** 인슐린 설정(디자인 보드 InsulinSetup). '저장하기'는 바로 저장하고 아이 정보로 돌아간다. */
+/** 인슐린 설정(디자인 보드 InsulinSetup). '저장하기'는 바로 저장하고 아이 정보로 돌아간다(일기 인슐린 줄·시트에서 열면 그 화면으로 — 9-2). */
 @Composable
-private fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
+internal fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
     val saver: FormSaveModel = viewModel(key = "insulinSetup")

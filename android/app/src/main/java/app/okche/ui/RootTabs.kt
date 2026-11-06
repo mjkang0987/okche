@@ -98,9 +98,14 @@ fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMed
     val view = androidx.compose.ui.platform.LocalView.current
     val appScope = rememberCoroutineScope()
     val toasts = remember { UndoToasts({ item = it }, { item }, appScope, view) }
-    androidx.compose.runtime.CompositionLocalProvider(LocalUndoToasts provides toasts, LocalUndoInset provides if (item != null) toastHeight else 0.dp) {
+    /** 일기 인슐린 줄 '설정하기 ›'·인슐린 시트 줄로 연 인슐린 설정(9-2) — 어느 시트에서든 열게 여기서 준다. */
+    val insulinSetup = rememberSaveable { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalUndoToasts provides toasts, LocalUndoInset provides if (item != null) toastHeight else 0.dp,
+        app.okche.ui.diabetes.LocalOpenInsulinSetup provides { id: String -> insulinSetup.value = id },
+    ) {
         Box(Modifier.fillMaxSize()) {
-            RootTabsContent(barHeight, openMedPetId, onMedOpened, openMedId, onMedIdOpened)
+            RootTabsContent(barHeight, insulinSetup, openMedPetId, onMedOpened, openMedId, onMedIdOpened)
             UndoToast(
                 item, onDismiss = { item = null }, onUndo = { item?.undo?.invoke() },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -120,7 +125,8 @@ fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMed
 /** 하단 탭 5개. 순서는 디자인 기준(일기 → 문안 → 실록 → 어진첩 → 더보기), 첫 화면은 일기. */
 @Composable
 private fun RootTabsContent(
-    barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>, openMedPetId: String?, onMedOpened: () -> Unit,
+    barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>, insulinSetup: androidx.compose.runtime.MutableState<String?>,
+    openMedPetId: String?, onMedOpened: () -> Unit,
     openMedId: String?, onMedIdOpened: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
@@ -140,6 +146,7 @@ private fun RootTabsContent(
     val current = loaded?.let { (p, id) -> currentPet(p, id) }
     // 탭 아래 화면(하단 탭 없음 — 디자인 '화면 짜임새'): 아이 정보(6-2), 아이 등록(6-3).
     var editPetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var insulinSetupId by insulinSetup
     var registering by rememberSaveable { mutableStateOf(false) }
     var switching by rememberSaveable { mutableStateOf(false) }
     var logOpen by rememberSaveable { mutableStateOf(false) }
@@ -205,6 +212,10 @@ private fun RootTabsContent(
                 onDismiss = { switching = false },
             )
         }
+    }
+    insulinSetupId?.let { id ->
+        app.okche.ui.pet.InsulinSetupScreen(id) { insulinSetupId = null }
+        return
     }
     editPetId?.let { id ->
         PetEditFlow(

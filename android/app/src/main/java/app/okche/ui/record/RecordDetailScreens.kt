@@ -82,7 +82,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** 자세히 시트를 여는 값: 새 기록(종류·아이)이거나 고칠 기록. */
-data class DetailTarget(val kind: RecordKind, val editing: Record? = null, val petId: String? = null)
+/** [glucoseText]는 혈당 ⋯로 열 때 줄에 넣던 수치(맞는 숫자면 시트에 채움). */
+data class DetailTarget(val kind: RecordKind, val editing: Record? = null, val petId: String? = null, val glucoseText: String = "")
 
 /**
  * 구토·매화·소피 자세히 시트(보드 Vomit·Stool·Urine): 시간, 칸들, 의서 안내, '기록하기'. 고치기도 같은 시트(값이 채워진 채).
@@ -92,6 +93,8 @@ data class DetailTarget(val kind: RecordKind, val editing: Record? = null, val p
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, Boolean) -> Unit, onClose: () -> Unit) {
+    // 혈당은 혈당 시트(9-1) — 기록 고치기가 모두 여기로 오므로 한곳에서 나눈다.
+    if (target.kind == RecordKind.glucose) return app.okche.ui.diabetes.GlucoseSheet(target, pets, onSaved, onClose)
     val context = LocalContext.current
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -335,6 +338,7 @@ private fun guideLines(kind: RecordKind): List<String> {
             limp,
         )
         RecordKind.stool -> listOf("변이 짜장처럼 새까매요", "변에 피가 많이 섞였고, 처지거나 토해요", urinary, limp)
+        RecordKind.glucose -> listOf(limp) // 의서에 있는 줄만(새 의학 문구는 지어내지 않음 — 9-1)
         else -> listOf(urinary, limp)
     }
 }
@@ -342,6 +346,7 @@ private fun guideLines(kind: RecordKind): List<String> {
 private fun guideHelp(kind: RecordKind) = when (kind) {
     RecordKind.vomit -> "토한 것 사진과 실록을 보여 주면 진료에 도움이 돼요."
     RecordKind.stool -> "변 사진과 실록을 보여 주면 진료에 도움이 돼요."
+    RecordKind.glucose -> "언제부터 그랬는지와 실록을 보여 주면 진료에 도움이 돼요."
     else -> "언제부터 못 봤는지와 실록을 보여 주면 진료에 도움이 돼요."
 }
 

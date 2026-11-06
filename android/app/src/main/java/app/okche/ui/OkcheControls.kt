@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -367,6 +369,7 @@ private fun ChipFace(text: String, isSelected: Boolean) {
 /**
  * 고르기 칸: 52 높이 카드 여러 칸을 나란히(종 고양이·강아지). 고른 것 namsaekSoft 바탕·남색 테두리·namsaekDeep 굵은 글자.
  * [icons]를 주면 아이콘 위·글자 아래 96 높이(7-2 매화 모양), [onDeselect]가 있으면 고른 카드를 다시 눌러 푼다.
+ * [checked]를 주면 여러 개 고르기(체크 카드 — 혈당 '함께 보였나요?', 9-1): 세로로 쌓고 체크 상자, 고르면 연지색 테두리·굵은 글자, 누르면 [onSelect]로 넣고 뺀다.
  */
 @Composable
 fun <T> OkcheChoiceCards(
@@ -380,7 +383,33 @@ fun <T> OkcheChoiceCards(
     onDeselect: (() -> Unit)? = null,
     /** 묶음 이름을 화면에선 숨기고 TalkBack만 읽게(수라 끼니 칸 '아침 식사량' — 보드 legend sr-only). */
     hideLabel: Boolean = false,
+    checked: Set<T>? = null,
 ) {
+    if (checked != null) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
+            OkcheFieldLabel(label, hint = hint)
+            for ((value, text) in options) {
+                val on = value in checked
+                val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = FieldHeight)
+                        .background(OkcheColor.Paper, shape)
+                        .border(1.5.dp, if (on) OkcheColor.Yeonji else OkcheColor.Line, shape)
+                        .clip(shape)
+                        .toggleable(on, role = Role.Checkbox, onValueChange = { onSelect(value) })
+                        .padding(horizontal = OkcheSpacing.Space4, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(on, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = OkcheColor.Yeonji, uncheckedColor = OkcheColor.LineStrong))
+                    Text(text, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle(if (on) FontWeight.Bold else FontWeight.Normal))
+                }
+            }
+        }
+        return
+    }
     Column(modifier) {
         OkcheFieldLabel(label, if (hideLabel) Modifier.visuallyHidden() else Modifier.padding(bottom = OkcheSpacing.Space2), hint = hint)
         // 아이콘 카드는 큰 글자에서 나란히 두면 낱말이 끊기니 세로로 쌓는다(iOS ViewThatFits와 같은 결과).

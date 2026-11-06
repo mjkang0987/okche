@@ -70,4 +70,22 @@ final class InsulinRulesTests: XCTestCase {
         XCTAssertNil(InsulinRules.units("100.5"))
         XCTAssertEqual(InsulinRules.unitsError("0"), "0보다 크고 100 이하인 숫자로 넣어 주세요")
     }
+
+    /// 양을 바꾼 뒤에도 어제 기록 고치기·지난 시각 새 기록은 그때 계획으로.
+    func testPlanAtTime() throws {
+        let a = plan()
+        a.activeUntil = at(27, 12)
+        let b = InsulinPlan(petId: pet, slots: [InsulinSlot(time: "08:00", units: 3), InsulinSlot(time: "20:00", units: 3)], activeFrom: at(27, 12))
+        context.insert(a); context.insert(b)
+        XCTAssertEqual(InsulinRules.planAt([a, b], petId: pet, at: at(26, 8))?.id, a.id)
+        XCTAssertEqual(InsulinRules.planAt([a, b], petId: pet, at: at(27, 13))?.id, b.id)
+        let old = try InsulinRules.save(petId: pet, plan: a, units: 2, status: .full, mealBefore: nil, at: at(26, 8, 2), now: at(26, 9), in: context)
+        let key = old.slotKey
+        // 시간을 안 바꾸고 밥만 고치면 계획·차례 그대로(지금 열린 계획 B가 넘어와도).
+        try InsulinRules.save(petId: pet, plan: b, units: 2, status: .full, mealBefore: "none", at: at(26, 8, 2), editing: old, now: at(27, 14), in: context)
+        XCTAssertEqual(old.slotKey, key)
+        XCTAssertEqual(InsulinRules.planId(old), a.id)
+        // 그 시간의 양이 없는 차례는 없음(안드로이드와 같음) — 08:00 하나면 저녁도 08:00 차례.
+        XCTAssertEqual(InsulinRules.slot(plan([("08:00", 2)]), at: at(27, 20))?.time, "08:00")
+    }
 }

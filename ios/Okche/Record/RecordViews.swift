@@ -35,6 +35,9 @@ struct RecordTab: View {
     /// 인슐린 '설정하기 ›'(열린 계획이 없을 때 — 9-2).
     @State private var insulinSetup: Pet?
     @State private var savingInsulin = false
+    /// 인슐린 줄의 '지금' — 구간이 끝날 때·앱으로 돌아올 때 다시 본다(켜 둔 채 차례가 바뀌어도 맞게).
+    @State private var clock = Date.now
+    @Environment(\.scenePhase) private var scenePhase
     @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil }) private var plans: [InsulinPlan]
     @Query(filter: #Predicate<Record> { $0.kind == "insulin" && $0.deletedAt == nil }) private var insulinRecords: [Record]
 
@@ -60,7 +63,6 @@ struct RecordTab: View {
                 QuickRecordCard(onTap: { row, value in record(row, value) }, onDetail: { kind in
                     if kind == .meal { path.append(.sura(nil)) }
                     else if kind == .med { medSheet = pets.first { $0.id == who } }
-                    else if kind == .insulin, case .handled(_, let record, _) = insulinLine { detail = DetailTarget(kind: .insulin, editing: record) }
                     else { detail = DetailTarget(kind: kind, petId: who) }
                 }, mealMore: suraPet, med: medLine, onGive: give,
                    glucose: showsGlucose ? $glucoseText : nil, glucoseFocused: $glucoseFocused, onLeaveGlucose: leaveGlucose,
@@ -117,24 +119,38 @@ struct RecordTab: View {
         }
         .transaction { $0.disablesAnimations = askingGlucose != nil }
         .sheet(item: $insulinSetup) { pet in NavigationStack { InsulinSetupScreen(pet: pet) } }
+        .onChange(of: scenePhase) { if scenePhase == .active { clock = .now } }
+        .task(id: insulinWindowEnd) {
+            guard let end = insulinWindowEnd, end > .now else { return }
+            try? await Task.sleep(for: .seconds(end.timeIntervalSinceNow + 1))
+            if !Task.isCancelled { clock = .now }
+        }
     }
 
     /// 인슐린 줄: 당뇨 아이만. 열린 계획이 없으면 설정 안내, 지금 구간에 기록이 있으면 처리한 상태.
     private var insulinLine: InsulinLine? {
         guard showsGlucose, let who else { return nil }
         guard let plan = GlucoseRules.openPlan(plans, petId: who) else { return .noPlan }
-        guard let slot = InsulinRules.slot(plan, at: .now) else { return .noPlan }
+        guard let slot = InsulinRules.slot(plan, at: max(clock, .now)) else { return .noPlan }
         if let record = InsulinRules.handled(petId: who, records: insulinRecords, slot: slot) {
             return .handled(slot, record, next: InsulinRules.next(slot))
         }
         return .ready(slot)
     }
 
+    private var insulinWindowEnd: Date? {
+        if case .ready(let s) = insulinLine { return s.end }
+        if case .handled(let s, _, _) = insulinLine { return s.end }
+        return nil
+    }
+
     /// '맞음'(그 차례 정해 둔 양)·'건너뜀'(0): 바로 기록 → 처리한 상태, 탭 바 위 되돌리기(= 지우기 확인 창).
-    private func giveInsulin(_ slot: InsulinRules.Slot, _ status: InsulinRules.Status) {
+    /// 누른 때 차례를 다시 본다(오래 켜 둔 화면의 옛 차례 양으로 남지 않게).
+    private func giveInsulin(_ shown: InsulinRules.Slot, _ status: InsulinRules.Status) {
         guard !savingInsulin, let who, let plan = GlucoseRules.openPlan(plans, petId: who) else { return }
+        guard let slot = InsulinRules.slot(plan, at: .now), slot.key == shown.key else { clock = .now; return } // 차례가 바뀌었으면 줄만 새로
         savingInsulin = true
-        defer { savingInsulin = false }
+        Task { try? await Task.sleep(for: .seconds(1)); savingInsulin = false } // 빨리 두 번 눌러 둘 남지 않게
         do {
             let saved = try InsulinRules.save(petId: who, plan: plan, units: slot.units, status: status, mealBefore: nil, at: .now, in: context)
             failed = false
@@ -170,7 +186,7 @@ struct RecordTab: View {
     private func saveGlucose(_ mgdl: Int, _ timing: GlucoseRules.Timing, petId: UUID) {
         guard !savingGlucose else { return } // 두 번 눌러 둘 남지 않게
         savingGlucose = true
-        defer { savingGlucose = false }
+        Task { try? await Task.sleep(for: .seconds(1)); savingGlucose = false }
         do {
             let saved = try GlucoseRules.save(petId: petId, mgdl: mgdl, timing: timing, signs: [], at: .now, in: context)
             failed = false
@@ -284,7 +300,10 @@ struct QuickRecordCard: View {
     var onInsulinEdit: (Record) -> Void = { _ in }
     var onInsulinSetup: () -> Void = {}
     @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 44 // 보드 56 → 44(2026-11-05 사용자 — 너무 높음, 누르는 크기 최소)
-    @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var narrowLabel: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var wideLabel: CGFloat = 70
+    /// 인슐린 줄이 있으면 줄 이름 칸을 모두 70으로('인슐린'이 들어가게 — 보드).
+    private var labelWidth: CGFloat { insulin == nil ? narrowLabel : wideLabel }
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
     var body: some View {
@@ -296,7 +315,7 @@ struct QuickRecordCard: View {
                     OkcheColor.line.frame(height: 1)
                 }
                 if row.kind == .meal, let glucose, let glucoseFocused {
-                    GlucoseRow(text: glucose, focused: glucoseFocused, onLeave: onLeaveGlucose) { onDetail(.glucose) }
+                    GlucoseRow(text: glucose, focused: glucoseFocused, wide: insulin != nil, onLeave: onLeaveGlucose) { onDetail(.glucose) }
                     OkcheColor.line.frame(height: 1)
                 }
                 if row.kind == .meal, let insulin {

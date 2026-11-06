@@ -19,12 +19,18 @@ enum InsulinRules {
         let key: String
     }
 
-    /// `at`이 든 구간의 차례. 차례 날은 그 차례 시각의 6시 기준 날.
+    /// 그 시각에 쓰던 계획(`activeFrom` ≤ 시각 < `activeUntil`) — 늦은 `activeFrom`, 같으면 늦은 `updatedAt`. 지난 기록·고치기는 이 계획으로.
+    static func planAt(_ plans: [InsulinPlan], petId: UUID, at: Date) -> InsulinPlan? {
+        plans.filter { $0.petId == petId && $0.deletedAt == nil && $0.activeFrom <= at && ($0.activeUntil.map { at < $0 } ?? true) }
+            .max { ($0.activeFrom, $0.updatedAt) < ($1.activeFrom, $1.updatedAt) }
+    }
+
+    /// `at`이 든 구간의 차례. 차례 날은 그 차례 시각의 6시 기준 날. 그 시간의 양이 없으면 nil(안드로이드와 같음).
     static func slot(_ plan: InsulinPlan, at: Date) -> Slot? {
         guard let w = GlucoseRules.window(plan, now: at) else { return nil }
         let due = w.start.addingTimeInterval(3600)
         let time = MedSlots.hhmm(due)
-        let units = plan.slots.first { $0.time == time }?.units ?? 0
+        guard let units = plan.slots.first(where: { $0.time == time })?.units else { return nil }
         return Slot(time: time, units: units, start: w.start, end: w.end, due: due,
                     key: "\(plan.id.uuidString.lowercased())|\(OkcheDay.of(due))|\(time)")
     }
@@ -70,9 +76,10 @@ enum InsulinRules {
     static func save(petId: UUID, plan: InsulinPlan?, units: Double, status: Status, mealBefore: String?, at: Date,
                      editing: Record? = nil, now: Date = .now, in context: ModelContext) throws -> Record {
         let at = min(at, now) // 앞날 기록 막기
-        let picked = plan.flatMap { InsulinRules.slot($0, at: at) }
-        // 열린 계획 없이 고치면 그 기록의 계획·차례는 그대로.
-        let json = data(planId: plan?.id ?? editing.flatMap(planId), units: units, status: status, mealBefore: mealBefore)
+        // 시간을 안 바꾼 고치기·계획이 없으면 그 기록의 계획·차례 그대로(바꾼 뒤 계획으로 옮겨 가지 않게).
+        let keep = editing.map { $0.occurredAt == at } ?? false
+        let picked = keep ? nil : plan.flatMap { InsulinRules.slot($0, at: at) }
+        let json = data(planId: keep ? editing.flatMap(planId) : (plan?.id ?? editing.flatMap(planId)), units: units, status: status, mealBefore: mealBefore)
         let record: Record
         if let editing {
             if editing.occurredAt != at { editing.setOccurredAt(at, now: now) }

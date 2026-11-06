@@ -19,7 +19,7 @@ struct InsulinRow: View {
     let onDetail: () -> Void
     let onSetup: () -> Void
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 70 // '인슐린'이 들어가게(보드 70)
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
     var body: some View {
@@ -52,14 +52,36 @@ struct InsulinRow: View {
         switch line {
         case .ready(let slot):
             let spoken = MedSlots.spokenTime(slot.due)
-            HStack(spacing: 6) {
-                quick("✓ 맞음 · \(MedRules.number(slot.units))단위", label: "인슐린 \(spoken) · \(MedRules.number(slot.units))단위 맞음 · 바로 기록") { onGive(slot, .full) }
-                quick("건너뜀", label: "인슐린 \(spoken) 건너뜀 · 바로 기록") { onGive(slot, .skipped) }
+            // 아주 큰 글자에선 세로로(화면 밖으로 밀리지 않게).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) { readyButtons(slot, spoken) }
+                VStack(alignment: .leading, spacing: 6) { readyButtons(slot, spoken) }
             }
         case .handled(let slot, let record, let next):
             let skipped = InsulinRules.status(record) == .skipped
             let time = QuickRecord.time(record)
-            HStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { handledViews(slot, record, next, skipped: skipped, time: time) }
+                VStack(alignment: .leading, spacing: 6) { handledViews(slot, record, next, skipped: skipped, time: time) }
+            }
+        case .noPlan:
+            Button(action: onSetup) {
+                (Text("인슐린 설정이 없어요 · ") + Text("설정하기 ›").fontWeight(.bold).foregroundColor(OkcheColor.namsaek))
+                    .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    .frame(minHeight: height)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("인슐린 설정이 없어요, 설정하기")
+        }
+    }
+
+    @ViewBuilder private func readyButtons(_ slot: InsulinRules.Slot, _ spoken: String) -> some View {
+        quick("✓ 맞음 · \(MedRules.number(slot.units))단위", label: "인슐린 \(spoken) · \(MedRules.number(slot.units))단위 맞음 · 바로 기록") { onGive(slot, .full) }
+        quick("건너뜀", label: "인슐린 \(spoken) 건너뜀 · 바로 기록") { onGive(slot, .skipped) }
+    }
+
+    @ViewBuilder private func handledViews(_ slot: InsulinRules.Slot, _ record: Record, _ next: Date, skipped: Bool, time: String) -> some View {
                 Button { onEdit(record) } label: {
                     Text(skipped ? "– \(time) 건너뜀" : "✓ \(time) 맞음").okcheText(OkcheType.body, weight: .bold)
                         .foregroundStyle(skipped ? OkcheColor.inkMuted : OkcheColor.namsaekDeep)
@@ -76,16 +98,6 @@ struct InsulinRow: View {
                 Text("다음\n\(MedSlots.clockText(next))").okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
                     .fixedSize()
                     .accessibilityLabel("다음 \(MedSlots.clockText(next))")
-            }
-        case .noPlan:
-            Button(action: onSetup) {
-                (Text("인슐린 설정이 없어요 · ") + Text("설정하기 ›").fontWeight(.bold).foregroundColor(OkcheColor.namsaek))
-                    .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-                    .frame(minHeight: height)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
     }
 
     /// 바로 기록 버튼(일기 다른 줄과 같은 모양).
@@ -148,7 +160,8 @@ struct InsulinSheet: View {
     }
 
     private var petId: UUID? { target.editing?.petId ?? target.petId }
-    private var plan: InsulinPlan? { petId.flatMap { GlucoseRules.openPlan(plans, petId: $0) } }
+    /// 시트 시각에 쓰던 계획(지난 기록·고치기는 그때 계획 — 바꾼 뒤 계획으로 옮겨 가지 않게).
+    private var plan: InsulinPlan? { petId.flatMap { InsulinRules.planAt(plans, petId: $0, at: sheetTime) } }
     /// 시트 시각이 든 구간의 차례(새 기록은 시간을 안 바꿨으면 지금).
     private var sheetTime: Date { target.editing == nil && !timeChanged ? .now : occurredAt }
     private var slot: InsulinRules.Slot? { plan.flatMap { InsulinRules.slot($0, at: sheetTime) } }
@@ -183,8 +196,8 @@ struct InsulinSheet: View {
                             .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.yeonji)
                     }
                 }
-                // 경고가 새로 뜨면 화면 읽기로 알림.
-                .onChange(of: twice?.id) { _, id in
+                // 경고가 뜨면(열 때부터 있어도) 화면 읽기로 알림.
+                .onChange(of: twice?.id, initial: true) { _, id in
                     if id != nil { AccessibilityNotification.Announcement("이 시간대에 이미 맞은 기록이 있어요. 두 번 맞히지 않았는지 확인해 주세요.").post() }
                 }
                 if status != .skipped {
@@ -201,8 +214,12 @@ struct InsulinSheet: View {
                     OkcheFieldLabel(title: "맞기 전에 밥은?", note: "(선택)").accessibilityAddTraits(.isHeader)
                     OkcheChoiceChips(options: InsulinRules.mealTitles.map { ($0.value, $0.title) }, selection: $meal)
                 }
+                // 보드: 연한 남색 상자 안내.
                 Text("밥을 안 먹은 날 인슐린을 어떻게 할지는 미리 수의사와 정해 두길 권해요. 양은 상의 없이 바꾸지 않길 권해요.")
-                    .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
+                    .okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.namsaekDeep)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .background(OkcheColor.namsaekSoft, in: RoundedRectangle(cornerRadius: OkcheRadius.radiusMd))
                 if let pet = pets.first(where: { $0.id == petId && $0.memorializedAt == nil }) {
                     Button { setup = pet } label: {
                         Text("인슐린 이름·양·시간 바꾸기 ›").okcheText(OkcheType.body, weight: .medium).foregroundStyle(OkcheColor.namsaek)

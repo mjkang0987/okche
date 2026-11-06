@@ -6,10 +6,14 @@ struct GlucoseRow: View {
     @Binding var text: String
     /// 숫자 칸 포커스 — 키보드 '완료'·남기기에서 내린다.
     var focused: FocusState<Bool>.Binding
+    /// 인슐린 줄이 함께 있으면 줄 이름 칸 70(다른 줄과 맞춤).
+    var wide = false
     let onLeave: () -> Void
     let onDetail: () -> Void
     @ScaledMetric(relativeTo: .body) private var height: CGFloat = 44
-    @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var narrowLabel: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var wideLabel: CGFloat = 70
+    private var labelWidth: CGFloat { wide ? wideLabel : narrowLabel }
     @ScaledMetric(relativeTo: .body) private var moreSize: CGFloat = 44
 
     var body: some View {
@@ -247,7 +251,10 @@ struct DetailSheet: View {
     var onSaved: (Record, Bool) -> Void = { _, _ in }
 
     var body: some View {
-        if target.kind == .glucose { GlucoseSheet(target: target, prefill: prefill, onSaved: onSaved) }
-        else { RecordDetailSheet(target: target, onSaved: onSaved) }
+        switch target.kind {
+        case .glucose: GlucoseSheet(target: target, prefill: prefill, onSaved: onSaved)
+        case .insulin: InsulinSheet(target: target, onSaved: onSaved)
+        default: RecordDetailSheet(target: target, onSaved: onSaved)
+        }
     }
 }

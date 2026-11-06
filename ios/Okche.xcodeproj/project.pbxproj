@@ -25,6 +25,7 @@
 		36D433BA612453B341D24296 /* FoodViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C43BC7334DDC910B21B9BC5 /* FoodViews.swift */; };
 		3845BBC987E9608D145B36D1 /* RecordDetailTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC5A22B158B3162629C6935 /* RecordDetailTests.swift */; };
 		3F842F5BE36A90FE38166270 /* FoodRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 935B4FE477BE31CBAFE4B4E1 /* FoodRulesTests.swift */; };
+		40AD2F56072E0B5BA7D04E36 /* InsulinViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BB1D3E3C7D7781080884731 /* InsulinViews.swift */; };
 		40D83CD78156D172A07B7055 /* MedNotifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24746FB0B75D33397B72821 /* MedNotifyTests.swift */; };
 		47B5D69BEBA333C23CA3FCEC /* OkcheApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3C37A0F69F744AE711E6A0 /* OkcheApp.swift */; };
 		47E69A733C055FBF45DB1209 /* RecordDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587A130CDC735508E9872722 /* RecordDetailViews.swift */; };
@@ -51,10 +52,12 @@
 		8AB032ADA2B2492FDAC0992A /* PetMemorial.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A5E485C3A008F73B1F9707 /* PetMemorial.swift */; };
 		8AFD23D52C7634547C6CA6C5 /* RecordViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026A0B16D0F9C96FEAC020DC /* RecordViews.swift */; };
 		8D89CD5891DC346774F1F5FD /* MedReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274F9FEBB38E4DDF70F92647 /* MedReminders.swift */; };
+		8E72AF3B20FCBF6EB17080CE /* InsulinRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2A392492C3E35C9214B7E1 /* InsulinRules.swift */; };
 		903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0275EB8CA7B29A763A8B16D3 /* MainCard.swift */; };
 		95ABC1DC5E7B906B146994BC /* MedNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E39E7464C390CAF358F0AA5 /* MedNotify.swift */; };
 		986E58BCF34B19D0F44E2317 /* PetRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465382965673124E58129062 /* PetRegistrationTests.swift */; };
 		993F2F797C959E00151D1DE4 /* MealRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F73F64B813195814FFBB6A /* MealRulesTests.swift */; };
+		9E8ECEDEADBEB82D0D4E8D97 /* InsulinRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F780A7478E17BBBA82F0891E /* InsulinRulesTests.swift */; };
 		A490AFA4074C1845E2F45C69 /* MedSchedules.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9272A3825D3B69753AFF2C0 /* MedSchedules.swift */; };
 		A96B05858AA04FF33C7C83CF /* FixedID.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC98478DFCF8B973F662089 /* FixedID.swift */; };
 		AD0753AB4D5869EC8DBE728A /* Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F659238365F43F72FF6074CF /* Tabs.swift */; };
@@ -116,9 +119,11 @@
 		274F9FEBB38E4DDF70F92647 /* MedReminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedReminders.swift; sourceTree = "<group>"; };
 		28809CA2E38D55D30DE87A2C /* OkcheDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OkcheDay.swift; sourceTree = "<group>"; };
 		2B822C022AE27D79E8DEE12B /* MedSlots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedSlots.swift; sourceTree = "<group>"; };
+		2BB1D3E3C7D7781080884731 /* InsulinViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinViews.swift; sourceTree = "<group>"; };
 		2C604B5EEB3BFD9BCC93D250 /* SnackRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnackRules.swift; sourceTree = "<group>"; };
 		3243EEDC54CED5C2596666C2 /* PetFormParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetFormParts.swift; sourceTree = "<group>"; };
 		33F73F64B813195814FFBB6A /* MealRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRulesTests.swift; sourceTree = "<group>"; };
+		3C2A392492C3E35C9214B7E1 /* InsulinRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinRules.swift; sourceTree = "<group>"; };
 		4237F70768EE44C9E0C8879D /* MealRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRules.swift; sourceTree = "<group>"; };
 		465382965673124E58129062 /* PetRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRegistrationTests.swift; sourceTree = "<group>"; };
 		473738171DE9AE6187DF447C /* Setting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Setting.swift; sourceTree = "<group>"; };
@@ -176,6 +181,7 @@
 		F57E6ED410BA84EDC2095BEF /* MedSchedulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedSchedulesTests.swift; sourceTree = "<group>"; };
 		F659238365F43F72FF6074CF /* Tabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tabs.swift; sourceTree = "<group>"; };
 		F746B7528E2591E8DB910CC6 /* PetCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetCatalog.swift; sourceTree = "<group>"; };
+		F780A7478E17BBBA82F0891E /* InsulinRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinRulesTests.swift; sourceTree = "<group>"; };
 		FD7A4A732BEF40A56DBC021A /* OkcheUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OkcheUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -291,6 +297,7 @@
 			children = (
 				935B4FE477BE31CBAFE4B4E1 /* FoodRulesTests.swift */,
 				8A3534C92199E0E05569B542 /* GlucoseRulesTests.swift */,
+				F780A7478E17BBBA82F0891E /* InsulinRulesTests.swift */,
 				F2E96E8F46489BFC87729621 /* MainCardTests.swift */,
 				33F73F64B813195814FFBB6A /* MealRulesTests.swift */,
 				D24746FB0B75D33397B72821 /* MedNotifyTests.swift */,
@@ -358,6 +365,8 @@
 			children = (
 				8D58EE489B31367C34F6CF23 /* GlucoseRules.swift */,
 				C7A118C347258276E395DCCE /* GlucoseViews.swift */,
+				3C2A392492C3E35C9214B7E1 /* InsulinRules.swift */,
+				2BB1D3E3C7D7781080884731 /* InsulinViews.swift */,
 			);
 			path = Diabetes;
 			sourceTree = "<group>";
@@ -487,6 +496,7 @@
 			files = (
 				3F842F5BE36A90FE38166270 /* FoodRulesTests.swift in Sources */,
 				266B24B0C3388DA81E19AA72 /* GlucoseRulesTests.swift in Sources */,
+				9E8ECEDEADBEB82D0D4E8D97 /* InsulinRulesTests.swift in Sources */,
 				59772EFB793215AC18BF8358 /* MainCardTests.swift in Sources */,
 				993F2F797C959E00151D1DE4 /* MealRulesTests.swift in Sources */,
 				40D83CD78156D172A07B7055 /* MedNotifyTests.swift in Sources */,
@@ -525,7 +535,9 @@
 				C9380FEA3E64CDA7BE873E2D /* FormControls.swift in Sources */,
 				35515139A7D58C8CC41AC576 /* GlucoseRules.swift in Sources */,
 				839BF6C7C4A4A13F8730017F /* GlucoseViews.swift in Sources */,
+				8E72AF3B20FCBF6EB17080CE /* InsulinRules.swift in Sources */,
 				EA602DD64B1EFC19974AB3AD /* InsulinSetupView.swift in Sources */,
+				40AD2F56072E0B5BA7D04E36 /* InsulinViews.swift in Sources */,
 				903D72958C5FDAFCA8BCDEB5 /* MainCard.swift in Sources */,
 				49EA965508951840BD7CFB45 /* MainView.swift in Sources */,
 				790F42C0FF0254712506CDB9 /* MealRules.swift in Sources */,

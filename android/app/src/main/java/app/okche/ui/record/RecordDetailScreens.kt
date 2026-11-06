@@ -95,6 +95,7 @@ data class DetailTarget(val kind: RecordKind, val editing: Record? = null, val p
 fun RecordDetailSheet(target: DetailTarget, pets: List<Pet>, onSaved: (Record, Boolean) -> Unit, onClose: () -> Unit) {
     // 혈당은 혈당 시트(9-1) — 기록 고치기가 모두 여기로 오므로 한곳에서 나눈다.
     if (target.kind == RecordKind.glucose) return app.okche.ui.diabetes.GlucoseSheet(target, pets, onSaved, onClose)
+    if (target.kind == RecordKind.insulin) return app.okche.ui.diabetes.InsulinSheet(target, pets, onSaved, onClose)
     val context = LocalContext.current
     val view = LocalView.current
     val dao = remember { OkcheDatabase.get(context).dao() }
@@ -235,18 +236,23 @@ internal fun pickDateTime(context: Context, at: Long, onPicked: (Long) -> Unit) 
     }
 }
 
-/** '지금 · 오후 2:14' + '시간 바꾸기' 줄. */
+/** '지금 · 오후 2:14' + '시간 바꾸기' 줄. [detail]은 시각 아래 둘째 줄(인슐린 '글라진 인슐린 · 정해 둔 양 2단위'), [warning]이면 연지색 테두리(이미 맞은 시간대 — 9-2). */
 @Composable
-internal fun TimeRow(text: String, onChange: () -> Unit) {
+internal fun TimeRow(text: String, detail: String? = null, warning: Boolean = false, onChange: () -> Unit) {
+    val rowShape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Row(
         Modifier
             .fillMaxWidth()
-            .background(OkcheColor.Paper, RoundedCornerShape(OkcheRadius.RadiusMd))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .background(OkcheColor.Paper, rowShape)
+            .then(if (warning) Modifier.border(1.5.dp, OkcheColor.Yeonji, rowShape) else Modifier)
+            .padding(horizontal = 14.dp, vertical = if (detail != null) 10.dp else 6.dp),
         horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, Modifier.weight(1f), color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
+        Column(Modifier.weight(1f)) {
+            Text(text, color = OkcheColor.Ink, style = OkcheType.Body.toTextStyle())
+            if (detail != null) Text(detail, color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal))
+        }
         val shape = RoundedCornerShape(OkcheRadius.RadiusPill)
         Box(
             Modifier

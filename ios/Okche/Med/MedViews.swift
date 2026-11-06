@@ -49,6 +49,16 @@ struct YakbangView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .sheet(item: $sheet) { MedFormSheet(mode: $0) }
+        // 남은 약 알림을 누르면 그 약 고치기(8-4c).
+        .onChange(of: router.openMedId, initial: true) { openFromAlert() }
+    }
+
+    @State private var router = NotifyRouter.shared
+
+    private func openFromAlert() {
+        guard let id = router.openMedId else { return }
+        router.openMedId = nil
+        if let med = meds.first(where: { $0.id == id && $0.deletedAt == nil }) { sheet = .edit(med) }
     }
 }
 

@@ -65,19 +65,28 @@ import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
 import kotlinx.coroutines.launch
 
-/** 약방(보드 Yakbang·YakbangEmpty): 더보기 '약방 · 약 목록'. '약'·'보조제' 묶음(없는 묶음은 숨김), 줄을 누르면 고치기, '+ 약 들이기'. */
+/**
+ * 약방(보드 Yakbang·YakbangEmpty): 더보기 '약방 · 약 목록'. '약'·'보조제' 묶음(없는 묶음은 숨김), 줄을 누르면 고치기, '+ 약 들이기'.
+ * [openMedId]: 남은 약 알림으로 연 약 — 다 읽은 뒤 그 약 고치기를 열고 [onMedOpened]로 비운다(빠진 약이면 약방만).
+ */
 @Composable
-fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, onBack: () -> Unit) {
+fun YakbangScreen(pets: List<Pet>, seal: @Composable () -> Unit, openMedId: String? = null, onMedOpened: () -> Unit = {}, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
-    val meds by remember { dao.medicationsFlow() }.collectAsState(emptyList())
+    val loadedMeds by remember { dao.medicationsFlow() }.collectAsState<List<Medication>, List<Medication>?>(null)
+    val meds = loadedMeds.orEmpty()
     // 처음 읽기 전(null)엔 고치기를 열지 않는다(남은 양 칸이 기록을 빼기 전 값으로 채워지지 않게).
     val loaded by remember { dao.medRecordsFlow() }.collectAsState<List<app.okche.store.Record>, List<app.okche.store.Record>?>(null)
     val records = loaded.orEmpty()
     val schedules by remember { dao.medSchedulesFlow() }.collectAsState(emptyList())
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medication?>(null) }
+    androidx.compose.runtime.LaunchedEffect(openMedId, loaded != null, loadedMeds != null) {
+        if (openMedId == null || loaded == null || loadedMeds == null) return@LaunchedEffect
+        editing = meds.firstOrNull { it.id == openMedId && it.deletedAt == null }
+        onMedOpened()
+    }
     if (adding) MedFormSheet(null, pets, records) { adding = false }
     editing?.let { MedFormSheet(it, pets, records) { editing = null } }
     val groups = groupedMeds(meds)

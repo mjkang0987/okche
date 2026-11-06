@@ -2,7 +2,7 @@ import Foundation
 
 /// 탕약 알림 목록 계산(8-4a, 데이터 6-2) — 휴대폰에 걸기 전 순수 계산. 걸기·지우기는 8-4b.
 enum MedNotify {
-    enum Kind: String { case due, again, more }
+    enum Kind: String { case due, again, more, low }
 
     struct Alert: Equatable {
         let id: String
@@ -12,6 +12,10 @@ enum MedNotify {
         let body: String
         /// 누르면 열 아이(묶이면 첫 아이). 이어짐 알림은 없음.
         let petId: UUID?
+        /// 남은 약 알림: 누르면 약방의 그 약 고치기.
+        var medId: UUID?
+        /// 남은 약 알림의 보낸 기록 열쇠(`{약 id}|{stockCountedAt}`).
+        var sentKey: String?
     }
 
     /// 아이폰 걸어 둘 수 있는 알림 64개 — 이어짐 알림 하나를 남긴다.
@@ -20,7 +24,7 @@ enum MedNotify {
 
     /// 오늘(6시 기준)부터 3일 뒤까지 남은 차례 → 울릴 시각마다 하나로 묶은 알림, 이른 것부터 63개 + 이어짐 알림.
     static func alerts(_ schedules: [MedSchedule], records: [Record], pets: [Pet], rests: [RestPeriod], meds: [Medication],
-                       medTimeOn: Bool, now: Date = .now) -> [Alert] {
+                       medTimeOn: Bool, limit: Int = limit, now: Date = .now) -> [Alert] {
         guard medTimeOn else { return [] }
         let live = schedules.filter { $0.deletedAt == nil }
         let medById = Dictionary(meds.filter { $0.deletedAt == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -60,11 +64,54 @@ enum MedNotify {
                          title: title, body: body, petId: first.pet.id)
         }
         alerts.sort { ($0.fireAt, $0.kind == .due ? 0 : 1) < ($1.fireAt, $1.kind == .due ? 0 : 1) }
-        alerts = Array(alerts.prefix(limit))
+        alerts = Array(alerts.prefix(max(limit, 0)))
         if let last = alerts.last {
             alerts.append(Alert(id: "med.more", kind: .more, fireAt: last.fireAt.addingTimeInterval(60), title: "옥체", body: "옥체를 열면 알림이 이어져요", petId: nil))
         }
         return alerts
+    }
+
+    /// 남은 약 알림(8-4c): 약방 '○일분'이 기준 이하가 되는 날 오전 10시에 한 번 '약방 · 프레드니솔론이 3일분 남았어요'.
+    /// 이미 기준 이하면 오늘 10시(지났으면 내일). `sent`(`{약 id}|{stockCountedAt}`)에 있으면 남은 양을 다시 적기 전까지 안 보냄.
+    static func lowMedAlerts(meds: [Medication], schedules: [MedSchedule], records: [Record], on: Bool, days threshold: Int,
+                             quiet: QuietHours?, sent: Set<String>, now: Date = .now) -> [Alert] {
+        guard on else { return [] }
+        let calendar = Calendar.current
+        let live = schedules.filter { $0.deletedAt == nil }
+        // 밤 알림 쉬기 시간에 걸리면 보내지 않음(10시라 보통 겹치지 않음).
+        if let quiet, quiet.enabled, inQuiet("10:00", quiet) { return [] }
+        return meds.filter { $0.deletedAt == nil }.compactMap { med in
+            guard let left = MedSchedules.daysLeft(med, schedules: live, records: records), !sent.contains(sentKey(med)) else { return nil }
+            let ahead = max(left - threshold, 0)
+            guard let day = calendar.date(byAdding: .day, value: ahead, to: now),
+                  var fireAt = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: day) else { return nil }
+            if fireAt <= now, let next = calendar.date(byAdding: .day, value: 1, to: fireAt) { fireAt = next }
+            guard fireAt <= now.addingTimeInterval(window) else { return nil }
+            // 울리는 날에 남을 일수(하루에 하루분씩 줄어듦) — 10시가 지나 내일로 밀리면 하루 적게.
+            let days = left - (calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: fireAt)).day ?? 0)
+            return Alert(id: "low.\(med.id.uuidString.lowercased())", kind: .low, fireAt: fireAt, title: "약방",
+                         body: lowMedBody(med.name, days: days), petId: nil, medId: med.id, sentKey: sentKey(med))
+        }
+        .prefix(limit).map { $0 }
+    }
+
+    /// '프레드니솔론이 3일분 남았어요', 하루분도 안 남으면 '프레드니솔론이 거의 다 떨어졌어요'.
+    static func lowMedBody(_ name: String, days: Int) -> String {
+        days > 0 ? "\(MedRules.withSubjectParticle(name)) \(days)일분 남았어요" : "\(MedRules.withSubjectParticle(name)) 거의 다 떨어졌어요"
+    }
+
+    /// 알림 켠 약(열린 줄, 필요할 때만 아님)이 하나라도 있는지 — 꺼짐 띠를 띄울 때.
+    static func wantsReminders(_ schedules: [MedSchedule]) -> Bool {
+        schedules.contains { $0.deletedAt == nil && $0.activeUntil == nil && $0.reminder && $0.frequency != .asNeeded }
+    }
+
+    static func sentKey(_ med: Medication) -> String {
+        "\(med.id.uuidString.lowercased())|\(med.stockCountedAt.map { String(Int($0.timeIntervalSince1970)) } ?? "")"
+    }
+
+    /// `HH:mm`이 쉬는 시간 안인지(자정을 넘기는 시간 포함, 끝은 빼고).
+    static func inQuiet(_ time: String, _ quiet: QuietHours) -> Bool {
+        quiet.start <= quiet.end ? (quiet.start <= time && time < quiet.end) : (time >= quiet.start || time < quiet.end)
     }
 
     private static func minute(_ date: Date) -> Date {

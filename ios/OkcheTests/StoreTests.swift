@@ -148,7 +148,7 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(setting.id, .setting)
         XCTAssertEqual(setting.weightReminder, WeightReminder(weekday: 7, time: "10:00"))
         XCTAssertEqual(setting.lowMedDays, 3)
-        XCTAssertFalse(setting.quietHours.enabled)
+        XCTAssertEqual(setting.quietHours, QuietHours(enabled: true, start: "22:00", end: "08:00")) // 보드 Notify 처음 값
         XCTAssertTrue(setting.notify.lastYearToday)
     }
 

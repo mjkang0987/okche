@@ -34,8 +34,9 @@ data class Setting(
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = createdAt,
     @ColumnInfo(name = "deleted_at") val deletedAt: Long? = null,
-    // shortcut: 밤 알림 쉬기·알림 켜짐·축하 문구의 처음 값은 임시(문서 10장), 설정 화면 만들 때 디자인과 맞춘다.
-    @Embedded(prefix = "quiet_hours_") val quietHours: QuietHours = QuietHours(enabled = false, start = "22:00", end = "07:00"),
+    // 밤 알림 쉬기·알림 켜짐은 기별 보드(Notify) 값(8-4c). 새로 깐 기기만 — 있는 줄은 그대로.
+    // shortcut: 축하 문구의 처음 값은 임시(문서 10장), 그 설정 화면 만들 때 디자인과 맞춘다.
+    @Embedded(prefix = "quiet_hours_") val quietHours: QuietHours = QuietHours(enabled = true, start = "22:00", end = "08:00"),
     @Embedded(prefix = "notify_") val notify: NotifySettings = NotifySettings(
         medTime = true, insulinTime = true, lowMed = true, weighIn = true, goodDay = true, lastYearToday = true,
     ),

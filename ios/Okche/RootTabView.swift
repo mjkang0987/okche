@@ -48,6 +48,8 @@ struct RootTabView: View {
                              set: { if $0 == nil { router.openPetId = nil } })) { pet in
             MedTodaySheet(pet: pet)
         }
+        // 남은 약 알림을 누르면 더보기 탭(약방·그 약 고치기는 더보기가 연다, 8-4c).
+        .onChange(of: router.openMedId, initial: true) { if router.openMedId != nil { tab = .more } }
         // 추억·지운 아이 알림이면 비워 둔다(나중에 되돌려도 시트가 갑자기 뜨지 않게).
         .onChange(of: router.openPetId) { if let id = router.openPetId, !alive.contains(where: { $0.id == id }) { router.openPetId = nil } }
     }

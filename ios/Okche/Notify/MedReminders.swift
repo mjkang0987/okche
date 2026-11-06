@@ -5,24 +5,31 @@ import UserNotifications
 /// 탕약 알림 걸기(8-4b): 계산(`MedNotify.alerts`)한 목록으로 휴대폰 알림을 모두 지우고 다시 건다.
 @MainActor
 enum MedReminders {
-    static let prefix = "med."
+    static let prefixes = ["med.", "low."]
 
     /// 앱을 열 때·저장할 때마다 부른다. 허락이 없으면 휴대폰이 받지 않을 뿐 그대로 둔다.
     static func reschedule(in context: ModelContext, now: Date = .now) async {
-        guard let alerts = try? alerts(in: context, now: now) else { return }
         let center = UNUserNotificationCenter.current()
-        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
+        let status = await center.notificationSettings().authorizationStatus
+        guard let alerts = try? alerts(in: context, delivered: [.authorized, .provisional, .ephemeral].contains(status), now: now) else { return }
+        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { id in prefixes.contains { id.hasPrefix($0) } }
         center.removePendingNotificationRequests(withIdentifiers: pending)
         for request in alerts.map(request) { try? await center.add(request) }
     }
 
-    static func alerts(in context: ModelContext, now: Date = .now) throws -> [MedNotify.Alert] {
+    /// 남은 약 알림을 먼저(몇 개 안 됨) 넣고, 탕약은 남은 자리(이어짐 알림 하나 빼고 64개)만큼.
+    /// `delivered`: 휴대폰 알림이 허락돼 걸어 둔 남은 약 알림이 실제로 떴을 때만 보낸 것으로 친다.
+    static func alerts(in context: ModelContext, delivered: Bool = true, now: Date = .now) throws -> [MedNotify.Alert] {
         let setting = try Setting.loadOrCreate(in: context)
-        return MedNotify.alerts(try context.fetch(FetchDescriptor<MedSchedule>(predicate: #Predicate { $0.deletedAt == nil })),
-                                records: try context.fetch(FetchDescriptor<Record>(predicate: #Predicate { $0.deletedAt == nil }))
-                                    .filter { $0.kind == RecordKind.med.rawValue },
-                                pets: try context.fetch(FetchDescriptor<Pet>()), rests: try context.fetch(FetchDescriptor<RestPeriod>()),
-                                meds: try context.fetch(FetchDescriptor<Medication>()), medTimeOn: setting.notify.medTime, now: now)
+        let schedules = try context.fetch(FetchDescriptor<MedSchedule>(predicate: #Predicate { $0.deletedAt == nil }))
+        let records = try context.fetch(FetchDescriptor<Record>(predicate: #Predicate { $0.deletedAt == nil })).filter { $0.kind == RecordKind.med.rawValue }
+        let meds = try context.fetch(FetchDescriptor<Medication>())
+        let low = MedNotify.lowMedAlerts(meds: meds, schedules: schedules, records: records, on: setting.notify.lowMed, days: setting.lowMedDays,
+                                         quiet: setting.quietHours, sent: LowMedLog.sent(now: now, delivered: delivered), now: now)
+        LowMedLog.armed(low)
+        return low + MedNotify.alerts(schedules, records: records, pets: try context.fetch(FetchDescriptor<Pet>()),
+                                      rests: try context.fetch(FetchDescriptor<RestPeriod>()), meds: meds,
+                                      medTimeOn: setting.notify.medTime, limit: MedNotify.limit - low.count, now: now)
     }
 
     static func request(_ alert: MedNotify.Alert) -> UNNotificationRequest {
@@ -31,6 +38,7 @@ enum MedReminders {
         content.body = alert.body
         content.sound = .default
         if let petId = alert.petId { content.userInfo = ["petId": petId.uuidString] }
+        if let medId = alert.medId { content.userInfo = ["medId": medId.uuidString] }
         // 시간대를 함께 넣어 휴대폰 시간대가 바뀌어도 같은 순간에 울림(안드로이드와 같음).
         let parts = Calendar.current.dateComponents([.timeZone, .year, .month, .day, .hour, .minute], from: alert.fireAt)
         return UNNotificationRequest(identifier: alert.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
@@ -55,11 +63,33 @@ enum MedReminders {
     }
 }
 
-/// 알림을 누르면 열 아이(8-4b) — 탭 화면이 오늘 먹일 약 시트를 띄운다.
+/// 남은 약 알림을 보낸 기록(이 기기, 10장 `lowMedSent`): 건 알림은 울릴 시각이 지나면 보낸 것으로 옮긴다.
+@MainActor
+enum LowMedLog {
+    private static let sentKey = "lowMedSent", armedKey = "lowMedArmed"
+
+    static func sent(now: Date, delivered: Bool = true) -> Set<String> {
+        let d = UserDefaults.standard
+        var sent = Set(d.stringArray(forKey: sentKey) ?? [])
+        let armed = d.dictionary(forKey: armedKey) as? [String: Double] ?? [:]
+        // 알림이 꺼져 있던 동안 지난 것은 안 보낸 것 — 켜면 다시 건다.
+        for (key, at) in armed where delivered && at <= now.timeIntervalSince1970 { sent.insert(key) }
+        d.set(Array(sent), forKey: sentKey)
+        return sent
+    }
+
+    static func armed(_ alerts: [MedNotify.Alert]) {
+        let pairs = alerts.compactMap { a in a.sentKey.map { ($0, a.fireAt.timeIntervalSince1970) } }
+        UserDefaults.standard.set(Dictionary(pairs, uniquingKeysWith: { a, _ in a }), forKey: armedKey)
+    }
+}
+
+/// 알림을 누르면 열 아이(8-4b) — 탭 화면이 오늘 먹일 약 시트를 띄운다. 남은 약 알림은 약방의 그 약(8-4c).
 @MainActor @Observable
 final class NotifyRouter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotifyRouter()
     var openPetId: UUID?
+    var openMedId: UUID?
 
     /// 앱이 앞에 있어도 알림을 보여 준다.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -67,8 +97,13 @@ final class NotifyRouter: NSObject, UNUserNotificationCenterDelegate {
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let id = (response.notification.request.content.userInfo["petId"] as? String).flatMap(UUID.init(uuidString:))
-        await MainActor.run { NotifyRouter.shared.openPetId = id }
+        let info = response.notification.request.content.userInfo
+        let pet = (info["petId"] as? String).flatMap(UUID.init(uuidString:))
+        let med = (info["medId"] as? String).flatMap(UUID.init(uuidString:))
+        await MainActor.run {
+            NotifyRouter.shared.openPetId = pet
+            NotifyRouter.shared.openMedId = med
+        }
     }
 }
 

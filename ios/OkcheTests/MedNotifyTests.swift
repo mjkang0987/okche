@@ -125,4 +125,42 @@ final class MedNotifyTests: XCTestCase {
         XCTAssertFalse(trigger.repeats)
         XCTAssertTrue(MedReminders.request(MedNotify.Alert(id: "med.more", kind: .more, fireAt: at(27, 21), title: "옥체", body: "", petId: nil)).content.userInfo.isEmpty)
     }
+
+    /// 8-4c 남은 약: 기준 이하면 오늘 10시(지났으면 내일), 아니면 기준이 되는 날 10시, 보낸 것·밤 쉬기·끔·남은 양 없음은 빠짐.
+    func testLowMed() {
+        let p = Medication(name: "프레드니솔론", category: .medicine, form: .pill, doseAmount: 1, unit: .pill, stockAmount: 2, stockCountedAt: at(20, 9))
+        let daily = row(kong, p, ["08:00"]) // 하루 1알 → 2일분
+        func low(_ m: Medication, now: Date, days: Int = 3, quiet: QuietHours? = nil, sent: Set<String> = [], on: Bool = true) -> [MedNotify.Alert] {
+            MedNotify.lowMedAlerts(meds: [m], schedules: [daily], records: [], on: on, days: days, quiet: quiet, sent: sent, now: now)
+        }
+        let early = low(p, now: at(27, 9))
+        XCTAssertEqual(early.map(\.fireAt), [at(27, 10)])
+        XCTAssertEqual(early.first?.title, "약방")
+        XCTAssertEqual(early.first?.body, "프레드니솔론이 2일분 남았어요")
+        XCTAssertEqual(early.first?.medId, p.id)
+        XCTAssertEqual(low(p, now: at(27, 12)).map(\.fireAt), [at(28, 10)])
+        // 내일로 밀리면 하루 적게, 하루분도 안 남으면 '거의 다 떨어졌어요'.
+        XCTAssertEqual(low(p, now: at(27, 12)).first?.body, "프레드니솔론이 1일분 남았어요")
+        XCTAssertEqual(MedNotify.lowMedBody("프레드니솔론", days: 0), "프레드니솔론이 거의 다 떨어졌어요")
+        // 5일분, 기준 3 → 이틀 뒤 10시 '3일분'.
+        p.stockAmount = 5
+        let ahead = low(p, now: at(27, 12))
+        XCTAssertEqual(ahead.map(\.fireAt), [at(29, 10)])
+        XCTAssertEqual(ahead.first?.body, "프레드니솔론이 3일분 남았어요")
+        XCTAssertTrue(low(p, now: at(27, 12), days: 0).isEmpty) // 닷새 뒤는 3일 창 밖
+        XCTAssertTrue(low(p, now: at(27, 12), sent: [MedNotify.sentKey(p)]).isEmpty)
+        XCTAssertTrue(low(p, now: at(27, 12), quiet: QuietHours(enabled: true, start: "22:00", end: "11:00")).isEmpty)
+        XCTAssertEqual(low(p, now: at(27, 12), quiet: QuietHours(enabled: false, start: "22:00", end: "11:00")).count, 1)
+        XCTAssertTrue(low(p, now: at(27, 12), on: false).isEmpty)
+        p.stockAmount = nil
+        XCTAssertTrue(low(p, now: at(27, 12)).isEmpty)
+        // 탕약은 남은 자리만큼.
+        let s = row(kong, p, [], lead: 0, freq: .everyNHours, hours: 1, firstAt: at(27, 12, 30))
+        XCTAssertEqual(MedNotify.alerts([s], records: [], pets: [kong], rests: [], meds: [p], medTimeOn: true, limit: 60, now: at(27, 12)).filter { $0.kind == .due }.count, 60)
+        XCTAssertTrue(MedNotify.inQuiet("23:30", QuietHours(enabled: true, start: "22:00", end: "07:00")))
+        XCTAssertFalse(MedNotify.inQuiet("07:00", QuietHours(enabled: true, start: "22:00", end: "07:00")))
+        XCTAssertTrue(MedNotify.wantsReminders([daily]))
+        XCTAssertFalse(MedNotify.wantsReminders([row(kong, p, ["08:00"], reminder: false)]))
+        XCTAssertEqual(NotifySettingsView.weekly(WeightReminder(weekday: 7, time: "10:00")), "매주 일요일 오전 10시")
+    }
 }

@@ -30,6 +30,7 @@ import app.okche.store.RecordKind
 import app.okche.ui.diabetes.insulinData
 import app.okche.ui.diabetes.insulinHandled
 import app.okche.ui.diabetes.insulinNext
+import app.okche.ui.diabetes.insulinPlanAt
 import app.okche.ui.diabetes.insulinSlotAt
 import app.okche.ui.diabetes.insulinTwice
 import app.okche.ui.diabetes.insulinUnitsError
@@ -108,27 +109,59 @@ class InsulinRulesTest {
 
     @Test fun quickAndSheetData() = runBlocking {
         val now = at(6, 8, 2)
-        val full = saveInsulin(dao, "kong", plan, 2.0, "full", null, now, now = now, zone = seoul)
+        val full = saveInsulin(dao, "kong", listOf(plan), 2.0, "full", null, now, now = now, zone = seoul)
         assertEquals("""{"planId":"${plan.id}","status":"full","units":2}""", full.data)
         assertEquals("${plan.id}|2026-11-06|08:00", full.slotKey)
         assertEquals(now, full.occurredAt)
         assertEquals("2026-11-06", full.day)
-        val skipped = saveInsulin(dao, "kong", plan, 2.0, "skipped", null, now, now = now, zone = seoul)
+        val skipped = saveInsulin(dao, "kong", listOf(plan), 2.0, "skipped", null, now, now = now, zone = seoul)
         assertEquals("""{"planId":"${plan.id}","status":"skipped","units":0}""", skipped.data)
         // 시트: 밥·일부만, 새벽 2시면 전날 저녁 차례.
-        val sheet = saveInsulin(dao, "kong", plan, 1.5, "partial", "none", at(7, 2), now = at(7, 3), zone = seoul)
+        val sheet = saveInsulin(dao, "kong", listOf(plan), 1.5, "partial", "none", at(7, 2), now = at(7, 3), zone = seoul)
         assertEquals("""{"mealBefore":"none","planId":"${plan.id}","status":"partial","units":1.5}""", sheet.data)
         assertEquals("${plan.id}|2026-11-06|20:00", sheet.slotKey)
         assertEquals("2026-11-06", sheet.day)
         // 계획 없음 → planId·slotKey 없음.
-        val noPlan = saveInsulin(dao, "kong", null, 2.0, "full", null, now, now = now, zone = seoul)
+        val noPlan = saveInsulin(dao, "kong", emptyList(), 2.0, "full", null, now, now = now, zone = seoul)
         assertEquals("""{"status":"full","units":2}""", noPlan.data)
         assertNull(noPlan.slotKey)
         // 고치기: 시간을 바꾸면 그 시각 구간의 차례로.
-        val edited = saveInsulin(dao, "kong", plan, 2.0, "full", "all", at(6, 20, 5), editing = full, now = at(6, 21), zone = seoul)
+        val edited = saveInsulin(dao, "kong", listOf(plan), 2.0, "full", "all", at(6, 20, 5), editing = full, now = at(6, 21), zone = seoul)
         assertEquals(full.id, edited.id)
         assertEquals("${plan.id}|2026-11-06|20:00", edited.slotKey)
         assertEquals("2단위 맞음 · 밥 다 먹음", insulinValue(dao.record(full.id)!!))
+    }
+
+    /** 그때 쓰던 계획: 오늘 양을 바꿔 A가 닫히고 B가 열려도 어제 기록 고치기는 A 그대로, 뒤늦게 남긴 어제 기록은 A로. */
+    @Test fun planInForceAtTheTime() = runBlocking {
+        val change = at(6, 10)
+        val a = plan.copy(activeUntil = change)
+        val b = plan.copy(id = "9b1e0000-0000-4000-8000-000000000002", slots = listOf(InsulinSlot("08:00", 3.0), InsulinSlot("20:00", 3.0)), activeFrom = change)
+        val plans = listOf(a, b)
+        assertEquals(a.id, insulinPlanAt(plans, "kong", at(5, 9))?.id)
+        assertEquals(a.id, insulinPlanAt(plans, "kong", change - 1)?.id)
+        assertEquals(b.id, insulinPlanAt(plans, "kong", change)?.id)
+        assertNull(insulinPlanAt(plans, "kong", at(1, 0) - 1)) // 계획 전
+        assertNull(insulinPlanAt(plans, "bori", at(6, 11)))
+        assertNull(insulinPlanAt(listOf(b.copy(deletedAt = change)), "kong", at(6, 11)))
+        // 같은 activeFrom이면 늦은 updatedAt.
+        val later = b.copy(id = "9b1e0000-0000-4000-8000-000000000003", updatedAt = b.updatedAt + 1)
+        assertEquals(later.id, insulinPlanAt(listOf(b, later), "kong", at(6, 11))?.id)
+
+        val now = at(6, 11)
+        val yesterday = saveInsulin(dao, "kong", listOf(a), 2.0, "full", null, at(5, 8, 2), now = at(5, 8, 2), zone = seoul)
+        // 시간 그대로 고치기 → A의 planId·slotKey 그대로.
+        val edited = saveInsulin(dao, "kong", plans, 1.5, "partial", null, yesterday.occurredAt, editing = yesterday, now = now, zone = seoul)
+        assertEquals("""{"planId":"${a.id}","status":"partial","units":1.5}""", edited.data)
+        assertEquals(yesterday.slotKey, edited.slotKey)
+        // 어제 안에서 시간을 바꿔도 그때 계획 A의 차례.
+        val moved = saveInsulin(dao, "kong", plans, 1.5, "partial", null, at(5, 20, 5), editing = edited, now = now, zone = seoul)
+        assertEquals("${a.id}|2026-11-05|20:00", moved.slotKey)
+        // 뒤늦게 남긴 어제 저녁 기록 → A, 오늘 지금 기록 → B.
+        val backdated = saveInsulin(dao, "kong", plans, 2.0, "full", null, at(5, 20, 1), now = now, zone = seoul)
+        assertEquals("""{"planId":"${a.id}","status":"full","units":2}""", backdated.data)
+        assertEquals("${a.id}|2026-11-05|20:00", backdated.slotKey)
+        assertEquals("${b.id}|2026-11-06|08:00", saveInsulin(dao, "kong", plans, 3.0, "full", null, now, now = now, zone = seoul).slotKey)
     }
 
     @Test fun valueText() {
@@ -182,6 +215,35 @@ class InsulinFlowTest {
         override fun getConstraints() = isAssignableFrom(View::class.java)
         override fun getDescription() = "고르기 값 바꾸기"
         override fun perform(uiController: UiController, view: View) = block(view)
+    }
+
+    /** 처리한 뒤 ⋯은 새 기록 시트 — 열자마자 이미 맞은 경고(보드와 같음). 처리한 칩은 고치기 시트(경고 없음). */
+    @Test fun moreOpensNewSheetWithWarning() {
+        val plan = InsulinPlan(petId = "", slots = listOf(InsulinSlot("08:00", 2.0), InsulinSlot("20:00", 2.0)), activeFrom = System.currentTimeMillis() - 86_400_000)
+        val slot = insulinSlotAt(plan, System.currentTimeMillis())!!
+        val given = maxOf(slot.start, System.currentTimeMillis() - 60_000)
+        runBlocking {
+            val dao = OkcheDatabase.get(context).dao()
+            OkcheDatabase.get(context).clearAllTables()
+            registerPet(dao, PetForm(name = "콩이"))
+            val pet = dao.pets().single()
+            dao.update(pet.copy(hasDiabetes = true))
+            dao.insert(plan.copy(petId = pet.id))
+            dao.insert(Record(petId = pet.id, kind = RecordKind.insulin, occurredAt = given, data = insulinData(plan.id, 2.0, "full", null)))
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        val chip = hasContentDescription("에 2단위 맞음 · 눌러서 고치기", substring = true)
+        waitFor(chip)
+        val warning = hasText("에 이미 맞은 기록이 있어요", substring = true)
+        rule.onNode(hasContentDescription("인슐린 자세히 남기기")).performScrollTo().performClick()
+        waitFor(hasText("콩이 · 인슐린"))
+        waitFor(warning)
+        rule.onNode(hasText("지금 · ", substring = true)).assertExists() // 새 기록(지금 시각)
+        rule.onNode(hasContentDescription("닫기")).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasText("콩이 · 인슐린")).fetchSemanticsNodes().isEmpty() }
+        rule.onNode(chip).performScrollTo().performClick()
+        waitFor(hasText("콩이 · 인슐린"))
+        rule.onAllNodes(warning).fetchSemanticsNodes().let { assertEquals(0, it.size) } // 고치는 그 기록은 빼고
     }
 
     @Test fun giveUndoThenSheetWarning() {

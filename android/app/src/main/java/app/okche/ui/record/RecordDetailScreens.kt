@@ -245,7 +245,7 @@ internal fun TimeRow(text: String, detail: String? = null, warning: Boolean = fa
             .fillMaxWidth()
             .background(OkcheColor.Paper, rowShape)
             .then(if (warning) Modifier.border(1.5.dp, OkcheColor.Yeonji, rowShape) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(horizontal = 14.dp, vertical = if (detail != null) 10.dp else 6.dp),
         horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {

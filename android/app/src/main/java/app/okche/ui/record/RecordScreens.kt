@@ -114,12 +114,13 @@ import app.okche.ui.diabetes.insulinSlotAt
 import app.okche.ui.diabetes.insulinStatus
 import app.okche.ui.diabetes.insulinUnits
 import app.okche.ui.diabetes.insulinValue
-import app.okche.ui.diabetes.openInsulinPlan
+import app.okche.ui.diabetes.insulinPlanAt
 import app.okche.ui.diabetes.saveInsulin
 import app.okche.ui.med.clockText
 import app.okche.ui.med.medNumber
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.outlined.Vaccines
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.ui.text.input.KeyboardType
 import app.okche.ui.OkcheChoiceChips
 import app.okche.ui.OkcheConfirmDialog
@@ -220,19 +221,28 @@ fun RecordTab(
             glucoseBusy = false
         }
     }
-    // 인슐린 줄(9-2): 혈당 줄과 같은 아이. 계획·기록을 읽기 전엔 그리지 않음. 구간이 끝나면 다시 그리게 끝 시각에 한 번 깨움.
+    // 인슐린 줄(9-2): 혈당 줄과 같은 아이. 계획·기록을 읽기 전엔 그리지 않음. 구간이 끝나면 다시 그리게 끝 시각에 한 번 깨움
+    // + 앱으로 돌아올 때마다(깊은 잠에선 기다림이 늦어짐).
     var insulinTick by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     val insulinLine = glucosePet?.let { pet ->
         val p = insulinPlans ?: return@let null
         val r = insulinRecords ?: return@let null
         val now = maxOf(insulinTick, System.currentTimeMillis())
-        val slot = openInsulinPlan(p, pet.id)?.let { insulinSlotAt(it, now) }
+        val slot = insulinPlanAt(p, pet.id, now)?.let { insulinSlotAt(it, now) }
         InsulinLine(slot, slot?.let { insulinHandled(pet.id, r, it) })
     }
     androidx.compose.runtime.LaunchedEffect(insulinLine?.slot?.end) {
         val end = insulinLine?.slot?.end ?: return@LaunchedEffect
         kotlinx.coroutines.delay((end - System.currentTimeMillis()).coerceAtLeast(0))
         insulinTick = System.currentTimeMillis()
+    }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) insulinTick = System.currentTimeMillis()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
     /** 맞음·건너뜀 저장 중 — 처리한 상태가 뜨거나 되돌려 바뀌면 풂(두 번 눌러 두 번 남지 않게). */
     var insulinBusy by remember { mutableStateOf(false) }
@@ -241,13 +251,13 @@ fun RecordTab(
 
     fun saveInsulinNow(petId: String, skipped: Boolean) {
         if (insulinBusy) return
-        val plan = openInsulinPlan(insulinPlans.orEmpty(), petId) ?: return
+        val plans = insulinPlans ?: return
         insulinBusy = true
         scope.launch {
             runCatching {
                 val now = System.currentTimeMillis()
-                val slot = insulinSlotAt(plan, now) ?: error("차례 없음")
-                saveInsulin(dao, petId, plan, slot.units, if (skipped) "skipped" else "full", null, now, now = now)
+                val slot = insulinPlanAt(plans, petId, now)?.let { insulinSlotAt(it, now) } ?: error("차례 없음")
+                saveInsulin(dao, petId, plans, slot.units, if (skipped) "skipped" else "full", null, now, now = now)
             }
                 .onSuccess { saved ->
                     failed = false
@@ -352,8 +362,6 @@ fun RecordTab(
                     RecordKind.meal -> onOpenSura(null)
                     RecordKind.med -> medSheet = pets.firstOrNull { p -> p.id == who }
                     RecordKind.glucose -> detail = DetailTarget(it, petId = who, glucoseText = glucoseText)
-                    // 처리했으면 그 기록 고치기, 아니면 새 기록.
-                    RecordKind.insulin -> detail = DetailTarget(it, editing = insulinLine?.handled, petId = who)
                     else -> detail = DetailTarget(it, petId = who)
                 }
             }) { row, value ->
@@ -495,7 +503,7 @@ private fun QuickRecordCard(
             }
             val label = @Composable {
                 Row(
-                    Modifier.then(if (large) Modifier else Modifier.width(labelWidth)).semantics(mergeDescendants = true) { heading() },
+                    Modifier.then(if (large) Modifier else Modifier.widthIn(min = labelWidth)).semantics(mergeDescendants = true) { heading() },
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -531,7 +539,7 @@ private fun QuickRecordCard(
 private fun MedRow(line: MedLine, large: Boolean, labelWidth: androidx.compose.ui.unit.Dp, onGive: (MedSlot) -> Unit, more: @Composable () -> Unit) {
     val label = @Composable {
         Row(
-            Modifier.then(if (large) Modifier else Modifier.width(labelWidth)).semantics(mergeDescendants = true) { heading() },
+            Modifier.then(if (large) Modifier else Modifier.widthIn(min = labelWidth)).semantics(mergeDescendants = true) { heading() },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -583,7 +591,7 @@ private fun GlucoseRow(text: String, onText: (String) -> Unit, large: Boolean, l
     val error = glucoseError(text)
     val label = @Composable {
         Row(
-            Modifier.then(if (large) Modifier else Modifier.width(labelWidth)).semantics(mergeDescendants = true) { heading() },
+            Modifier.then(if (large) Modifier else Modifier.widthIn(min = labelWidth)).semantics(mergeDescendants = true) { heading() },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -630,11 +638,11 @@ private class InsulinLine(val slot: InsulinSlotAt?, val handled: Record?)
 private fun InsulinRow(line: InsulinLine, large: Boolean, labelWidth: androidx.compose.ui.unit.Dp, more: @Composable () -> Unit, onGive: (Boolean) -> Unit, onEdit: (Record) -> Unit, onSetup: () -> Unit) {
     val label = @Composable {
         Row(
-            Modifier.then(if (large) Modifier else Modifier.width(labelWidth)).semantics(mergeDescendants = true) { heading() },
+            Modifier.then(if (large) Modifier else Modifier.widthIn(min = labelWidth)).semantics(mergeDescendants = true) { heading() },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.Vaccines, null, Modifier.size(22.dp), tint = OkcheColor.NamsaekDeep)
+            Icon(Icons.Outlined.Science, null, Modifier.size(22.dp), tint = OkcheColor.NamsaekDeep)
             Text("인슐린", color = OkcheColor.NamsaekDeep, style = OkcheType.Body.toTextStyle(FontWeight.Bold), softWrap = false)
         }
     }
@@ -643,16 +651,21 @@ private fun InsulinRow(line: InsulinLine, large: Boolean, labelWidth: androidx.c
         val handled = line.handled
         if (slot == null) {
             Text(
-                "인슐린 설정이 없어요 · 설정하기 ›",
-                modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onSetup).wrapContentHeight(Alignment.CenterVertically),
-                color = OkcheColor.Namsaek, style = OkcheType.Label.toTextStyle(),
+                buildAnnotatedString {
+                    append("인슐린 설정이 없어요 · ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = OkcheColor.Namsaek)) { append("설정하기 ›") }
+                },
+                modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onSetup)
+                    .semantics { contentDescription = "인슐린 설정이 없어요, 설정하기" }.wrapContentHeight(Alignment.CenterVertically),
+                color = OkcheColor.InkMuted, style = OkcheType.Label.toTextStyle(FontWeight.Normal),
             )
         } else if (handled == null) {
             val units = medNumber(slot.units)
             val clock = spokenTime(slot.occurrence)
-            FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                QuickButton("✓ 맞음 · ${units}단위", "인슐린 $clock · ${units}단위 맞음 · 바로 기록", softWrap = false) { onGive(false) }
-                QuickButton("건너뜀", "인슐린 $clock 건너뜀 · 바로 기록", softWrap = false) { onGive(true) }
+            // 360dp에서 한 줄에 들게 이 두 버튼만 사이 4·옆 여백 6.
+            FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                QuickButton("✓ 맞음 · ${units}단위", "인슐린 $clock · ${units}단위 맞음 · 바로 기록", softWrap = false, padding = 6.dp) { onGive(false) }
+                QuickButton("건너뜀", "인슐린 $clock 건너뜀 · 바로 기록", softWrap = false, padding = 6.dp) { onGive(true) }
             }
         } else {
             val skipped = insulinStatus(handled) == "skipped"
@@ -699,7 +712,10 @@ private fun InsulinRow(line: InsulinLine, large: Boolean, labelWidth: androidx.c
 
 /** 바로 기록 버튼(높이 44). [filled]면 남색 채움·흰 굵은 글자(혈당 '남기기' — 탕약 '✓' 버튼 모양), 못 누르면 회색. */
 @Composable
-private fun QuickButton(title: String, label: String, softWrap: Boolean = true, filled: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+private fun QuickButton(
+    title: String, label: String, softWrap: Boolean = true, filled: Boolean = false, enabled: Boolean = true,
+    padding: androidx.compose.ui.unit.Dp = if (filled) 12.dp else 8.dp, onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(OkcheRadius.RadiusMd)
     Box(
         Modifier
@@ -712,7 +728,7 @@ private fun QuickButton(title: String, label: String, softWrap: Boolean = true, 
             )
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label }
-            .padding(horizontal = if (filled) 12.dp else 8.dp),
+            .padding(horizontal = padding),
         contentAlignment = Alignment.Center,
     ) {
         Text(

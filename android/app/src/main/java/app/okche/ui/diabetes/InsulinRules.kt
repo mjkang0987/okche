@@ -30,6 +30,11 @@ fun insulinSlotAt(plan: InsulinPlan, at: Long, zone: ZoneId = ZoneId.systemDefau
     return InsulinSlotAt(time, slot.units, start, end, occurrence, "${plan.id}|${OkcheDay.of(occurrence, zone)}|$time")
 }
 
+/** [at]에 쓰던 인슐린 계획(7장): 지우지 않은 그 아이 계획 중 `activeFrom <= at < (activeUntil ?: ∞)`, 늦은 `activeFrom`, 같으면 늦은 `updatedAt`. */
+fun insulinPlanAt(plans: List<InsulinPlan>, petId: String, at: Long): InsulinPlan? =
+    plans.filter { it.petId == petId && it.deletedAt == null && it.activeFrom <= at && (it.activeUntil ?: Long.MAX_VALUE) > at }
+        .maxWithOrNull(compareBy<InsulinPlan> { it.activeFrom }.thenBy { it.updatedAt })
+
 private fun json(r: Record) = runCatching { JSONObject(r.data) }.getOrNull()
 
 fun insulinStatus(r: Record): String? = json(r)?.optString("status")?.takeIf { it in setOf("full", "partial", "skipped") }
@@ -69,14 +74,16 @@ fun insulinData(planId: String?, units: Double, status: String, mealBefore: Stri
     }.toString()
 
 /**
- * 인슐린 남기기(일기 '맞음'·'건너뜀'과 시트 '기록하기'). 차례 = 시각이 든 구간의 차례([plan]이 없으면 `planId`·`slotKey` 없음).
- * 고치기는 같은 기록의 `data`·`slotKey`(시간을 바꿨으면 `occurredAt`·`day`도)·`updatedAt` — 계획이 없으면 기록의 계획·차례 그대로.
+ * 인슐린 남기기(일기 '맞음'·'건너뜀'과 시트 '기록하기'). 차례 = 그 시각에 쓰던 계획([insulinPlanAt])의, 시각이 든 구간의 차례(없으면 `planId`·`slotKey` 없음).
+ * 고치기는 같은 기록의 `data`·`slotKey`(시간을 바꿨으면 `occurredAt`·`day`도)·`updatedAt`. 시간을 안 바꿨거나 그 시각 차례가 없으면 기록의 계획·차례 그대로
+ * (오늘 양을 바꿔 계획이 갈려도 어제 기록은 옛 계획으로 남게).
  */
 suspend fun saveInsulin(
-    dao: OkcheDao, petId: String?, plan: InsulinPlan?, units: Double, status: String, mealBefore: String?, occurredAt: Long,
+    dao: OkcheDao, petId: String?, plans: List<InsulinPlan>, units: Double, status: String, mealBefore: String?, occurredAt: Long,
     editing: Record? = null, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault(),
 ): Record {
     val at = minOf(occurredAt, now) // 지금보다 뒤는 안 됨
+    val plan = if (editing != null && at == editing.occurredAt) null else petId?.let { insulinPlanAt(plans, it, at) }
     val slot = plan?.let { insulinSlotAt(it, at, zone) }
     val planId = if (slot != null && plan != null) plan.id else editing?.let { json(it)?.optString("planId")?.takeIf(String::isNotEmpty) }
     val slotKey = if (slot != null) slot.key else editing?.slotKey

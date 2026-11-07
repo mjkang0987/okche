@@ -7,9 +7,13 @@ struct SillokTab: View {
     @Query(filter: #Predicate<Pet> { $0.deletedAt == nil }, sort: \Pet.createdAt) private var pets: [Pet]
     @AppStorage("lastPetId") private var lastPetId = ""
 
-    // '콩이실록'(이름 + 실록, 호칭 없음 — 보드 `Sillok`). 아이가 없으면 '실록'.
+    // 아이가 있으면 실록(10-1, 머리 '콩이실록'은 남색 금테 카드 — 보드 `Sillok`), 없으면 '실록' 빈 탭 머리.
     var body: some View {
-        TabScreen(title: PetTitle.current(pets, lastPetId: lastPetId).map { "\($0.name)실록" } ?? "실록", trailing: { PetSeal() })
+        if let pet = PetTitle.current(pets, lastPetId: lastPetId) {
+            SillokView(pet: pet)
+        } else {
+            TabScreen(title: "실록", trailing: { PetSeal() })
+        }
     }
 }
 

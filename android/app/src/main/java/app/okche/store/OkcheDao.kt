@@ -79,6 +79,8 @@ abstract class OkcheDao {
     @Query("SELECT * FROM food_change WHERE deleted_at IS NULL") abstract suspend fun foodChanges(): List<FoodChange>
     @Query("SELECT * FROM food_change WHERE deleted_at IS NULL") abstract fun foodChangesFlow(): Flow<List<FoodChange>>
     @Query("SELECT * FROM food WHERE deleted_at IS NULL") abstract fun foodsFlow(): Flow<List<Food>>
+    /** 지운 사료도(이름은 남음 — 1-4): 실록 '바뀐 것' 글. */
+    @Query("SELECT * FROM food") abstract fun allFoodsFlow(): Flow<List<Food>>
     @Query("SELECT * FROM food WHERE deleted_at IS NULL AND name = :name LIMIT 1") protected abstract suspend fun foodNamed(name: String): Food?
 
     /** 사료 바꾸기 저장: 같은 이름 사료가 있으면 그 사료, 없으면 새 사료 + 바꾸기 줄(한 번에). */
@@ -240,6 +242,13 @@ abstract class OkcheDao {
         deletePhotosOnlyOf(petId, now)
         deletePhotoLinks(petId, now)
     }
+
+    /** 실록(10-1): 그 아이의 [from]..[to] 날(6시 기준) 지우지 않은 기록 — 보는 기간과 직전 기간을 한 번에. */
+    @Query("SELECT * FROM record WHERE pet_id = :petId AND day BETWEEN :from AND :to AND deleted_at IS NULL")
+    abstract fun petRecordsFlow(petId: String, from: String, to: String): Flow<List<Record>>
+
+    /** 실록 끼니 분모(6-3): 그 아이의 휴양 기간 전부(끝난 것 포함). */
+    @Query("SELECT * FROM rest_period WHERE pet_id = :petId AND deleted_at IS NULL") abstract fun petRestPeriodsFlow(petId: String): Flow<List<RestPeriod>>
 
     /** 그날(6시 기준) 지우지 않은 기록, 늦은 것 위 — 기록 목록(7-1). */
     @Query("SELECT * FROM record WHERE day = :day AND deleted_at IS NULL ORDER BY occurred_at DESC")

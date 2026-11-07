@@ -372,7 +372,8 @@ private fun RootTabsContent(
                     onOpenSura = { id -> suraFor = id; suraOpen = true },
                 )
             }
-            Tab.Sillok -> SillokTab(modifier, current?.name, seal)
+            // 아이가 있으면 실록(10-1), 없으면 빈 탭 머리.
+            Tab.Sillok -> if (current != null) app.okche.ui.sillok.SillokScreen(current, modifier, seal) else SillokTab(modifier, null, seal)
             Tab.Album -> AlbumTab(modifier, seal)
             Tab.More -> MoreTab(modifier) {
                 if (pets != null) PetManageSection(pets, restingIds, onEditPet = { editPetId = it }, onRegister = { registering = true })

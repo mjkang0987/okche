@@ -79,8 +79,9 @@ struct InsulinSetupView: View {
                 }
         }
         .background(OkcheColor.hanji)
-        .fullScreenCover(isPresented: $asking) {
-            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false; dismiss() }
+        // 화면 닫기는 창이 다 닫힌 뒤에.
+        .fullScreenCover(isPresented: $asking, onDismiss: { dismiss() }) {
+            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false }
         }
         .transaction { $0.disablesAnimations = asking }
         .toolbar(.hidden, for: .navigationBar)

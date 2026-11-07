@@ -192,7 +192,9 @@ private fun RootTabsContent(
     androidx.compose.runtime.LaunchedEffect(openInsulinPetId, pets != null) {
         if (openInsulinPetId == null || pets == null) return@LaunchedEffect
         if (pets.any { it.id == openInsulinPetId && it.memorializedAt == null }) {
-            // 일기 탭이 보이게 그 앞에 그려지는 화면들은 닫는다(남은 약 알림과 같은 것 + 수라·기록 목록·다과).
+            // 일기 탭이 보이게 그 앞에 그려지는 화면들은 닫는다(남은 약 알림과 같은 것 + 수라·기록 목록·다과·아이 바꾸기 시트).
+            // 입력 중인 화면(아이 정보·인슐린 설정·아이 등록)은 그대로 — 남은 약 알림과 같이 입력을 잃지 않게.
+            switching = false
             medEditId = null
             medAddOpen = false
             tangyakOpen = false

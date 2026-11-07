@@ -100,6 +100,7 @@ enum MedNotify {
             guard let plan = GlucoseRules.openPlan(plans, petId: pet.id) else { continue }
             let petRests = rests.filter { $0.petId == pet.id && $0.deletedAt == nil }
             // 다시 알림(최대 1시간 뒤)이 아직 남은 지난 차례부터 구간을 하나씩 넘김 — 차례 − 1시간이 구간 시작.
+            // shortcut: 맞혔는지는 그 차례 구간 안 기록으로만 본다 — 두 차례가 다시 알림 분보다 가까우면(08:00·08:30에 1시간 뒤) 다시 알림이 어긋날 수 있음, 그런 계획이 생기면 다시 알림은 차례 시각 이후 기록으로 본다.
             var cursor = now.addingTimeInterval(-3 * 3600)
             while let w = GlucoseRules.window(plan, now: cursor), w.start <= end {
                 cursor = w.end

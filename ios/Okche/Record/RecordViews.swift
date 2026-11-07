@@ -126,9 +126,11 @@ struct RecordTab: View {
             guard let id else { return }
             router.insulinPetId = nil
             guard chipPets.contains(where: { $0.id == id }) else { return }
+            // 오늘 먹일 약 시트는 닫는다. 입력 중인 시트(자세히·인슐린 설정)는 그대로 — 남은 약 알림과 같이 입력을 잃지 않게.
             unknownPicked = false
             lastPetId = id.uuidString
             path = []
+            medSheet = nil
             clock = .now
         }
         .task(id: insulinWindowEnd) {

@@ -69,8 +69,9 @@ struct PetRegisterView: View {
                 }
         }
         .background(OkcheColor.hanji)
-        .fullScreenCover(isPresented: $asking) {
-            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false; checking = false; commit() }
+        // 저장(시작하기면 탭으로 바뀜)·닫기는 창이 다 닫힌 뒤에.
+        .fullScreenCover(isPresented: $asking, onDismiss: { checking = false; commit() }) {
+            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false }
         }
         .transaction { $0.disablesAnimations = asking }
         // 숫자 자판에는 리턴 키가 없어 닫는 버튼을 붙인다.

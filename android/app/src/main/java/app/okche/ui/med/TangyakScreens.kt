@@ -354,8 +354,45 @@ internal var notifyAskOn = true
 
 /** 알림 켠 약을 저장했고 안드로이드 13 이상에서 아직 허락도, 안내 창도 없었으면 안내 창(8-4 '허락'). */
 private suspend fun shouldAskNotify(context: android.content.Context, f: ScheduleFields): Boolean =
-    notifyAskOn && f.reminder && f.frequency != MedFrequency.asNeeded && (needsNotifyPermission(context) || needsExactAlarm(context)) &&
-        !context.notifyAsked()
+    f.reminder && f.frequency != MedFrequency.asNeeded && shouldAskNotify(context)
+
+/** 아직 알림 허락이나 '알람 및 리마인더'가 없고, 안내 창을 띄운 적도 없으면 참(8-4b·9-3 인슐린도 같음). */
+internal suspend fun shouldAskNotify(context: android.content.Context): Boolean =
+    notifyAskOn && (needsNotifyPermission(context) || needsExactAlarm(context)) && !context.notifyAsked()
+
+/**
+ * 허락 안내 창(보드 NotifyAsk) 자리 — 허락 창의 답을 받으려고 화면에 늘 둔다. [asking]이 참이면 창을 띄우고,
+ * '나중에'·바깥·뒤로면 바로, '계속하기'면 허락 창(그다음 '알람 및 리마인더'가 꺼져 있으면 그 설정 화면)을 거쳐 [onDone].
+ * 안내 창을 띄울 때 부르는 쪽이 `setNotifyAsked(true)`로 표시한다(한 번만 묻기).
+ */
+@Composable
+internal fun NotifyAskHost(asking: androidx.compose.runtime.MutableState<Boolean>, title: String, onDone: () -> Unit) {
+    val context = LocalContext.current
+    // 알림 허락 다음 '알람 및 리마인더'가 꺼져 있으면 그 설정 화면으로 — 돌아오면 다시 걸기(onResume)가 정시로 건다.
+    fun exactThenDone() {
+        if (needsExactAlarm(context)) {
+            runCatching {
+                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}")))
+            }
+        }
+        onDone()
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { exactThenDone() }
+    // 바깥을 누르거나 뒤로 가면 '나중에'와 같음.
+    if (asking.value) {
+        app.okche.ui.OkcheConfirmDialog(
+            title, "계속하기",
+            onCancel = { asking.value = false; onDone() },
+            onConfirm = {
+                asking.value = false
+                if (needsNotifyPermission(context)) permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else exactThenDone()
+            },
+            text = "알림을 허락하면 정해 둔 시간에 탕약 알림이 와요. 다음 창에서 '허용'을 눌러 주세요.",
+            message = "나중에 휴대폰 설정에서도 켤 수 있어요.",
+            cancel = "나중에",
+        )
+    }
+}
 
 private fun needsNotifyPermission(context: android.content.Context) = android.os.Build.VERSION.SDK_INT >= 33 &&
     context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -430,18 +467,9 @@ fun MedAddScreen(
         touched = touched + "med" + "dose"
     }
 
-    var asking by rememberSaveable { mutableStateOf(false) }
     // 허락 창의 답과 상관없이 약은 이미 저장됨 — 답이 오면 저장 뒤처럼 나감.
-    // 알림 허락 다음 '알람 및 리마인더'가 꺼져 있으면 그 설정 화면으로 — 돌아오면 다시 걸기(onResume)가 정시로 건다.
-    fun exactThenBack() {
-        if (needsExactAlarm(context)) {
-            runCatching {
-                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}")))
-            }
-        }
-        onBack()
-    }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { exactThenBack() }
+    val askingState = rememberSaveable { mutableStateOf(false) }
+    var asking by askingState
 
     fun save() {
         if (busy || missing != null) return
@@ -459,20 +487,7 @@ fun MedAddScreen(
         }
     }
 
-    // 허락 안내 창(보드 NotifyAsk): 바깥을 누르거나 뒤로 가면 '나중에'와 같음.
-    if (asking) {
-        app.okche.ui.OkcheConfirmDialog(
-            "약 먹일 시간을 알려 드릴까요?", "계속하기",
-            onCancel = { asking = false; onBack() },
-            onConfirm = {
-                asking = false
-                if (needsNotifyPermission(context)) permission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else exactThenBack()
-            },
-            text = "알림을 허락하면 정해 둔 시간에 탕약 알림이 와요. 다음 창에서 '허용'을 눌러 주세요.",
-            message = "나중에 휴대폰 설정에서도 켤 수 있어요.",
-            cancel = "나중에",
-        )
-    }
+    NotifyAskHost(askingState, "약 먹일 시간을 알려 드릴까요?", onBack)
 
     if (adding) MedFormSheet(null, pets, records, picking = true, onAdded = { pick(it) }) { adding = false }
     val toasts = app.okche.ui.LocalUndoToasts.current

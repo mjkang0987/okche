@@ -66,6 +66,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.okche.store.OkcheDatabase
 import app.okche.store.Pet
+import app.okche.store.setNotifyAsked
 import app.okche.store.Sex
 import app.okche.store.Species
 import app.okche.store.Syringe
@@ -439,13 +440,22 @@ internal fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
     LaunchedEffect(petId) { if (form == null) form = InsulinSetupForm.load(dao, petId) }
     val anchors = remember { Anchors() }
     val scope = rememberCoroutineScope()
+    /** 알림을 켠 채 저장하면 허락 안내 창(NotifyAsk, 9-3) — 계획은 이미 저장됨, 답이 오면 닫음. */
+    val asking = rememberSaveable { mutableStateOf(false) }
     val result = saver.result
     LaunchedEffect(result) {
         if (result == null) return@LaunchedEffect
         failed = "save" in result
         touched = touched + result.keys
         saver.consume()
-        if (result.isEmpty()) onClose()
+        if (result.isEmpty()) {
+            if (form?.notify == true && runCatching { app.okche.ui.med.shouldAskNotify(context) }.getOrDefault(false)) {
+                runCatching { context.setNotifyAsked(true) }
+                asking.value = true
+            } else {
+                onClose()
+            }
+        }
     }
     val close = {
         if (!saver.saving) {
@@ -500,8 +510,17 @@ internal fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
                 )
             }
             OkcheSwitchRow("인슐린 시간 알림", "끄면 모든 아이의 인슐린 알림이 멈춰요", f.notify, { edit { copy(notify = it) } })
-            OkcheSwitchRow("밤에도 울리기", "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요", f.ringDuringQuiet, { edit { copy(ringDuringQuiet = it) } })
-            app.okche.ui.OkcheMenuPicker("알림 보낼 때", insulinLeadChoices, f.leadMinutes, { edit { copy(leadMinutes = it) } })
+            // 알림을 끄면 밤에도 울리기·알림 보낼 때·다시 알림은 숨김(9-3).
+            if (f.notify) {
+                OkcheSwitchRow("밤에도 울리기", "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요", f.ringDuringQuiet, { edit { copy(ringDuringQuiet = it) } })
+                // 두 칸을 같이 옆으로/아래로(약 추가와 같음).
+                val inline = androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.1f
+                app.okche.ui.OkcheMenuPicker("알림 보낼 때", insulinLeadChoices, f.leadMinutes, { edit { copy(leadMinutes = it) } }, inline = inline)
+                app.okche.ui.OkcheMenuPicker(
+                    "안 맞혔으면 다시 알림", app.okche.ui.med.againChoices, f.remindAgainMinutes, { edit { copy(remindAgainMinutes = it) } },
+                    inline = inline,
+                )
+            }
             SourceNote(DIABETES_SOURCE)
         }
         OkcheFooter {
@@ -515,5 +534,6 @@ internal fun InsulinSetupScreen(petId: String, onClose: () -> Unit) {
             }
         }
     }
+    app.okche.ui.med.NotifyAskHost(asking, "인슐린 맞을 시간을 알려 드릴까요?", onClose)
 }
 

@@ -1,14 +1,18 @@
 package app.okche
 
 import app.okche.notify.MedAlertKind
+import app.okche.notify.insulinAlerts
 import app.okche.notify.medAlerts
 import app.okche.store.DoseUnit
+import app.okche.store.InsulinPlan
+import app.okche.store.InsulinSlot
 import app.okche.store.MedCategory
 import app.okche.store.MedForm
 import app.okche.store.MedFrequency
 import app.okche.store.MedSchedule
 import app.okche.store.Medication
 import app.okche.store.Pet
+import app.okche.store.QuietHours
 import app.okche.store.Record
 import app.okche.store.RecordKind
 import app.okche.store.RestPeriod
@@ -16,6 +20,7 @@ import app.okche.store.Species
 import app.okche.store.newId
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,7 +45,8 @@ class MedNotifyTest {
     private val bori = pet("보리", at(2, 9))
 
     private fun alerts(rows: List<MedSchedule>, meds: List<Medication>, records: List<Record> = emptyList(), pets: List<Pet> = listOf(kong, bori),
-                       rests: List<RestPeriod> = emptyList(), on: Boolean = true) = medAlerts(rows, records, pets, rests, meds, on, now)
+                       rests: List<RestPeriod> = emptyList(), on: Boolean = true, insulinExtra: List<app.okche.notify.MedAlert> = emptyList()) =
+        medAlerts(rows, records, pets, rests, meds, on, now, extra = insulinExtra)
 
     @Test fun leadAndWindow() {
         val p = med("프레드니솔론")
@@ -117,5 +123,84 @@ class MedNotifyTest {
         // 초가 붙은 차례(12:30:12)도 분 단위로 내려 울림.
         val odd = alerts(listOf(row(kong, p, emptyList(), lead = 0, freq = MedFrequency.everyNHours, hours = 8, firstAt = at(27, 12, 30) + 12_345)), listOf(p))
         assertEquals(at(27, 12, 30), odd.first().fireAt)
+    }
+
+    // 인슐린 알림(9-3) — iOS MedNotifyTests의 인슐린 경우와 같음.
+
+    private fun insulinPlan(
+        pet: Pet, times: List<Pair<String, Double>> = listOf("08:00" to 2.0, "20:00" to 1.5), lead: Int = 10, again: Int = 0, ringDuringQuiet: Boolean = true,
+    ) = InsulinPlan(
+        petId = pet.id, slots = times.map { InsulinSlot(it.first, it.second) }, ringDuringQuiet = ringDuringQuiet,
+        leadMinutes = lead, remindAgainMinutes = again, activeFrom = at(20, 9),
+    )
+    private fun insulin(
+        plans: List<InsulinPlan>, records: List<Record> = emptyList(), pets: List<Pet> = listOf(kong, bori), rests: List<RestPeriod> = emptyList(),
+        on: Boolean = true, quiet: QuietHours? = null, at: Long = now,
+    ) = insulinAlerts(plans, records, pets, rests, on, quiet, at)
+    private fun shot(pet: Pet, status: String, time: Long) =
+        Record(petId = pet.id, kind = RecordKind.insulin, occurredAt = time, data = JSONObject().put("status", status).put("units", 2).toString())
+
+    @Test fun insulinLeadAndWindow() {
+        val list = insulin(listOf(insulinPlan(kong)))
+        // 27일 12시부터 72시간: 27일 20:00, 28·29일 08:00·20:00, 30일 08:00 − 10분. 30일 20:00은 창 밖.
+        assertEquals(listOf(at(27, 19, 50), at(28, 7, 50), at(28, 19, 50), at(29, 7, 50), at(29, 19, 50), at(30, 7, 50)), list.map { it.fireAt })
+        assertEquals("인슐린 · 오후 8:00", list.first().title)
+        assertEquals("콩이 1.5단위", list.first().body)
+        assertEquals(MedAlertKind.insulinDue, list.first().kind)
+        assertEquals(kong.id, list.first().petId)
+        assertEquals("insulin.due.${at(27, 19, 50) / 1000}", list.first().id)
+        assertTrue(insulin(listOf(insulinPlan(kong)), on = false).isEmpty())
+    }
+
+    @Test fun insulinHandledRestAndGone() {
+        val p = insulinPlan(kong)
+        // 저녁 구간(19:00~)에 미리 맞혔거나 건너뛰었으면 그 차례는 빠짐.
+        assertEquals(at(28, 7, 50), insulin(listOf(p), records = listOf(shot(kong, "full", at(27, 19, 10)))).first().fireAt)
+        assertEquals(at(28, 7, 50), insulin(listOf(p), records = listOf(shot(kong, "skipped", at(27, 19, 10)))).first().fireAt)
+        // 다른 아이 기록·구간 밖 기록은 상관없음.
+        assertEquals(at(27, 19, 50), insulin(listOf(p), records = listOf(shot(bori, "full", at(27, 19, 10)), shot(kong, "full", at(27, 9)))).first().fireAt)
+        // 휴양 중(28일 9시 끝)이면 그 안 차례 빠짐.
+        val rest = RestPeriod(petId = kong.id, startedAt = at(26, 9), endedAt = at(28, 9))
+        assertEquals(at(28, 19, 50), insulin(listOf(p), rests = listOf(rest)).first().fireAt)
+        val gone = pet("별이", at(3, 9), memorial = at(4, 9))
+        assertTrue(insulin(listOf(insulinPlan(gone)), pets = listOf(gone)).isEmpty())
+        // 닫힌 계획은 안 울림.
+        assertTrue(insulin(listOf(insulinPlan(kong).copy(activeUntil = at(25, 9)))).isEmpty())
+    }
+
+    @Test fun insulinAgainQuietAndGrouping() {
+        // 다시 알림 30분: 차례 + 30분 '아직 인슐린 기록이 없어요'.
+        val again = insulin(listOf(insulinPlan(kong, again = 30))).first { it.kind == MedAlertKind.insulinAgain }
+        assertEquals(at(27, 20, 30), again.fireAt)
+        assertEquals("아직 인슐린 기록이 없어요", again.title)
+        assertEquals("콩이 1.5단위", again.body)
+        // 08:30에 다시 걸면 막 지난 08:00 차례는 다시 알림(1시간 뒤 09:00)만 남음.
+        val late = insulin(listOf(insulinPlan(kong, again = 60)), at = at(27, 8, 30)).first()
+        assertEquals(MedAlertKind.insulinAgain, late.kind)
+        assertEquals(at(27, 9), late.fireAt)
+        // 밤 알림 쉬기(22:00~08:00) 안 07:50은 '밤에도 울리기'를 끈 계획만 빠짐.
+        val quiet = QuietHours(enabled = true, start = "22:00", end = "08:00")
+        assertTrue(insulin(listOf(insulinPlan(kong, ringDuringQuiet = true)), quiet = quiet).any { it.fireAt == at(28, 7, 50) })
+        assertFalse(insulin(listOf(insulinPlan(kong, ringDuringQuiet = false)), quiet = quiet).any { it.fireAt == at(28, 7, 50) })
+        assertTrue(insulin(listOf(insulinPlan(kong, ringDuringQuiet = false)), quiet = quiet).any { it.fireAt == at(27, 19, 50) })
+        // 같은 시각 두 아이는 하나로(먼저 모신 아이부터).
+        val both = insulin(listOf(insulinPlan(bori, listOf("20:00" to 1.0)), insulinPlan(kong)))
+        assertEquals("콩이 1.5단위 · 보리 1단위", both.first().body)
+        assertEquals(kong.id, both.first().petId)
+    }
+
+    /** 탕약과 같은 시각이어도 따로, 합쳐 63개 + 이어짐 하나. 탕약 알림을 꺼도 인슐린은 그대로. */
+    @Test fun insulinWithMed() {
+        val p = med("프레드니솔론")
+        val shots = insulin(listOf(insulinPlan(kong)))
+        val merged = alerts(listOf(row(kong, p, listOf("20:00"))), listOf(p), insulinExtra = shots)
+        assertEquals(listOf(MedAlertKind.due, MedAlertKind.insulinDue), merged.filter { it.fireAt == at(27, 19, 50) }.map { it.kind })
+        assertEquals(MedAlertKind.more, merged.last().kind)
+        assertEquals(shots.map { it.id }, alerts(listOf(row(kong, p, listOf("20:00"))), listOf(p), on = false, insulinExtra = shots)
+            .filter { it.kind != MedAlertKind.more }.map { it.id })
+        val hourly = row(kong, p, emptyList(), lead = 0, freq = MedFrequency.everyNHours, hours = 1, firstAt = at(27, 12, 30))
+        val capped = alerts(listOf(hourly), listOf(p), insulinExtra = shots)
+        assertEquals(64, capped.size)
+        assertEquals(shots.count { it.fireAt <= capped[62].fireAt }, capped.count { it.kind == MedAlertKind.insulinDue })
     }
 }

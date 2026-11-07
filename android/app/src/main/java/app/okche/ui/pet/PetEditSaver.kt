@@ -171,6 +171,8 @@ data class InsulinSetupForm(
     /** 밤에도 울리기 — 디자인 처음 값 켜짐 */
     val ringDuringQuiet: Boolean = true,
     val leadMinutes: Int = 10,
+    /** 안 맞혔으면 다시 알림(9-3) — 고르는 값은 탕약과 같음 */
+    val remindAgainMinutes: Int = 0,
 ) : Serializable {
     companion object {
         /** 열린 계획이 있으면 그 값, 없으면 아이 등록과 같은 처음 값. */
@@ -181,13 +183,14 @@ data class InsulinSetupForm(
                 petId = petId, name = plan.name.orEmpty(), syringe = plan.syringe,
                 rows = plan.slots.map { InsulinRow(it.time, BigDecimal.valueOf(it.units).stripTrailingZeros().toPlainString()) },
                 notify = notify, ringDuringQuiet = plan.ringDuringQuiet, leadMinutes = plan.leadMinutes,
+                remindAgainMinutes = plan.remindAgainMinutes,
             )
         }
     }
 }
 
 /**
- * 인슐린 설정 저장. 시간·양이 바뀌면 열린 계획을 모두 닫고 새 계획, 이름·주사기·밤에도 울리기·몇 분 전만 바뀌면 그 계획을 고친다(문서 7장·5장).
+ * 인슐린 설정 저장. 시간·양이 바뀌면 열린 계획을 모두 닫고 새 계획, 이름·주사기·밤에도 울리기·몇 분 전·다시 알림만 바뀌면 그 계획을 고친다(문서 7장·5장).
  * 인슐린을 설정했으면 당뇨 아이로 둔다. 오류 열쇠는 time{i}·units{i}·insulinRows·save, 저장되면 빈 맵.
  */
 suspend fun saveInsulinSetup(dao: OkcheDao, form: InsulinSetupForm, now: Long = System.currentTimeMillis()): Map<String, String> {
@@ -201,13 +204,17 @@ suspend fun saveInsulinSetup(dao: OkcheDao, form: InsulinSetupForm, now: Long = 
         var updates = emptyList<InsulinPlan>()
         var newPlan: InsulinPlan? = null
         if (current != null && current.slots.sortedBy { it.time } == slots) {
-            val edited = current.copy(name = name, syringe = form.syringe, ringDuringQuiet = form.ringDuringQuiet, leadMinutes = form.leadMinutes)
+            val edited = current.copy(
+                name = name, syringe = form.syringe, ringDuringQuiet = form.ringDuringQuiet, leadMinutes = form.leadMinutes,
+                remindAgainMinutes = form.remindAgainMinutes,
+            )
             if (edited != current) updates = listOf(edited.copy(updatedAt = now))
         } else {
             updates = plans.map { it.copy(activeUntil = now, updatedAt = now) }
             newPlan = InsulinPlan(
                 createdAt = now, petId = pet.id, name = name, syringe = form.syringe, slots = slots,
-                ringDuringQuiet = form.ringDuringQuiet, leadMinutes = form.leadMinutes, activeFrom = now,
+                ringDuringQuiet = form.ringDuringQuiet, leadMinutes = form.leadMinutes, remindAgainMinutes = form.remindAgainMinutes,
+                activeFrom = now,
             )
         }
         dao.saveInsulinSetup(updates, newPlan, pet.takeIf { !it.hasDiabetes }?.copy(hasDiabetes = true, updatedAt = now), form.notify, now)

@@ -1,5 +1,6 @@
 package app.okche.notify
 
+import app.okche.store.InsulinPlan
 import app.okche.store.MedFrequency
 import app.okche.store.MedSchedule
 import app.okche.store.Medication
@@ -7,33 +8,56 @@ import app.okche.store.OkcheDay
 import app.okche.store.Pet
 import app.okche.store.Record
 import app.okche.store.RestPeriod
+import app.okche.ui.diabetes.insulinHandled
+import app.okche.ui.diabetes.insulinSlotAt
+import app.okche.ui.diabetes.insulinWindow
+import app.okche.ui.diabetes.openInsulinPlan
 import app.okche.ui.med.amountText
+import app.okche.ui.med.medNumber
 import app.okche.ui.med.clockText
 import app.okche.ui.med.daysLeft
 import app.okche.ui.med.withSubjectParticle
 import app.okche.store.QuietHours
 import app.okche.ui.med.remainingSlots
 import app.okche.ui.record.shiftDay
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-// 탕약 알림 목록 계산(plan.md 8-4a 계산 규칙, 데이터 5장 `leadMinutes`·`remindAgainMinutes`). 휴대폰에 거는 일은 8-4b.
+// 탕약·인슐린 알림 목록 계산(plan.md 8-4a·9-3 계산 규칙, 데이터 5장·7장 `leadMinutes`·`remindAgainMinutes`). 휴대폰에 거는 일은 8-4b.
 
-enum class MedAlertKind { due, again, more, low }
+enum class MedAlertKind {
+    due, again, more, low, insulinDue, insulinAgain;
+
+    /** 인슐린 알림 — 누르면 일기 탭에 그 아이(9-3). */
+    val isInsulin get() = this == insulinDue || this == insulinAgain
+
+    /** 같은 시각이면 탕약 → 인슐린 → 다시 알림 순(iOS와 같게, 63개 경계에서 빠지는 것도 같게). */
+    val order get() = when (this) {
+        due -> 0
+        insulinDue -> 1
+        again -> 2
+        else -> 3
+    }
+}
 
 data class MedAlert(val id: String, val kind: MedAlertKind, val fireAt: Long, val title: String, val body: String, val petId: String?, val medId: String? = null)
 
 private const val MINUTE = 60_000L
+private const val HOUR = 3_600_000L
 private const val WINDOW = 72 * 3_600_000L
 internal const val LIMIT = 63
 
-/** 오늘(6시 기준)부터 3일 뒤까지 남은 차례의 알림. 같은 시각·같은 종류는 하나로, 이른 것부터 [limit]개(처음 값 63) + 이어짐 알림. 밤 알림 쉬기와 상관없음. */
+/**
+ * 오늘(6시 기준)부터 3일 뒤까지 남은 차례의 알림. 같은 시각·같은 종류는 하나로, 이른 것부터 [limit]개(처음 값 63) + 이어짐 알림. 밤 알림 쉬기와 상관없음.
+ * [extra](인슐린 알림 — [insulinAlerts])도 함께 이른 것부터 자른다(9-3, 합쳐 63개). 탕약 알림을 꺼도 [extra]는 그대로.
+ */
 fun medAlerts(
     schedules: List<MedSchedule>, medRecords: List<Record>, pets: List<Pet>, rests: List<RestPeriod>, meds: List<Medication>,
-    medTimeOn: Boolean, now: Long, zone: ZoneId = ZoneId.systemDefault(), limit: Int = LIMIT,
+    medTimeOn: Boolean, now: Long, zone: ZoneId = ZoneId.systemDefault(), limit: Int = LIMIT, extra: List<MedAlert> = emptyList(),
 ): List<MedAlert> {
-    if (!medTimeOn) return emptyList()
+    val pets = if (medTimeOn) pets else emptyList()
     val today = OkcheDay.of(now, zone)
     // 넷째 날 새벽 차례도 몇 분 전이면 72시간 안에 울릴 수 있어 하루 더 본다(창 밖은 아래에서 거름).
     val days = (0L..4L).map { shiftDay(today, it) }
@@ -70,10 +94,58 @@ fun medAlerts(
             val title = if (kind == MedAlertKind.due) "탕약 · " + clockText(entries.minOf { it.due }, zone) else "아직 안 준 약이 있어요"
             MedAlert("med.${kind.name}.${fireAt / 1000}", kind, fireAt, title, body, entries.first().pet.id)
         }
-        .sortedWith(compareBy({ it.fireAt }, { it.kind.ordinal }))
+        .plus(extra)
+        .sortedWith(compareBy({ it.fireAt }, { it.kind.order }))
         .take(limit.coerceAtLeast(0))
     val last = alerts.lastOrNull() ?: return alerts
     return alerts + MedAlert("med.more", MedAlertKind.more, last.fireAt + MINUTE, "옥체", "옥체를 열면 알림이 이어져요", null)
+}
+
+/**
+ * 인슐린 알림(plan.md 9-3, 데이터 7장): 아이마다 쓰는 계획(열린 줄)의 앞으로 차례에 '차례 − `leadMinutes`', 다시 알림이 있으면 '차례 + `remindAgainMinutes`'.
+ * 차례 구간에 그 아이의 인슐린 기록(건너뜀 포함)이 있으면 둘 다 빠짐(미리 맞힌 경우). 휴양 중·추억·지운 아이 빠짐,
+ * 밤 알림 쉬기 시간이면 계획의 `ringDuringQuiet`일 때만. 같은 시각·종류는 하나로. iOS `MedNotify.insulinAlerts`와 같음.
+ */
+fun insulinAlerts(
+    plans: List<InsulinPlan>, insulinRecords: List<Record>, pets: List<Pet>, rests: List<RestPeriod>,
+    insulinTimeOn: Boolean, quiet: QuietHours?, now: Long, zone: ZoneId = ZoneId.systemDefault(),
+): List<MedAlert> {
+    if (!insulinTimeOn) return emptyList()
+    val end = now + WINDOW
+    class Entry(val kind: MedAlertKind, val fireAt: Long, val due: Long, val pet: Pet, val units: Double)
+    val entries = mutableListOf<Entry>()
+    for (pet in pets.filter { it.deletedAt == null && it.memorializedAt == null }) {
+        val plan = openInsulinPlan(plans, pet.id) ?: continue
+        val petRests = rests.filter { it.petId == pet.id && it.deletedAt == null }
+        // 다시 알림(최대 1시간 뒤)이 아직 남은 지난 차례부터 구간을 하나씩 넘김 — 차례 − 1시간이 구간 시작.
+        var cursor = now - 3 * HOUR
+        while (true) {
+            val (start, windowEnd) = insulinWindow(plan, cursor, zone) ?: break
+            if (start > end) break
+            cursor = windowEnd
+            val slot = insulinSlotAt(plan, start, zone) ?: continue
+            if (slot.occurrence < plan.activeFrom || insulinHandled(pet.id, insulinRecords, slot) != null) continue
+            if (petRests.any { it.startedAt <= slot.occurrence && (it.endedAt == null || slot.occurrence < it.endedAt) }) continue
+            val fires = buildList {
+                add(MedAlertKind.insulinDue to slot.occurrence - plan.leadMinutes * MINUTE)
+                if (plan.remindAgainMinutes > 0) add(MedAlertKind.insulinAgain to slot.occurrence + plan.remindAgainMinutes * MINUTE)
+            }
+            for ((kind, fireAt) in fires) {
+                if (fireAt <= now || fireAt > end) continue
+                if (quiet != null && quiet.enabled && !plan.ringDuringQuiet && inQuiet(Instant.ofEpochMilli(fireAt).atZone(zone).toLocalTime(), quiet)) continue
+                entries += Entry(kind, minute(fireAt), slot.occurrence, pet, slot.units)
+            }
+        }
+    }
+    return entries.groupBy { it.kind to it.fireAt }.map { (k, list) ->
+        val (kind, fireAt) = k
+        val sorted = list.sortedBy { it.pet.createdAt }
+        val texts = sorted.map { "${it.pet.name} ${medNumber(it.units)}단위" }
+        val body = if (texts.size >= 4) texts.take(3).joinToString(" · ") + " 외 ${texts.size - 3}" else texts.joinToString(" · ")
+        val isDue = kind == MedAlertKind.insulinDue
+        val title = if (isDue) "인슐린 · " + clockText(sorted.minOf { it.due }, zone) else "아직 인슐린 기록이 없어요"
+        MedAlert("insulin.${if (isDue) "due" else "again"}.${fireAt / 1000}", kind, fireAt, title, body, sorted.first().pet.id)
+    }.sortedBy { it.fireAt }
 }
 
 private fun minute(ms: Long): Long = Math.floorDiv(ms, MINUTE) * MINUTE

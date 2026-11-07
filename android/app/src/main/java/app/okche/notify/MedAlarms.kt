@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-// 탕약·남은 약 알림을 휴대폰에 걸기·지우기(plan.md 8-4b·8-4c). 무엇을 언제 울릴지는 MedNotify.kt.
+// 탕약·남은 약·인슐린 알림을 휴대폰에 걸기·지우기(plan.md 8-4b·8-4c·9-3). 무엇을 언제 울릴지는 MedNotify.kt.
 
 private const val PREFS = "med_alarms"
 private const val ARMED = "armed"
@@ -33,6 +33,8 @@ private const val ACTION = "app.okche.MED_ALARM"
 const val OPEN_MED_PET_ID = "openMedPetId"
 /** 남은 약 알림을 누르면 MainActivity가 받아 약방의 그 약 고치기를 연다(8-4c). */
 const val OPEN_MED_ID = "openMedId"
+/** 인슐린 알림을 누르면 MainActivity가 받아 일기 탭에 그 아이를 고른다(9-3). */
+const val OPEN_INSULIN_PET_ID = "openInsulinPetId"
 private const val LOW_SENT = "lowMedSent"
 private val lock = Mutex()
 private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -56,8 +58,11 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
         val records = dao.medRecords()
         val meds = dao.medications()
         val low = lowMedAlerts(meds, schedules, records, setting.notify.lowMed, setting.lowMedDays, setting.quietHours, sent, now)
-        // 남은 약 알림 몫을 빼고 탕약 알림(+ 이어짐 알림)을 건다 — 합쳐 64개 안.
-        val alerts = low + medAlerts(schedules, records, dao.pets(), dao.restPeriods(), meds, setting.notify.medTime, now, limit = LIMIT - low.size)
+        val pets = dao.pets()
+        val rests = dao.restPeriods()
+        val insulin = insulinAlerts(dao.insulinPlans(), dao.insulinRecords(), pets, rests, setting.notify.insulinTime, setting.quietHours, now)
+        // 남은 약 알림 몫을 빼고 탕약·인슐린 알림(+ 이어짐 알림)을 이른 것부터 건다 — 합쳐 64개 안.
+        val alerts = low + medAlerts(schedules, records, pets, rests, meds, setting.notify.medTime, now, limit = LIMIT - low.size, extra = insulin)
         val medById = meds.associateBy { it.id }
         val am = app.getSystemService(AlarmManager::class.java)
         for (id in prefs.getStringSet(ARMED, null).orEmpty()) {
@@ -66,13 +71,14 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
                 it.cancel()
             }
         }
-        // 첫 알림 전에도 휴대폰 설정에 '탕약 알림'이 보이게(만들기는 몇 번 불려도 같음).
-        app.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("med", "탕약 알림", NotificationManager.IMPORTANCE_HIGH))
+        // 첫 알림 전에도 휴대폰 설정에 '탕약 알림'·'인슐린 알림'이 보이게(만들기는 몇 번 불려도 같음).
+        createChannels(app)
         // 걸기 전에 적어 둔다 — 걸다 멈춰도 다음에 지울 수 있게.
         prefs.edit().putStringSet(ARMED, alerts.mapTo(mutableSetOf()) { it.id }).commit()
         val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
         for (a in alerts) {
-            val intent = medAlarmIntent(app, a.id).putExtra("id", a.id).putExtra("title", a.title).putExtra("body", a.body).putExtra("petId", a.petId).putExtra("medId", a.medId)
+            val intent = medAlarmIntent(app, a.id).putExtra("id", a.id).putExtra("title", a.title).putExtra("body", a.body).putExtra("medId", a.medId)
+                .putExtra(if (a.kind.isInsulin) "insulinPetId" else "petId", a.petId)
                 .putExtra("sentKey", medById[a.medId]?.let(::lowMedKey))
             val pi = PendingIntent.getBroadcast(app, a.id.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             // 권한은 걸던 중에도 꺼질 수 있어 막히면 대략으로.
@@ -86,30 +92,41 @@ suspend fun rescheduleMedAlarms(context: Context) = lock.withLock {
     }
 }
 
-/** 앱이 살아 있는 동안 약 주기·기록·약·아이·휴양·설정이 바뀌면 0.5초 모아 다시 건다(한 번만 시작). */
+/** 앱이 살아 있는 동안 약 주기·인슐린 계획·기록·약·아이·휴양·설정이 바뀌면 0.5초 모아 다시 건다(한 번만 시작). */
 @OptIn(FlowPreview::class)
 fun watchMedAlarms(context: Context) {
     if (!watching.compareAndSet(false, true)) return
     val app = context.applicationContext
     appScope.launch {
-        OkcheDatabase.get(app).invalidationTracker.createFlow("med_schedule", "record", "medication", "pet", "rest_period", "setting")
+        OkcheDatabase.get(app).invalidationTracker.createFlow("med_schedule", "insulin_plan", "record", "medication", "pet", "rest_period", "setting")
             .debounce(500)
             .collect { runCatching { rescheduleMedAlarms(app) } }
     }
 }
 
-/** 울릴 때: 휴대폰 알림 하나(같은 알림 id면 덮음). 누르면 앱 — 아이가 있으면 그 아이의 오늘 먹일 약 시트, 남은 약이면 약방의 그 약 고치기. */
+private fun createChannels(context: Context) {
+    val nm = context.getSystemService(NotificationManager::class.java)
+    nm.createNotificationChannel(NotificationChannel("med", "탕약 알림", NotificationManager.IMPORTANCE_HIGH))
+    nm.createNotificationChannel(NotificationChannel("insulin", "인슐린 알림", NotificationManager.IMPORTANCE_HIGH))
+}
+
+/**
+ * 울릴 때: 휴대폰 알림 하나(같은 알림 id면 덮음). 누르면 앱 — 아이가 있으면 그 아이의 오늘 먹일 약 시트, 남은 약이면 약방의 그 약 고치기,
+ * 인슐린이면 일기 탭에 그 아이(9-3).
+ */
 class MedAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val id = intent.getStringExtra("id") ?: return
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel("med", "탕약 알림", NotificationManager.IMPORTANCE_HIGH))
+        createChannels(context)
         val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         intent.getStringExtra("petId")?.let { open.putExtra(OPEN_MED_PET_ID, it) }
         intent.getStringExtra("medId")?.let { open.putExtra(OPEN_MED_ID, it) }
+        val insulinPetId = intent.getStringExtra("insulinPetId")
+        insulinPetId?.let { open.putExtra(OPEN_INSULIN_PET_ID, it) }
         val body = intent.getStringExtra("body")
-        val notification = Notification.Builder(context, "med")
+        val notification = Notification.Builder(context, if (insulinPetId != null) "insulin" else "med")
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(intent.getStringExtra("title"))
             .setContentText(body)

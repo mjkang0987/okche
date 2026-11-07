@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.okche.store.OkcheDatabase
 import app.okche.store.newId
 import app.okche.store.setLastPetId
+import app.okche.store.setNotifyAsked
 import app.okche.store.Sex
 import app.okche.store.Species
 import app.okche.store.Syringe
@@ -75,6 +76,8 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         form = form.change()
         touched = touched.afterRows(key, rows, form.insulinRows.size)
     }
+    /** 당뇨 아이를 모시면 허락 안내 창(NotifyAsk, 9-3) — 아이는 이미 저장됨, 답이 오면 탭으로. */
+    val asking = rememberSaveable { mutableStateOf(false) }
     // 저장 결과 받기(저장 중 화면이 다시 만들어졌어도 여기서 받는다).
     val result = saver.result
     LaunchedEffect(result) {
@@ -82,7 +85,18 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         failed = "save" in result
         touched = touched + result.keys // 화면 검사와 저장 검사가 어긋나도 그 칸이 보이게
         saver.consume()
-        if (result.isEmpty()) onSaved()
+        if (result.isEmpty()) {
+            // 인슐린 시간 알림(설정 notify.insulinTime, 모든 아이 공통)을 꺼 두었으면 묻지 않는다.
+            val ask = form.hasDiabetes && runCatching {
+                OkcheDatabase.get(context).dao().loadOrCreateSetting().notify.insulinTime && app.okche.ui.med.shouldAskNotify(context)
+            }.getOrDefault(false)
+            if (ask) {
+                runCatching { context.setNotifyAsked(true) }
+                asking.value = true
+            } else {
+                onSaved()
+            }
+        }
     }
 
     // 저장 중엔 닫지 않는다(닫으면 끝난 결과가 남아 다음 등록 화면에 옛 결과가 뜸). 닫을 때 남은 결과도 버린다.
@@ -158,6 +172,7 @@ fun PetRegisterScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             }
         }
     }
+    app.okche.ui.med.NotifyAskHost(asking, "인슐린 맞을 시간을 알려 드릴까요?", onSaved)
 }
 
 /** 당뇨를 켜면 나오는 인슐린 칸: 이름, 시간·양 줄(최소 1줄), 주사기. */

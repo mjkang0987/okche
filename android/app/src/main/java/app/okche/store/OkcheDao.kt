@@ -69,6 +69,7 @@ abstract class OkcheDao {
 
     @Query("SELECT * FROM medication") abstract suspend fun medications(): List<Medication>
     @Query("SELECT * FROM record WHERE kind = 'med' AND deleted_at IS NULL") abstract suspend fun medRecords(): List<Record>
+    @Query("SELECT * FROM record WHERE kind = 'insulin' AND deleted_at IS NULL") abstract suspend fun insulinRecords(): List<Record>
     @Query("SELECT * FROM rest_period WHERE deleted_at IS NULL") abstract suspend fun restPeriods(): List<RestPeriod>
 
     // 다과(7-4b): 목록에서 뺀 다과도 이름은 지난 기록 글자에 쓰여서 모두 읽는다.

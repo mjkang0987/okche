@@ -88,9 +88,13 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
  * 하단 탭 5개 + 앱 하나의 되돌리기 알림 자리(탭 막대가 보이면 그 위, 없으면 화면 아래).
  * [openMedPetId]: 탕약 알림을 눌러 연 아이 — 그 아이의 오늘 먹일 약 시트를 띄우고 [onMedOpened]로 비운다(8-4b).
  * [openMedId]: 남은 약 알림을 눌러 연 약 — 더보기 → 약방 → 그 약 고치기, [onMedIdOpened]로 비운다(8-4c).
+ * [openInsulinPetId]: 인슐린 알림을 눌러 연 아이 — 일기 탭에 그 아이를 고르고 [onInsulinOpened]로 비운다(9-3).
  */
 @Composable
-fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMedId: String? = null, onMedIdOpened: () -> Unit = {}) {
+fun RootTabs(
+    openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMedId: String? = null, onMedIdOpened: () -> Unit = {},
+    openInsulinPetId: String? = null, onInsulinOpened: () -> Unit = {},
+) {
     var item by remember { mutableStateOf<UndoToastItem?>(null) }
     var toastHeight by remember { mutableStateOf(0.dp) }
     val barHeight = remember { mutableStateOf(0.dp) }
@@ -105,7 +109,7 @@ fun RootTabs(openMedPetId: String? = null, onMedOpened: () -> Unit = {}, openMed
         app.okche.ui.diabetes.LocalOpenInsulinSetup provides { id: String -> insulinSetup.value = id },
     ) {
         Box(Modifier.fillMaxSize()) {
-            RootTabsContent(barHeight, insulinSetup, openMedPetId, onMedOpened, openMedId, onMedIdOpened)
+            RootTabsContent(barHeight, insulinSetup, openMedPetId, onMedOpened, openMedId, onMedIdOpened, openInsulinPetId, onInsulinOpened)
             UndoToast(
                 item, onDismiss = { item = null }, onUndo = { item?.undo?.invoke() },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -128,6 +132,7 @@ private fun RootTabsContent(
     barHeight: androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>, insulinSetup: androidx.compose.runtime.MutableState<String?>,
     openMedPetId: String?, onMedOpened: () -> Unit,
     openMedId: String?, onMedIdOpened: () -> Unit,
+    openInsulinPetId: String?, onInsulinOpened: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     val density = LocalDensity.current
@@ -182,6 +187,27 @@ private fun RootTabsContent(
         if (openMedPetId == null || pets == null) return@LaunchedEffect
         medSheetPetId = pets.firstOrNull { it.id == openMedPetId && it.memorializedAt == null }?.id
         onMedOpened()
+    }
+    // 인슐린 알림으로 연 아이: 아이 목록을 읽은 뒤 일기 탭에 그 아이를 고른다(인슐린 줄이 보이게). 지웠거나 추억이면 앱만 연다.
+    androidx.compose.runtime.LaunchedEffect(openInsulinPetId, pets != null) {
+        if (openInsulinPetId == null || pets == null) return@LaunchedEffect
+        if (pets.any { it.id == openInsulinPetId && it.memorializedAt == null }) {
+            // 일기 탭이 보이게 그 앞에 그려지는 화면들은 닫는다(남은 약 알림과 같은 것 + 수라·기록 목록·다과).
+            medEditId = null
+            medAddOpen = false
+            tangyakOpen = false
+            yakbangOpen = false
+            notifyOpen = false
+            snackListOpen = false
+            suraOpen = false
+            logOpen = false
+            medSheetPetId = null
+            quickState.unknownPicked.value = false
+            runCatching { context.setLastPetId(openInsulinPetId) }
+                .onFailure { Toast.makeText(context, "저장하지 못했어요. 다시 해 주세요.", Toast.LENGTH_SHORT).show() }
+            selected = Tab.Record.ordinal
+        }
+        onInsulinOpened()
     }
     // 시트는 떠 있는 창이라 어느 화면 위에서도 같은 자리(아래 화면 고르기보다 먼저 그림).
     pets?.firstOrNull { it.id == medSheetPetId && it.memorializedAt == null }?.let { pet ->

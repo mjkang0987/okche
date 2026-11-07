@@ -236,6 +236,20 @@ class PetEditTest {
         assertNull(plan.activeUntil)
     }
 
+    /** 다시 알림만 바꾸면 쓰는 줄을 고침(9-3, 7장 — 새 줄 아님), 시간을 바꾼 새 줄에도 이어짐. */
+    @Test fun changingRemindAgainEditsSamePlan() = runBlocking {
+        val id = makePet(diabetes = true)
+        val form = InsulinSetupForm.load(dao, id)
+        assertEquals(0, form.remindAgainMinutes)
+        saveInsulinSetup(dao, form.copy(remindAgainMinutes = 30), now)
+        assertEquals(30, plans().single().remindAgainMinutes)
+        assertNull(plans().single().activeUntil)
+        val again = InsulinSetupForm.load(dao, id)
+        assertEquals(30, again.remindAgainMinutes)
+        saveInsulinSetup(dao, again.copy(rows = listOf(InsulinRow("09:00", "2"))), now + 60_000)
+        assertEquals(30, plans().single { it.activeUntil == null }.remindAgainMinutes)
+    }
+
     @Test fun twoOpenPlansBothCloseOnChange() = runBlocking {
         val id = makePet(diabetes = true)
         dao.insert(InsulinPlan(createdAt = created, petId = id, slots = listOf(InsulinSlot("09:00", 1.0)), activeFrom = created + 60_000))

@@ -98,6 +98,8 @@ data class InsulinPlan(
     val slots: List<InsulinSlot>,
     @ColumnInfo(name = "ring_during_quiet") val ringDuringQuiet: Boolean = false,
     @ColumnInfo(name = "lead_minutes") val leadMinutes: Int = 10,
+    /** 안 맞혔으면 다시 알림: 0(안 함), 10, 30, 60 — 맞는 시각 + 이 분에 구간 안 기록이 없으면 한 번 더(9-3) */
+    @ColumnInfo(name = "remind_again_minutes", defaultValue = "0") val remindAgainMinutes: Int = 0,
     @ColumnInfo(name = "active_from") val activeFrom: Long,
     @ColumnInfo(name = "active_until") val activeUntil: Long? = null,
 )

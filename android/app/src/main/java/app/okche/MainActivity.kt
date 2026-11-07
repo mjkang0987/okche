@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
+import app.okche.notify.OPEN_INSULIN_PET_ID
 import app.okche.notify.OPEN_MED_ID
 import app.okche.notify.OPEN_MED_PET_ID
 import app.okche.notify.rescheduleMedAlarms
@@ -39,15 +40,19 @@ class MainActivity : ComponentActivity() {
     private var openMedPetId by mutableStateOf<String?>(null)
     /** 남은 약 알림을 눌러 연 약(8-4c) — 약방의 그 약 고치기를 열면 비운다. */
     private var openMedId by mutableStateOf<String?>(null)
+    /** 인슐린 알림을 눌러 연 아이(9-3) — 일기 탭에 그 아이를 고르면 비운다. */
+    private var openInsulinPetId by mutableStateOf<String?>(null)
 
     private fun takeMedPetId(intent: Intent) {
         // 최근 앱에서 다시 열면 처음 연 알림의 값이 남아 있어 시트를 또 띄우지 않음.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
             intent.getStringExtra(OPEN_MED_PET_ID)?.let { openMedPetId = it }
             intent.getStringExtra(OPEN_MED_ID)?.let { openMedId = it }
+            intent.getStringExtra(OPEN_INSULIN_PET_ID)?.let { openInsulinPetId = it }
         }
         intent.removeExtra(OPEN_MED_PET_ID)
         intent.removeExtra(OPEN_MED_ID)
+        intent.removeExtra(OPEN_INSULIN_PET_ID)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +63,9 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
-        setContent { OkcheApp(openMedPetId, { openMedPetId = null }, openMedId) { openMedId = null } }
+        setContent {
+            OkcheApp(openMedPetId, { openMedPetId = null }, openMedId, { openMedId = null }, openInsulinPetId) { openInsulinPetId = null }
+        }
         // 저장소를 열고 설정 줄을 없을 때만 만든다(IGNORE라 화면을 다시 만들 때 여러 번 불려도 안전).
         lifecycleScope.launch { OkcheDatabase.get(this@MainActivity).dao().loadOrCreateSetting() }
         watchMedAlarms(this)
@@ -81,7 +88,10 @@ private enum class Screen { Start, Register, Tabs }
 
 /** 첫 화면 고르기: 지운 줄 뺀 아이가 없고 '먼저 둘러볼게요'를 누른 적 없으면 시작하기, 아니면 탭. */
 @Composable
-private fun OkcheApp(openMedPetId: String?, onMedOpened: () -> Unit, openMedId: String?, onMedIdOpened: () -> Unit) {
+private fun OkcheApp(
+    openMedPetId: String?, onMedOpened: () -> Unit, openMedId: String?, onMedIdOpened: () -> Unit,
+    openInsulinPetId: String?, onInsulinOpened: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var screen by rememberSaveable { mutableStateOf<Screen?>(null) }
@@ -103,6 +113,6 @@ private fun OkcheApp(openMedPetId: String?, onMedOpened: () -> Unit, openMedId: 
             },
         )
         Screen.Register -> PetRegisterScreen(onClose = { screen = Screen.Start }, onSaved = { screen = Screen.Tabs })
-        Screen.Tabs -> RootTabs(openMedPetId, onMedOpened, openMedId, onMedIdOpened)
+        Screen.Tabs -> RootTabs(openMedPetId, onMedOpened, openMedId, onMedIdOpened, openInsulinPetId, onInsulinOpened)
     }
 }

@@ -56,7 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -88,6 +88,7 @@ import app.okche.ui.theme.OkcheSpacing
 import app.okche.ui.theme.OkcheType
 import app.okche.ui.toTextStyle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -120,7 +121,11 @@ fun SillokScreen(pet: Pet, modifier: Modifier = Modifier, seal: @Composable () -
 
     val context = LocalContext.current
     val dao = remember { OkcheDatabase.get(context).dao() }
-    val records by remember(pet.id, before.start, period.end) { dao.petRecordsFlow(pet.id, before.start, period.end) }.collectAsState(null)
+    // 직전 기간 첫날 하루 앞 ~ 끝 다음 날: 끼니 차례와 그 기록의 날이 하루 다를 수 있어서(6-1). 받은 목록에 열쇠를 붙여
+    // 기간을 넘긴 직후 옛 목록으로 그리지 않게(비교 줄이 잠깐 빠졌다 돌아오지 않게).
+    val key = Triple(pet.id, shiftDay(before.start, -1), shiftDay(period.end, 1))
+    val loaded by remember(key) { dao.petRecordsFlow(key.first, key.second, key.third).map { key to it } }.collectAsState(null)
+    val records = loaded?.takeIf { it.first == key }?.second
     val plans by remember(pet.id) { dao.mealPlansFlow(pet.id) }.collectAsState(emptyList())
     val rests by remember(pet.id) { dao.petRestPeriodsFlow(pet.id) }.collectAsState(emptyList())
     val foodChanges by remember { dao.foodChangesFlow() }.collectAsState(emptyList())
@@ -151,11 +156,11 @@ fun SillokScreen(pet: Pet, modifier: Modifier = Modifier, seal: @Composable () -
             )
         } else {
             val changes = sillokChanges(pet, foodChanges, foods, schedules, meds, period)
-            Summary(now30, prev30, plans, rests, pet.id, period, range, now)
+            Summary(now30, prev30, all, plans, rests, pet.id, period, range, now)
             VomitChart(now30, period, changes)
             stoolShares(now30)?.let { StoolCard(it) }
             urineSummary(now30, period.days)?.let { u ->
-                UrineCard(u, urineSummary(prev30, before.days)?.perDay?.takeIf { prev30.isNotEmpty() }, range)
+                UrineCard(u, if (prev30.isNotEmpty()) urinePerDay(prev30, before.days) else null, range)
             }
             weightPoints(now30).takeIf { it.isNotEmpty() }?.let { WeightCard(it, period) }
             if (changes.isNotEmpty()) ChangesCard(changes)
@@ -282,13 +287,13 @@ private fun RoundArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 /** 요약 세 칸: 구토·묽은 변·다 먹은 끼니(끼니 차례가 없던 기간이면 두 칸). */
 @Composable
 private fun Summary(
-    now: List<app.okche.store.Record>, prev: List<app.okche.store.Record>, plans: List<app.okche.store.MealPlan>,
+    now: List<app.okche.store.Record>, prev: List<app.okche.store.Record>, around: List<app.okche.store.Record>, plans: List<app.okche.store.MealPlan>,
     rests: List<app.okche.store.RestPeriod>, petId: String, period: SillokPeriod, range: SillokRange, nowMs: Long,
 ) {
     val hasPrev = prev.isNotEmpty()
     val vomit = vomitCount(now)
     val loose = looseStoolCount(now)
-    val meal = mealFraction(now, plans, rests, petId, period, nowMs)
+    val meal = mealFraction(around, plans, rests, petId, period, nowMs)
     // 칸 높이를 가장 큰 칸에 맞춤.
     Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2)) {
         SummaryCell("구토", "$vomit", "회", compareText(vomit, vomitCount(prev), hasPrev, range))
@@ -347,7 +352,7 @@ private fun CardTitle(text: androidx.compose.ui.text.AnnotatedString) {
 private val BAR_AREA = 84.dp
 private val LABEL_TOP = 18.dp
 
-/** 구토 횟수 막대: 하루 단위, 최근 날짜부터 보이고 옆으로 넘기면 지난 날. 바꾼 날 앞에 금색 선과 이름표(선 왼쪽 — 첫 이틀은 오른쪽, 12장). */
+/** 구토 횟수 막대: 하루 단위, 최근 날짜부터 보이고 옆으로 넘기면 지난 날. 바꾼 날 앞에 금색 선과 이름표(선 왼쪽 — 첫 사흘은 오른쪽, 12장). */
 @Composable
 private fun VomitChart(records: List<app.okche.store.Record>, period: SillokPeriod, changes: List<SillokChange>) {
     val counts = dailyVomits(records, period)
@@ -383,7 +388,7 @@ private fun VomitChart(records: List<app.okche.store.Record>, period: SillokPeri
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 period.dayList.forEachIndexed { i, day ->
-                    marks[day]?.let { ChangeLine(it, labelRight = i < 2) }
+                    marks[day]?.let { ChangeLine(it, labelRight = i < 3) }
                     DayBar(counts[i], top, dayLabel(day, i))
                 }
             }
@@ -538,7 +543,7 @@ private fun ChangesCard(changes: List<SillokChange>) {
         changes.forEachIndexed { i, c ->
             if (i > 0) HorizontalDivider(thickness = 1.dp, color = OkcheColor.Line)
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 52.dp).semantics(mergeDescendants = true) { contentDescription = c.text },
+                Modifier.fillMaxWidth().heightIn(min = 52.dp).clearAndSetSemantics { contentDescription = c.label },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(OkcheSpacing.Space2),
             ) {
                 Box(Modifier.size(10.dp).background(OkcheColor.Geum, CircleShape))

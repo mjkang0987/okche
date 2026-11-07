@@ -87,7 +87,7 @@ fun barTop(counts: List<Int>): Int = maxOf(2, counts.maxOrNull() ?: 0).let { if 
 
 /**
  * 다 먹은 끼니 a/b(6-3): 분모 = 기간 각 날의 끼니 차례(그때 계획) 중 예정 시각이 휴양 기간 밖인 것,
- * 분자 = 그 차례 중 같은 `slotKey`에 `all` 기록이 있는 차례 수. 아직 안 온 끼니([now] 뒤)는 빼고, 차례가 없으면 null(칸 숨김).
+ * 분자 = 그 차례 중 같은 `slotKey`에 `all` 기록이 있는 차례 수([records]는 기간 앞뒤 하루까지 — 차례와 기록의 날이 다를 수 있어서). 아직 안 온 끼니([now] 뒤)는 빼고, 차례가 없으면 null(칸 숨김).
  */
 fun mealFraction(
     records: List<Record>, plans: List<MealPlan>, rests: List<RestPeriod>, petId: String, p: SillokPeriod, now: Long,
@@ -145,6 +145,9 @@ fun urineSummary(records: List<Record>, days: Int): UrineSummary? {
     )
 }
 
+/** 직전 기간 소피 하루 평균 — 그 기간에 소피 기록이 없어도 0(직전 기간에 다른 기록이 있을 때만 부름). */
+fun urinePerDay(records: List<Record>, days: Int): Double = records.count { it.kind == RecordKind.urine }.toDouble() / days
+
 /** 하루 평균 글자 '3.2'(소수 첫째 자리, 기기 지역과 상관없이 '.'). */
 fun perDayText(v: Double): String = String.format(Locale.ROOT, "%.1f", v)
 
@@ -157,8 +160,10 @@ fun weightPoints(records: List<Record>): List<Pair<Long, Long>> =
 fun weightAxis(p: SillokPeriod): List<String> =
     if (p.days <= 7) p.dayList.map(::md) else (1..((p.days + 6) / 7)).map { "${it}주" }
 
-/** 바꾼 날(6-4). [what] = '사료'·'탕약', [text] = 줄 글. */
-data class SillokChange(val day: String, val what: String, val text: String, val spoken: String)
+/** 바꾼 날(6-4). [what] = '사료'·'탕약', [text] = 줄 글, [spoken] = 그래프 읽기('10/14 사료 바꿈'), [label] = 줄 읽기(화살표 없이). */
+data class SillokChange(val day: String, val what: String, val text: String, val spoken: String, val name: String = "") {
+    val label get() = "$spoken, $name"
+}
 
 /**
  * 이 기간에 바뀐 것(6-4): 사료 = 그 아이 `FoodChange.startedOn`. 약 = 같은 `seriesId` 줄을 `activeFrom` 순으로 —
@@ -173,7 +178,10 @@ fun sillokChanges(
     val medName = meds.associate { it.id to it.name }
     val food = foodChanges.filter { it.petId == pet.id && it.deletedAt == null && p.contains(it.startedOn) }
         .sortedBy { it.createdAt }
-        .map { SillokChange(it.startedOn, "사료", "${md(it.startedOn)} 사료 → ${foodName[it.foodId].orEmpty()}", "${md(it.startedOn)} 사료 바꿈") }
+        .map {
+            val name = foodName[it.foodId].orEmpty()
+            SillokChange(it.startedOn, "사료", "${md(it.startedOn)} 사료 → $name", "${md(it.startedOn)} 사료 바꿈", name)
+        }
     val med = schedules.filter { it.petId == pet.id && it.deletedAt == null }.groupBy { it.seriesId }.values.flatMap { series ->
         val rows = series.sortedWith(compareBy({ it.activeFrom }, { it.createdAt }))
         val name = medName[rows.first().medicationId].orEmpty()
@@ -185,7 +193,7 @@ fun sillokChanges(
         rows.last().activeUntil?.takeIf { it != pet.memorializedAt }?.let { marks += it to "그만" }
         marks.map { (at, word) ->
             val day = OkcheDay.of(at, zone)
-            SillokChange(day, "탕약", "${md(day)} 탕약 → $name · $word", "${md(day)} 탕약 $word")
+            SillokChange(day, "탕약", "${md(day)} 탕약 → $name · $word", "${md(day)} 탕약 $word", name)
         }
     }.filter { p.contains(it.day) }
     return (food + med).sortedWith(compareBy({ it.day }, { if (it.what == "사료") 0 else 1 }))

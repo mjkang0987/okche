@@ -188,7 +188,8 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(seal.waitForExistence(timeout: 3))
 
         app.tabBars.buttons["실록"].tap()
-        XCTAssertTrue(app.staticTexts["콩이실록"].waitForExistence(timeout: 3))
+        // 실록 머리는 '콩이실록, 최근 30일, 9/26 – 10/25' 한 머리말(10-1).
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "콩이실록")).firstMatch.waitForExistence(timeout: 3))
 
         app.tabBars.buttons["더보기"].tap()
         let rest = app.switches["콩이 아기씨 휴양 중 · 관리 쉬기"]

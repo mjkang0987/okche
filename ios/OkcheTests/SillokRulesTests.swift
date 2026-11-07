@@ -74,6 +74,10 @@ final class SillokRulesTests: XCTestCase {
         let rested = try XCTUnwrap(SillokRules.mealFraction(records, plans: [plan], rests: [rest], petId: pet.id, p30, now: late))
         XCTAssertEqual([rested.eaten, rested.total], [1, 9])
         XCTAssertNil(SillokRules.mealFraction(records, plans: [], rests: [], petId: pet.id, p30, now: late))
+        // 10/25 저녁 끼니를 10/26 아침 7시에 남겨도(기록 날 10/26) 그 차례로 셈.
+        let nextMorning = rec(.meal, 10, 26, 7, data: #"{"result":"all"}"#, slotKey: key("2026-10-25", "20:00"))
+        let late2 = try XCTUnwrap(SillokRules.mealFraction(records + [nextMorning], plans: [plan], rests: [], petId: pet.id, p30, now: late))
+        XCTAssertEqual([late2.eaten, late2.total], [2, 11])
     }
 
     func testStoolAndUrine() throws {
@@ -93,6 +97,9 @@ final class SillokRulesTests: XCTestCase {
         XCTAssertEqual([u.little, u.pinkRed, u.straining], [2, 1, 1])
         XCTAssertEqual(SillokRules.perDayText(96 / 30.0), "3.2")
         XCTAssertNil(SillokRules.urine([], days: 30))
+        // 직전 기간에 소피 기록이 없어도 평균 0(다른 기록이 있을 때 '직전 30일 0.0번').
+        XCTAssertEqual(SillokRules.perDayText(SillokRules.urinePerDay([rec(.vomit, 10, 10)], days: 30)), "0.0")
+        XCTAssertEqual(SillokRules.perDayText(SillokRules.urinePerDay(urine, days: 30)), "0.1")
     }
 
     func testWeight() {
@@ -120,6 +127,8 @@ final class SillokRulesTests: XCTestCase {
         XCTAssertEqual(list.map(\.text), ["10/14 사료 → 가수분해 처방식", "10/20 탕약 → 프레드니솔론 · 시작",
                                           "10/23 탕약 → 프레드니솔론 · 바꿈", "10/24 탕약 → 프레드니솔론 · 그만"])
         XCTAssertEqual(list.first?.spoken, "10/14 사료 바꿈")
+        XCTAssertEqual(list.first?.label, "10/14 사료 바꿈, 가수분해 처방식") // 줄 읽기는 화살표 없이
+        XCTAssertEqual(list[2].label, "10/23 탕약 바꿈, 프레드니솔론")
         // 같은 날 사료와 약이면 금색 선 하나, 이름표 '사료·탕약'.
         let sameDayFood = FoodChange(petId: pet.id, foodId: food.id, startedOn: "2026-10-20", method: .gradual)
         let sameDay = SillokRules.changes(pet: pet, foodChanges: [sameDayFood], foods: [food], schedules: [first], meds: [med], in: p30)

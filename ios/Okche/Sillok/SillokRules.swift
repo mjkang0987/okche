@@ -29,7 +29,7 @@ enum SillokRules {
     }
 
     /// 보는 기간: 6시 기준 날 `start`...`end`(둘 다 포함), `back` = 오늘이 든 기간에서 몇 칸 앞인지(0이면 다음 안 눌림).
-    struct Period: Equatable {
+    struct Period: Hashable {
         let start: String
         let end: String
         let days: Int
@@ -99,7 +99,7 @@ enum SillokRules {
     }
 
     /// 다 먹은 끼니 a/b(6-3): 분모 = 기간 각 날의 끼니 차례(그때 계획) 중 아직 안 온 것(`now` 뒤)·휴양 기간 안의 것을 뺀 것,
-    /// 분자 = 그 차례 중 같은 `slotKey`에 `all` 기록이 있는 차례 수. 차례가 없으면 nil(칸 숨김).
+    /// 분자 = 그 차례 중 같은 `slotKey`에 `all` 기록이 있는 차례 수(`records`는 그 아이 기록 전부 — 차례와 기록의 날이 다를 수 있어서). 차례가 없으면 nil(칸 숨김).
     static func mealFraction(_ records: [Record], plans: [MealPlan], rests: [RestPeriod], petId: UUID, _ p: Period, now: Date,
                              timeZone: TimeZone = .autoupdatingCurrent) -> (eaten: Int, total: Int)? {
         let petPlans = plans.filter { $0.petId == petId }
@@ -166,6 +166,11 @@ enum SillokRules {
                      straining: urine.filter { (json($0)["signs"] as? [String] ?? []).contains("straining") }.count)
     }
 
+    /// 직전 기간 소피 하루 평균 — 그 기간에 소피 기록이 없어도 0(직전 기간에 다른 기록이 있을 때만 부름).
+    static func urinePerDay(_ records: [Record], days: Int) -> Double {
+        Double(records.filter { $0.kind == RecordKind.urine.rawValue }.count) / Double(days)
+    }
+
     /// 하루 평균 글자 '3.2'(소수 첫째 자리, 기기 지역과 상관없이 '.').
     static func perDayText(_ v: Double) -> String { String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), v) }
 
@@ -190,12 +195,14 @@ enum SillokRules {
         return text.hasSuffix("kg") ? String(text.dropLast(2)) : text
     }
 
-    /// 바꾼 날(6-4). `what` = '사료'·'탕약', `text` = 줄 글, `spoken` = 화면 읽기.
+    /// 바꾼 날(6-4). `what` = '사료'·'탕약', `text` = 줄 글, `spoken` = 그래프 읽기('10/14 사료 바꿈'), `label` = 줄 읽기(화살표 없이).
     struct Change: Equatable {
         let day: String
         let what: String
         let text: String
         let spoken: String
+        var name = ""
+        var label: String { "\(spoken), \(name)" }
     }
 
     /// 이 기간에 바뀐 것(6-4): 사료 = 그 아이 `FoodChange.startedOn`. 약 = 같은 `seriesId` 줄을 `activeFrom` 순으로 —
@@ -207,8 +214,11 @@ enum SillokRules {
         let medName = Dictionary(meds.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         let food = foodChanges.filter { $0.petId == pet.id && $0.deletedAt == nil && p.contains($0.startedOn) }
             .sorted { $0.createdAt < $1.createdAt }
-            .map { Change(day: $0.startedOn, what: "사료", text: "\(md($0.startedOn)) 사료 → \(foodName[$0.foodId] ?? "")",
-                          spoken: "\(md($0.startedOn)) 사료 바꿈") }
+            .map { change -> Change in
+                let name = foodName[change.foodId] ?? ""
+                return Change(day: change.startedOn, what: "사료", text: "\(md(change.startedOn)) 사료 → \(name)",
+                              spoken: "\(md(change.startedOn)) 사료 바꿈", name: name)
+            }
         let series = Dictionary(grouping: schedules.filter { $0.petId == pet.id && $0.deletedAt == nil }, by: \.seriesId).values
         let med: [Change] = series.flatMap { group -> [Change] in
             let rows = group.sorted { ($0.activeFrom, $0.createdAt) < ($1.activeFrom, $1.createdAt) }
@@ -219,7 +229,7 @@ enum SillokRules {
             if let until = last.activeUntil, until != pet.memorializedAt { marks.append((until, "그만")) }
             return marks.map { mark in
                 let day = OkcheDay.of(mark.0, in: timeZone)
-                return Change(day: day, what: "탕약", text: "\(md(day)) 탕약 → \(name) · \(mark.1)", spoken: "\(md(day)) 탕약 \(mark.1)")
+                return Change(day: day, what: "탕약", text: "\(md(day)) 탕약 → \(name) · \(mark.1)", spoken: "\(md(day)) 탕약 \(mark.1)", name: name)
             }
         }
         .filter { p.contains($0.day) }

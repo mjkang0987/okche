@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// 실록 탭(보드 `Sillok`·`SillokLocked`·`SillokEmpty`, plan.md 10-1). 계산은 `SillokRules`. 안드로이드 `SillokScreen`과 같은 화면.
 /// 보기 설정(10-2)·바꾼 뒤 어때요(10-3)·당뇨 칸(10-4)·PDF(10-5)는 그 단계에서. 지금 보는 아이가 추억이어도 그대로(실록 탭은 기록 보기).
@@ -42,7 +43,7 @@ struct SillokView: View {
                     SillokVomitChart(records: current, period: period, changes: changes)
                     if let shares = SillokRules.stoolShares(current) { SillokStoolCard(shares: shares) }
                     if let urine = SillokRules.urine(current, days: period.days) {
-                        SillokUrineCard(urine: urine, before: previous.isEmpty ? nil : SillokRules.urine(previous, days: before.days)?.perDay, range: range)
+                        SillokUrineCard(urine: urine, before: previous.isEmpty ? nil : SillokRules.urinePerDay(previous, days: before.days), range: range)
                     }
                     let weights = SillokRules.weightPoints(current)
                     if !weights.isEmpty { SillokWeightCard(points: weights, period: period) }
@@ -82,7 +83,8 @@ struct SillokView: View {
         let hasPrev = !previous.isEmpty
         let vomit = SillokRules.vomitCount(current)
         let loose = SillokRules.looseStoolCount(current)
-        let meal = SillokRules.mealFraction(current, plans: plans, rests: rests, petId: pet.id, period, now: now)
+        // 끼니 기록은 그 아이 기록 전부에서 찾는다 — 차례와 기록의 날이 다를 수 있어서(6-1).
+        let meal = SillokRules.mealFraction(allRecords, plans: plans, rests: rests, petId: pet.id, period, now: now)
         return HStack(alignment: .top, spacing: OkcheSpacing.space2) {
             SillokSummaryCell(label: "구토", value: "\(vomit)", unit: "회",
                               note: SillokRules.compare(vomit, SillokRules.vomitCount(previous), beforeHasRecords: hasPrev, range))
@@ -94,9 +96,12 @@ struct SillokView: View {
     }
 }
 
+/// 기기 글자 크기를 따르는 크기(다른 글자의 `okcheText`와 같이 커지게).
+private func sillokScaled(_ size: CGFloat) -> CGFloat { UIFontMetrics.default.scaledValue(for: size) }
+
 /// '매화 · 변 상태'처럼 쉬운 말을 0.85배 회색으로.
 private func sillokEasy(_ word: String, _ easy: String, size: CGFloat = 16) -> Text {
-    Text(word) + Text(" · \(easy)").font(.system(size: size * 0.85, weight: .regular)).foregroundColor(OkcheColor.inkMuted)
+    Text(word) + Text(" · \(easy)").font(.system(size: sillokScaled(size * 0.85), weight: .regular)).foregroundColor(OkcheColor.inkMuted)
 }
 
 /// 남색 금테 머리: '콩이실록 최근 30일' + '9/26 – 10/25'. VoiceOver는 한 머리말.
@@ -144,7 +149,7 @@ private struct SillokRangeChips: View {
                 let selected = r == range
                 Button { isLocked ? onLocked() : onPick(r) } label: {
                     HStack(spacing: 4) {
-                        if isLocked { Image(systemName: "lock").font(.system(size: 12, weight: .semibold)) }
+                        if isLocked { Image(systemName: "lock").font(.system(size: sillokScaled(12), weight: .semibold)) }
                         Text(r.title).okcheText(OkcheType.body, weight: selected ? .bold : .regular)
                     }
                     .foregroundStyle(selected ? OkcheColor.paper : isLocked ? OkcheColor.inkMuted : OkcheColor.ink)
@@ -208,8 +213,11 @@ private struct SillokSummaryCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.inkMuted)
-            (Text(value).font(.system(size: 28, weight: .bold)) + Text(unit).font(.system(size: 14, weight: .medium)))
-                .foregroundStyle(OkcheColor.ink)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(value).okcheText(OkcheTextStyle(family: .sans, size: 28, lineHeight: 34, weight: .bold))
+                Text(unit).okcheText(OkcheType.label)
+            }
+            .foregroundStyle(OkcheColor.ink)
             if easy {
                 sillokEasy("수라", "식사", size: 12).okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
             } else if let note {
@@ -243,7 +251,7 @@ private func sillokCardTitle(_ text: Text) -> some View {
     text.okcheText(OkcheType.body, weight: .bold).foregroundStyle(OkcheColor.ink).accessibilityAddTraits(.isHeader)
 }
 
-/// 구토 횟수 막대: 하루 단위, 최근 날짜부터 보이고 옆으로 넘기면 지난 날. 바꾼 날 앞에 금색 선과 이름표(선 왼쪽 — 첫 이틀은 오른쪽, 12장).
+/// 구토 횟수 막대: 하루 단위, 최근 날짜부터 보이고 옆으로 넘기면 지난 날. 바꾼 날 앞에 금색 선과 이름표(선 왼쪽 — 첫 사흘은 오른쪽, 12장).
 private struct SillokVomitChart: View {
     let records: [Record]
     let period: SillokRules.Period
@@ -257,18 +265,18 @@ private struct SillokVomitChart: View {
         let marks = SillokRules.marks(changes)
         let days = period.dayList
         SillokCard {
-            sillokCardTitle(Text("구토 횟수 ") + Text("하루 단위").font(.system(size: 14, weight: .regular)).foregroundColor(OkcheColor.inkMuted))
+            sillokCardTitle(Text("구토 횟수 ") + Text("하루 단위").font(.system(size: sillokScaled(14), weight: .regular)).foregroundColor(OkcheColor.inkMuted))
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .trailing) {
                     Text("\(top)"); Spacer(minLength: 0); Text("\(top / 2)"); Spacer(minLength: 0); Text("0")
                 }
-                .font(.system(size: 12)).foregroundStyle(OkcheColor.inkMuted)
+                .okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
                 .frame(height: area).padding(.top, labelTop)
                 .accessibilityHidden(true)
                 ScrollView(.horizontal, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 4) {
                         ForEach(Array(days.enumerated()), id: \.element) { i, day in
-                            if let mark = marks[day] { changeLine(mark, labelRight: i < 2) }
+                            if let mark = marks[day] { changeLine(mark, labelRight: i < 3) }
                             bar(counts[i], top: top, label: dayLabel(day, i))
                         }
                     }
@@ -284,6 +292,7 @@ private struct SillokVomitChart: View {
                     .padding(.bottom, 6)
                 }
                 .defaultScrollAnchor(.trailing) // 처음엔 최근 날짜(오른쪽 끝)부터
+                .id(period) // 기간을 넘기면 다시 최근 날짜부터(안드로이드와 같음)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(SillokRules.vomitChartLabel(period, total: counts.reduce(0, +), changes: changes))
             }
@@ -310,7 +319,7 @@ private struct SillokVomitChart: View {
                         .frame(width: 14, height: area * CGFloat(count) / CGFloat(top))
                 }
             }
-            Text(label).font(.system(size: 12)).foregroundStyle(OkcheColor.inkMuted).lineLimit(1).fixedSize()
+            Text(label).okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted).lineLimit(1).fixedSize()
         }
         .frame(width: 22)
         .padding(.top, labelTop)
@@ -320,7 +329,7 @@ private struct SillokVomitChart: View {
     private func changeLine(_ label: String, labelRight: Bool) -> some View {
         OkcheColor.geum.frame(width: 2, height: area)
             .overlay(alignment: labelRight ? .topLeading : .topTrailing) {
-                Text(label).font(.system(size: 12, weight: .bold)).foregroundStyle(OkcheColor.geumDeep)
+                Text(label).okcheText(OkcheType.caption, weight: .bold).foregroundStyle(OkcheColor.geumDeep)
                     .fixedSize()
                     .offset(x: labelRight ? 6 : -6, y: -labelTop)
             }
@@ -416,8 +425,11 @@ private struct SillokWeightCard: View {
             HStack(alignment: .firstTextBaseline) {
                 sillokCardTitle(sillokEasy("옥체", "체중"))
                 Spacer(minLength: 0)
-                (Text(SillokRules.kgNumber(last)).font(.system(size: 32, weight: .bold)) + Text(" kg").font(.system(size: 14)))
-                    .foregroundStyle(OkcheColor.ink)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(SillokRules.kgNumber(last)).okcheText(OkcheType.number)
+                    Text(" kg").okcheText(OkcheType.label, weight: .regular)
+                }
+                .foregroundStyle(OkcheColor.ink)
             }
             line.frame(height: 90).accessibilityElement().accessibilityLabel(label).accessibilityAddTraits(.isImage)
             HStack {
@@ -426,7 +438,7 @@ private struct SillokWeightCard: View {
                     Text(text)
                 }
             }
-            .font(.system(size: 12)).foregroundStyle(OkcheColor.inkMuted)
+            .okcheText(OkcheType.caption).foregroundStyle(OkcheColor.inkMuted)
             .accessibilityHidden(true)
         }
     }
@@ -475,7 +487,8 @@ private struct SillokChangesCard: View {
                     Text(change.text).okcheText(OkcheType.label, weight: .regular).foregroundStyle(OkcheColor.ink)
                 }
                 .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(change.label) // 화살표를 읽지 않게
             }
         }
     }

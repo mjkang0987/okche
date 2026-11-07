@@ -32,6 +32,7 @@ import app.okche.ui.sillok.petRecords
 import app.okche.ui.sillok.sillokChanges
 import app.okche.ui.sillok.sillokPeriod
 import app.okche.ui.sillok.stoolShares
+import app.okche.ui.sillok.urinePerDay
 import app.okche.ui.sillok.urineSummary
 import app.okche.ui.sillok.vomitChartLabel
 import app.okche.ui.sillok.vomitCount
@@ -110,6 +111,9 @@ class SillokRulesTest {
         val rest = RestPeriod(petId = pet.id, startedAt = at(10, 23, 0), endedAt = at(10, 24, 0))
         assertEquals(1 to 9, mealFraction(records, listOf(plan), listOf(rest), pet.id, p30, late))
         assertNull(mealFraction(records, emptyList(), emptyList(), pet.id, p30, late))
+        // 10/25 저녁 끼니를 10/26 아침 7시에 남겨도(기록 날 10/26) 그 차례로 셈.
+        val nextMorning = rec(RecordKind.meal, 10, 26, 7, """{"result":"all"}""", key("2026-10-25", "20:00"))
+        assertEquals(2 to 11, mealFraction(records + nextMorning, listOf(plan), emptyList(), pet.id, p30, late))
     }
 
     @Test fun stoolAndUrine() {
@@ -128,6 +132,9 @@ class SillokRulesTest {
         assertEquals(listOf(2, 1, 1), listOf(u.little, u.pinkRed, u.straining))
         assertEquals("3.2", perDayText(96 / 30.0))
         assertNull(urineSummary(emptyList(), 30))
+        // 직전 기간에 소피 기록이 없어도 평균 0(다른 기록이 있을 때 '직전 30일 0.0번').
+        assertEquals("0.0", perDayText(urinePerDay(listOf(rec(RecordKind.vomit, 10, 10)), 30)))
+        assertEquals("0.1", perDayText(urinePerDay(urine, 30)))
     }
 
     @Test fun weight() {
@@ -153,6 +160,8 @@ class SillokRulesTest {
             list.map { it.text },
         )
         assertEquals("10/14 사료 바꿈", list.first().spoken)
+        assertEquals("10/14 사료 바꿈, 가수분해 처방식", list.first().label) // 줄 읽기는 화살표 없이
+        assertEquals("10/23 탕약 바꿈, 프레드니솔론", list[2].label)
         // 같은 날 사료와 약이면 금색 선 하나, 이름표 '사료·탕약'.
         val sameDay = sillokChanges(pet, listOf(fc.copy(startedOn = "2026-10-20")), listOf(food), listOf(first), listOf(med), p30)
         assertEquals(mapOf("2026-10-20" to "사료·탕약", "2026-10-22" to "탕약"), changeMarks(sameDay))

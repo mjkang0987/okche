@@ -50,6 +50,8 @@ struct RootTabView: View {
         }
         // 남은 약 알림을 누르면 더보기 탭(약방·그 약 고치기는 더보기가 연다, 8-4c).
         .onChange(of: router.openMedId, initial: true) { if router.openMedId != nil { tab = .more } }
+        // 인슐린 알림을 누르면 일기 탭(그 아이 고르기는 일기 탭이 함, 9-3). 값은 일기 탭이 비우므로 바뀐 값으로 본다.
+        .onChange(of: router.insulinPetId, initial: true) { _, id in if id != nil { tab = .record } }
         // 추억·지운 아이 알림이면 비워 둔다(나중에 되돌려도 시트가 갑자기 뜨지 않게).
         .onChange(of: router.openPetId) { if let id = router.openPetId, !alive.contains(where: { $0.id == id }) { router.openPetId = nil } }
     }

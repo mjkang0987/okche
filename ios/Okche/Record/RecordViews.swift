@@ -38,6 +38,7 @@ struct RecordTab: View {
     /// 인슐린 줄의 '지금' — 구간이 끝날 때·앱으로 돌아올 때 다시 본다(켜 둔 채 차례가 바뀌어도 맞게).
     @State private var clock = Date.now
     @Environment(\.scenePhase) private var scenePhase
+    @State private var router = NotifyRouter.shared
     @Query(filter: #Predicate<InsulinPlan> { $0.deletedAt == nil }) private var plans: [InsulinPlan]
     @Query(filter: #Predicate<Record> { $0.kind == "insulin" && $0.deletedAt == nil }) private var insulinRecords: [Record]
 
@@ -120,6 +121,16 @@ struct RecordTab: View {
         .transaction { $0.disablesAnimations = askingGlucose != nil }
         .sheet(item: $insulinSetup) { pet in NavigationStack { InsulinSetupScreen(pet: pet) } }
         .onChange(of: scenePhase) { if scenePhase == .active { clock = .now } }
+        // 인슐린 알림을 누르면 그 아이를 골라 둔다(9-3) — 탭은 `RootTabView`가 일기로 바꾼다. 추억·지운 아이면 그대로.
+        .onChange(of: router.insulinPetId, initial: true) { _, id in
+            guard let id else { return }
+            router.insulinPetId = nil
+            guard chipPets.contains(where: { $0.id == id }) else { return }
+            unknownPicked = false
+            lastPetId = id.uuidString
+            path = []
+            clock = .now
+        }
         .task(id: insulinWindowEnd) {
             guard let end = insulinWindowEnd, end > .now else { return }
             try? await Task.sleep(for: .seconds(end.timeIntervalSinceNow + 1))

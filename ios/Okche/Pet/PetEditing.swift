@@ -158,6 +158,8 @@ struct InsulinSetup {
     /// 밤에도 울리기
     var ringDuringQuiet: Bool
     var leadMinutes: Int
+    /// 안 맞혔으면 다시 알림(9-3) — 고르는 값은 탕약과 같음(`MedSchedules.againChoices`).
+    var remindAgainMinutes: Int
 
     static let leadChoices: [(minutes: Int, title: String)] =
         [(0, "맞는 시간에"), (5, "5분 전"), (10, "10분 전"), (15, "15분 전"), (30, "30분 전"), (60, "1시간 전")]
@@ -172,6 +174,7 @@ struct InsulinSetup {
             ?? [.init(time: "08:00"), .init(time: "20:00")]
         ringDuringQuiet = plan?.ringDuringQuiet ?? true
         leadMinutes = plan?.leadMinutes ?? 10
+        remindAgainMinutes = plan?.remindAgainMinutes ?? 0
         // 설정 줄은 앱 시작 때 만들어 둔다(`OkcheApp`). 여기서는 읽기만.
         let id = UUID.setting
         loadedNotify = (try? context.fetch(FetchDescriptor<Setting>(predicate: #Predicate { $0.id == id })).first)?.notify.insulinTime
@@ -191,11 +194,12 @@ struct InsulinSetup {
         let name = PetRegistration.trimmed(self.name)
         if let current = plans.first, current.slots.sorted(by: { $0.time < $1.time }) == newSlots {
             if current.name != name || current.syringe != syringe || current.ringDuringQuiet != ringDuringQuiet
-                || current.leadMinutes != leadMinutes {
+                || current.leadMinutes != leadMinutes || current.remindAgainMinutes != remindAgainMinutes {
                 current.name = name
                 current.syringe = syringe
                 current.ringDuringQuiet = ringDuringQuiet
                 current.leadMinutes = leadMinutes
+                current.remindAgainMinutes = remindAgainMinutes
                 current.updatedAt = now
             }
         } else {
@@ -204,7 +208,8 @@ struct InsulinSetup {
                 plan.updatedAt = now
             }
             context.insert(InsulinPlan(now: now, petId: pet.id, name: name, syringe: syringe, slots: newSlots,
-                                       ringDuringQuiet: ringDuringQuiet, leadMinutes: leadMinutes, activeFrom: now))
+                                       ringDuringQuiet: ringDuringQuiet, leadMinutes: leadMinutes, remindAgainMinutes: remindAgainMinutes,
+                                       activeFrom: now))
         }
         if !pet.hasDiabetes {
             pet.hasDiabetes = true

@@ -1,8 +1,22 @@
 import Foundation
 
-/// 탕약 알림 목록 계산(8-4a, 데이터 6-2) — 휴대폰에 걸기 전 순수 계산. 걸기·지우기는 8-4b.
+/// 탕약·인슐린 알림 목록 계산(8-4a·9-3, 데이터 6-2·7장) — 휴대폰에 걸기 전 순수 계산. 걸기·지우기는 8-4b.
 enum MedNotify {
-    enum Kind: String { case due, again, more, low }
+    enum Kind: String {
+        case due, again, more, low, insulinDue, insulinAgain
+
+        /// 인슐린 알림 — 누르면 일기 탭에 그 아이(9-3).
+        var isInsulin: Bool { self == .insulinDue || self == .insulinAgain }
+        /// 같은 시각이면 탕약 → 인슐린 → 다시 알림 순(정렬이 늘 같게 — 63개 경계에서 빠지는 것도 같게).
+        var order: Int {
+            switch self {
+            case .due: 0
+            case .insulinDue: 1
+            case .again: 2
+            default: 3
+            }
+        }
+    }
 
     struct Alert: Equatable {
         let id: String
@@ -23,9 +37,10 @@ enum MedNotify {
     static let window: TimeInterval = 72 * 3600
 
     /// 오늘(6시 기준)부터 3일 뒤까지 남은 차례 → 울릴 시각마다 하나로 묶은 알림, 이른 것부터 63개 + 이어짐 알림.
+    /// `extra`(인슐린 알림 — `insulinAlerts`)도 함께 이른 것부터 자른다(9-3, 합쳐 63개).
     static func alerts(_ schedules: [MedSchedule], records: [Record], pets: [Pet], rests: [RestPeriod], meds: [Medication],
-                       medTimeOn: Bool, limit: Int = limit, now: Date = .now) -> [Alert] {
-        guard medTimeOn else { return [] }
+                       medTimeOn: Bool, extra: [Alert] = [], limit: Int = limit, now: Date = .now) -> [Alert] {
+        let pets = medTimeOn ? pets : []
         let live = schedules.filter { $0.deletedAt == nil }
         let medById = Dictionary(meds.filter { $0.deletedAt == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         // 넷째 날 새벽 차례도 몇 분 전이면 72시간 안에 울릴 수 있어 하루 더 본다(창 밖은 아래에서 거름).
@@ -63,12 +78,53 @@ enum MedNotify {
             return Alert(id: "med.\(first.kind.rawValue).\(Int(first.fireAt.timeIntervalSince1970))", kind: first.kind, fireAt: first.fireAt,
                          title: title, body: body, petId: first.pet.id)
         }
-        alerts.sort { ($0.fireAt, $0.kind == .due ? 0 : 1) < ($1.fireAt, $1.kind == .due ? 0 : 1) }
+        alerts += extra
+        alerts.sort { ($0.fireAt, $0.kind.order) < ($1.fireAt, $1.kind.order) }
         alerts = Array(alerts.prefix(max(limit, 0)))
         if let last = alerts.last {
             alerts.append(Alert(id: "med.more", kind: .more, fireAt: last.fireAt.addingTimeInterval(60), title: "옥체", body: "옥체를 열면 알림이 이어져요", petId: nil))
         }
         return alerts
+    }
+
+    /// 인슐린 알림(9-3, 데이터 7장): 아이마다 쓰는 계획(열린 줄)의 앞으로 차례에 '차례 − `leadMinutes`', 다시 알림이 있으면
+    /// '차례 + `remindAgainMinutes`'. 차례 구간에 그 아이의 인슐린 기록(건너뜀 포함)이 있으면 둘 다 빠짐(미리 맞힌 경우).
+    /// 휴양 중·추억·지운 아이 빠짐, 밤 알림 쉬기 시간이면 계획의 `ringDuringQuiet`일 때만. 같은 시각·종류는 하나로.
+    static func insulinAlerts(_ plans: [InsulinPlan], records: [Record], pets: [Pet], rests: [RestPeriod], insulinTimeOn: Bool,
+                              quiet: QuietHours?, now: Date = .now) -> [Alert] {
+        guard insulinTimeOn else { return [] }
+        struct Entry { let kind: Kind; let fireAt: Date; let due: Date; let pet: Pet; let units: Double }
+        var entries: [Entry] = []
+        let end = now.addingTimeInterval(window)
+        for pet in pets where pet.deletedAt == nil && pet.memorializedAt == nil {
+            guard let plan = GlucoseRules.openPlan(plans, petId: pet.id) else { continue }
+            let petRests = rests.filter { $0.petId == pet.id && $0.deletedAt == nil }
+            // 다시 알림(최대 1시간 뒤)이 아직 남은 지난 차례부터 구간을 하나씩 넘김 — 차례 − 1시간이 구간 시작.
+            var cursor = now.addingTimeInterval(-3 * 3600)
+            while let w = GlucoseRules.window(plan, now: cursor), w.start <= end {
+                cursor = w.end
+                guard let slot = InsulinRules.slot(plan, at: w.start), slot.due >= plan.activeFrom,
+                      InsulinRules.handled(petId: pet.id, records: records, slot: slot) == nil,
+                      !petRests.contains(where: { $0.startedAt <= slot.due && ($0.endedAt.map { slot.due < $0 } ?? true) }) else { continue }
+                var fires = [(Kind.insulinDue, slot.due.addingTimeInterval(-TimeInterval(plan.leadMinutes * 60)))]
+                if plan.remindAgainMinutes > 0 { fires.append((.insulinAgain, slot.due.addingTimeInterval(TimeInterval(plan.remindAgainMinutes * 60)))) }
+                for (kind, fireAt) in fires where fireAt > now && fireAt <= end {
+                    if let quiet, quiet.enabled, !plan.ringDuringQuiet, inQuiet(MedSlots.hhmm(fireAt), quiet) { continue }
+                    entries.append(Entry(kind: kind, fireAt: minute(fireAt), due: slot.due, pet: pet, units: slot.units))
+                }
+            }
+        }
+        return Dictionary(grouping: entries) { "\($0.kind.rawValue)|\($0.fireAt.timeIntervalSince1970)" }.values.compactMap { group in
+            let sorted = group.sorted { $0.pet.createdAt < $1.pet.createdAt }
+            guard let first = sorted.first else { return nil }
+            let words = sorted.map { "\($0.pet.name) \(MedRules.number($0.units))단위" }
+            let body = words.count > 3 ? words.prefix(3).joined(separator: " · ") + " 외 \(words.count - 3)" : words.joined(separator: " · ")
+            let isDue = first.kind == .insulinDue
+            return Alert(id: "insulin.\(isDue ? "due" : "again").\(Int(first.fireAt.timeIntervalSince1970))", kind: first.kind, fireAt: first.fireAt,
+                         title: isDue ? "인슐린 · \(MedSlots.clockText(sorted.map(\.due).min() ?? first.due))" : "아직 인슐린 기록이 없어요",
+                         body: body, petId: first.pet.id)
+        }
+        .sorted { $0.fireAt < $1.fireAt }
     }
 
     /// 남은 약 알림(8-4c): 약방 '○일분'이 기준 이하가 되는 날 오전 10시에 한 번 '약방 · 프레드니솔론이 3일분 남았어요'.

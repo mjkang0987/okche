@@ -155,11 +155,14 @@ final class InsulinPlan {
     var slots: [InsulinSlot]
     var ringDuringQuiet: Bool
     var leadMinutes: Int
+    /// 안 맞혔으면 다시 알림 0(안 함)·10·30·60 — 맞는 시각 + 이 분에 구간 안 기록이 없으면 한 번 더(9-3).
+    var remindAgainMinutes: Int = 0
     var activeFrom: Date
     var activeUntil: Date?
 
     init(id: UUID = UUID(), now: Date = .now, petId: UUID, name: String? = nil, syringe: Syringe = .unknown,
-         slots: [InsulinSlot], ringDuringQuiet: Bool = false, leadMinutes: Int = 10, activeFrom: Date, activeUntil: Date? = nil) {
+         slots: [InsulinSlot], ringDuringQuiet: Bool = false, leadMinutes: Int = 10, remindAgainMinutes: Int = 0,
+         activeFrom: Date, activeUntil: Date? = nil) {
         self.id = id
         createdAt = now
         updatedAt = now
@@ -169,6 +172,7 @@ final class InsulinPlan {
         self.slots = slots
         self.ringDuringQuiet = ringDuringQuiet
         self.leadMinutes = leadMinutes
+        self.remindAgainMinutes = remindAgainMinutes
         self.activeFrom = activeFrom
         self.activeUntil = activeUntil
     }

@@ -24,6 +24,9 @@ struct PetRegisterView: View {
     }
     /// 저장한 뒤 닫히는 동안 한 번 더 눌러 두 번 저장되지 않게.
     @State private var saved = false
+    /// 당뇨 아이를 모시기 전 허락 안내 창(`NotifyAsk`, 9-3)과 묻는 중(두 번 눌러도 한 번만).
+    @State private var asking = false
+    @State private var checking = false
     @FocusState private var focused: PetRegistration.Field?
     @AppStorage("lastPetId") private var lastPetId = ""
 
@@ -66,6 +69,10 @@ struct PetRegisterView: View {
                 }
         }
         .background(OkcheColor.hanji)
+        .fullScreenCover(isPresented: $asking) {
+            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false; checking = false; commit() }
+        }
+        .transaction { $0.disablesAnimations = asking }
         // 숫자 자판에는 리턴 키가 없어 닫는 버튼을 붙인다.
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -97,8 +104,25 @@ struct PetRegisterView: View {
         if field != .birth, field != .insulinTimes { focused = field }
     }
 
+    /// 당뇨 아이면 저장 전에 허락 안내(9-3) — 시작하기에서 모시면 저장하자마자 탭 화면으로 바뀌어 뒤에 띄운 창이 사라져서.
     private func save() {
-        guard !saved, missing == nil else { return }
+        guard !saved, !checking, missing == nil else { return }
+        // 인슐린 시간 알림(설정 `notify.insulinTime`, 모든 아이 공통)을 꺼 두었으면 묻지 않는다.
+        guard form.hasDiabetes, (try? Setting.loadOrCreate(in: context))?.notify.insulinTime ?? true else { return commit() }
+        checking = true
+        Task {
+            if await MedReminders.shouldAsk() {
+                MedReminders.markAsked()
+                asking = true
+            } else {
+                checking = false
+                commit()
+            }
+        }
+    }
+
+    private func commit() {
+        guard !saved else { return }
         do {
             // 새로 모신 아이는 바로 지금 보는 아이(6-3).
             lastPetId = try form.save(in: context).id.uuidString

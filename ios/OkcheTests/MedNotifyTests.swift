@@ -22,8 +22,9 @@ final class MedNotifyTests: XCTestCase {
                     firstAt: firstAt, reminder: reminder, leadMinutes: lead, remindAgainMinutes: again, activeFrom: at(20, 9))
     }
     private func alerts(_ rows: [MedSchedule], records: [Record] = [], pets: [Pet]? = nil, rests: [RestPeriod] = [], meds: [Medication],
-                        on: Bool = true, now: Date? = nil) -> [MedNotify.Alert] {
-        MedNotify.alerts(rows, records: records, pets: pets ?? [kong, bori], rests: rests, meds: meds, medTimeOn: on, now: now ?? at(27, 12))
+                        on: Bool = true, now: Date? = nil, insulinExtra: [MedNotify.Alert] = []) -> [MedNotify.Alert] {
+        MedNotify.alerts(rows, records: records, pets: pets ?? [kong, bori], rests: rests, meds: meds, medTimeOn: on, extra: insulinExtra,
+                         now: now ?? at(27, 12))
     }
 
     override func setUp() async throws {
@@ -162,5 +163,112 @@ final class MedNotifyTests: XCTestCase {
         XCTAssertTrue(MedNotify.wantsReminders([daily]))
         XCTAssertFalse(MedNotify.wantsReminders([row(kong, p, ["08:00"], reminder: false)]))
         XCTAssertEqual(NotifySettingsView.weekly(WeightReminder(weekday: 7, time: "10:00")), "매주 일요일 오전 10시")
+    }
+
+    // MARK: 인슐린 알림(9-3) — 안드로이드 MedNotifyTest의 인슐린 경우와 같음.
+
+    private func insulinPlan(_ p: Pet, _ times: [(String, Double)] = [("08:00", 2), ("20:00", 1.5)], lead: Int = 10, again: Int = 0,
+                             ringDuringQuiet: Bool = true) -> InsulinPlan {
+        InsulinPlan(petId: p.id, slots: times.map { InsulinSlot(time: $0.0, units: $0.1) }, ringDuringQuiet: ringDuringQuiet,
+                    leadMinutes: lead, remindAgainMinutes: again, activeFrom: at(20, 9))
+    }
+    private func insulin(_ plans: [InsulinPlan], records: [Record] = [], pets: [Pet]? = nil, rests: [RestPeriod] = [], on: Bool = true,
+                         quiet: QuietHours? = nil, now: Date? = nil) -> [MedNotify.Alert] {
+        MedNotify.insulinAlerts(plans, records: records, pets: pets ?? [kong, bori], rests: rests, insulinTimeOn: on, quiet: quiet, now: now ?? at(27, 12))
+    }
+    private func shot(_ p: Pet, _ status: String, at time: Date) -> Record {
+        Record(petId: p.id, kind: .insulin, occurredAt: time, data: "{\"status\":\"\(status)\",\"units\":2}")
+    }
+
+    func testInsulinLeadAndWindow() {
+        let list = insulin([insulinPlan(kong)])
+        // 27일 12시부터 72시간: 27일 20:00, 28·29일 08:00·20:00, 30일 08:00 − 10분. 30일 20:00은 창 밖.
+        XCTAssertEqual(list.map(\.fireAt), [at(27, 19, 50), at(28, 7, 50), at(28, 19, 50), at(29, 7, 50), at(29, 19, 50), at(30, 7, 50)])
+        XCTAssertEqual(list.first?.title, "인슐린 · 오후 8:00")
+        XCTAssertEqual(list.first?.body, "콩이 1.5단위")
+        XCTAssertEqual(list.first?.kind, .insulinDue)
+        XCTAssertEqual(list.first?.petId, kong.id)
+        XCTAssertTrue(list.first?.id.hasPrefix("insulin.due.") ?? false)
+        XCTAssertTrue(insulin([insulinPlan(kong)], on: false).isEmpty)
+    }
+
+    func testInsulinHandledRestAndGone() {
+        let p = insulinPlan(kong)
+        // 저녁 구간(19:00~)에 미리 맞혔거나 건너뛰었으면 그 차례는 빠짐.
+        XCTAssertEqual(insulin([p], records: [shot(kong, "full", at: at(27, 19, 10))]).first?.fireAt, at(28, 7, 50))
+        XCTAssertEqual(insulin([p], records: [shot(kong, "skipped", at: at(27, 19, 10))]).first?.fireAt, at(28, 7, 50))
+        // 다른 아이 기록·구간 밖 기록은 상관없음.
+        XCTAssertEqual(insulin([p], records: [shot(bori, "full", at: at(27, 19, 10)), shot(kong, "full", at: at(27, 9))]).first?.fireAt, at(27, 19, 50))
+        // 휴양 중(28일 9시 끝)이면 그 안 차례 빠짐.
+        let rest = RestPeriod(petId: kong.id, startedAt: at(26, 9), endedAt: at(28, 9))
+        XCTAssertEqual(insulin([p], rests: [rest]).first?.fireAt, at(28, 19, 50))
+        let gone = Pet(now: at(3, 9), name: "별이", species: .cat, breed: "", furColor: "", memorializedAt: at(4, 9))
+        XCTAssertTrue(insulin([insulinPlan(gone)], pets: [gone]).isEmpty)
+        // 닫힌 계획은 안 울림.
+        let closed = insulinPlan(kong)
+        closed.activeUntil = at(25, 9)
+        XCTAssertTrue(insulin([closed]).isEmpty)
+    }
+
+    func testInsulinAgainQuietAndGrouping() {
+        // 다시 알림 30분: 차례 + 30분 '아직 인슐린 기록이 없어요'.
+        let list = insulin([insulinPlan(kong, again: 30)])
+        let again = list.first { $0.kind == .insulinAgain }
+        XCTAssertEqual(again?.fireAt, at(27, 20, 30))
+        XCTAssertEqual(again?.title, "아직 인슐린 기록이 없어요")
+        XCTAssertEqual(again?.body, "콩이 1.5단위")
+        // 08:30에 다시 걸면 막 지난 08:00 차례는 다시 알림(1시간 뒤 09:00)만 남음.
+        let late = insulin([insulinPlan(kong, again: 60)], now: at(27, 8, 30)).first
+        XCTAssertEqual(late?.kind, .insulinAgain)
+        XCTAssertEqual(late?.fireAt, at(27, 9))
+        // 밤 알림 쉬기(22:00~08:00) 안 07:50은 '밤에도 울리기'를 끈 계획만 빠짐.
+        let quiet = QuietHours(enabled: true, start: "22:00", end: "08:00")
+        XCTAssertTrue(insulin([insulinPlan(kong, ringDuringQuiet: true)], quiet: quiet).contains { $0.fireAt == at(28, 7, 50) })
+        XCTAssertFalse(insulin([insulinPlan(kong, ringDuringQuiet: false)], quiet: quiet).contains { $0.fireAt == at(28, 7, 50) })
+        XCTAssertTrue(insulin([insulinPlan(kong, ringDuringQuiet: false)], quiet: quiet).contains { $0.fireAt == at(27, 19, 50) })
+        // 같은 시각 두 아이는 하나로(먼저 모신 아이부터).
+        let both = insulin([insulinPlan(bori, [("20:00", 1)]), insulinPlan(kong)])
+        XCTAssertEqual(both.first?.body, "콩이 1.5단위 · 보리 1단위")
+        XCTAssertEqual(both.first?.petId, kong.id)
+    }
+
+    /// 탕약과 같은 시각이어도 따로, 합쳐 63개 + 이어짐 하나. 탕약 알림을 꺼도 인슐린은 그대로.
+    func testInsulinWithMed() {
+        let p = med("프레드니솔론")
+        let shots = insulin([insulinPlan(kong)])
+        let merged = alerts([row(kong, p, ["20:00"])], meds: [p], insulinExtra: shots)
+        XCTAssertEqual(merged.filter { $0.fireAt == at(27, 19, 50) }.map(\.kind), [.due, .insulinDue])
+        XCTAssertEqual(merged.last?.kind, .more)
+        XCTAssertEqual(alerts([row(kong, p, ["20:00"])], meds: [p], on: false, insulinExtra: shots).filter { $0.kind != .more }.map(\.id), shots.map(\.id))
+        let hourly = row(kong, p, [], lead: 0, freq: .everyNHours, hours: 1, firstAt: at(27, 12, 30))
+        let capped = alerts([hourly], meds: [p], insulinExtra: shots)
+        XCTAssertEqual(capped.count, 64)
+        XCTAssertEqual(capped.filter { $0.kind == .insulinDue }.count, shots.filter { $0.fireAt <= capped[62].fireAt }.count)
+        // 누르면 일기 탭에 그 아이(`insulinPetId`).
+        XCTAssertEqual(MedReminders.request(shots[0]).content.userInfo["insulinPetId"] as? String, kong.id.uuidString)
+        XCTAssertNil(MedReminders.request(shots[0]).content.userInfo["petId"])
+    }
+
+    /// 인슐린 설정: 다시 알림만 바꾸면 쓰는 줄을 그대로 고침(7장 — 새 줄 아님).
+    func testInsulinAgainChangeSameRow() throws {
+        context.insert(kong)
+        let plan = insulinPlan(kong)
+        context.insert(plan)
+        try context.save()
+        var form = InsulinSetup(pet: kong, context: context)
+        XCTAssertEqual(form.remindAgainMinutes, 0)
+        form.remindAgainMinutes = 30
+        try form.save(in: context)
+        let plans = try context.fetch(FetchDescriptor<InsulinPlan>())
+        XCTAssertEqual(plans.count, 1)
+        XCTAssertEqual(plans.first?.remindAgainMinutes, 30)
+        XCTAssertNil(plans.first?.activeUntil)
+        // 시간을 바꾸면 새 줄에도 다시 알림이 그대로.
+        form = InsulinSetup(pet: kong, context: context)
+        form.slots = [.init(time: "09:00", units: "2")]
+        try form.save(in: context)
+        let open = try InsulinPlan.open(for: kong.id, in: context)
+        XCTAssertEqual(open.first?.remindAgainMinutes, 30)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<InsulinPlan>()).count, 2)
     }
 }

@@ -23,6 +23,9 @@ struct InsulinSetupView: View {
         return petFieldLabel(field, slots: form.slots.map(\.id)).map { okcheNamed($0, message) } ?? message
     }
     @State private var saved = false
+    /// 알림을 켠 채 저장하면 허락 안내 창(`NotifyAsk`, 9-3) — 계획은 이미 저장됨.
+    @State private var asking = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var focused: PetRegistration.Field?
 
     init(form: InsulinSetup) {
@@ -50,9 +53,12 @@ struct InsulinSetupView: View {
                             note("병원에서 정해 준 양을 넣어 주세요. 일기의 '맞음' 버튼이 그 시간의 양으로 바로 기록해요. 양을 바꿀 땐 수의사와 먼저 상의하길 권해요.")
                         }
                         OkcheSwitchRow(title: "인슐린 시간 알림", detail: "끄면 모든 아이의 인슐린 알림이 멈춰요", isOn: $form.notify)
-                        OkcheSwitchRow(title: "밤에도 울리기", detail: "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요",
-                                       isOn: $form.ringDuringQuiet)
-                        leadPicker
+                        // 알림을 끄면 밤에도 울리기·알림 보낼 때·다시 알림은 숨김(9-3).
+                        if form.notify {
+                            OkcheSwitchRow(title: "밤에도 울리기", detail: "밤에 알림 쉬기 중에도 이 인슐린 알림은 울려요",
+                                           isOn: $form.ringDuringQuiet)
+                            reminderPickers
+                        }
                         SourceNote(text: diabetesSourceNote)
                     }
                     .padding(.horizontal, OkcheSpacing.space4)
@@ -73,6 +79,10 @@ struct InsulinSetupView: View {
                 }
         }
         .background(OkcheColor.hanji)
+        .fullScreenCover(isPresented: $asking) {
+            NotifyAskDialog(title: "인슐린 맞을 시간을 알려 드릴까요?") { asking = false; dismiss() }
+        }
+        .transaction { $0.disablesAnimations = asking }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar) // 탭 아래 화면은 하단 탭 없음(디자인 화면 짜임새)
         .toolbar {
@@ -90,9 +100,12 @@ struct InsulinSetupView: View {
         }
     }
 
-    /// 알림 보낼 때: 이름표 왼쪽, 고르기 칸 오른쪽.
-    private var leadPicker: some View {
-        OkcheMenuPicker(label: "알림 보낼 때", options: InsulinSetup.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes)
+    /// 알림 보낼 때·안 맞혔으면 다시 알림: 이름표 왼쪽, 고르기 칸 오른쪽. 두 칸을 같이 옆으로/아래로(약 추가와 같음).
+    @ViewBuilder private var reminderPickers: some View {
+        let inline = typeSize < .xLarge
+        OkcheMenuPicker(label: "알림 보낼 때", options: InsulinSetup.leadChoices.map { ($0.minutes, $0.title) }, selection: $form.leadMinutes, inline: inline)
+        OkcheMenuPicker(label: "안 맞혔으면 다시 알림", options: MedSchedules.againChoices.map { ($0.minutes, $0.title) },
+                        selection: $form.remindAgainMinutes, inline: inline)
     }
 
     private func note(_ text: String) -> some View {
@@ -105,7 +118,12 @@ struct InsulinSetupView: View {
             try form.save(in: context)
             failed = false
             saved = true
-            dismiss()
+            guard form.notify else { return dismiss() }
+            Task {
+                guard await MedReminders.shouldAsk() else { return dismiss() }
+                MedReminders.markAsked()
+                asking = true
+            }
         } catch {
             failed = true
             AccessibilityNotification.Announcement("저장하지 못했어요. 다시 해 주세요.").post()
